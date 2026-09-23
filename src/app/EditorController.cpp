@@ -141,11 +141,15 @@ void EditorController::setLibrary(AppLibrary *library)
 {
     if (m_library == library)
         return;
-    if (m_library)
+    if (m_library) {
         disconnect(m_library->service(), nullptr, this, nullptr);
+        disconnect(m_library, nullptr, this, nullptr);
+    }
     m_library = library;
-    if (m_library)
+    if (m_library) {
         connect(m_library->service(), &LibraryService::saveFinished, this, &EditorController::onSaveFinished);
+        connect(m_library, &AppLibrary::noteMetaChanged, this, &EditorController::onLibraryNoteChanged);
+    }
     emit libraryChanged();
     if (!m_pendingNoteId.isEmpty() && m_doc)
         openNote(std::exchange(m_pendingNoteId, {}));
@@ -279,14 +283,58 @@ bool EditorController::openNote(const QString &id)
     m_noteId = id;
     m_revision = record->revision;
     m_updatedAt = record->updatedAt;
+    m_deletedAt = record->deletedAt;
+    m_pinned = record->pinned;
     m_retryTimer.stop();
     m_retryCount = 0;
     loadBody(record->body);
     setSaveState(Saved);
     emit noteChanged();
+    emit noteMetaChanged();
     emit savedChanged();
     emit cursorRequested(m_doc->characterCount() - 1);
+    m_library->setLastNoteId(id);
     return true;
+}
+
+void EditorController::closeNote()
+{
+    m_idleTimer.stop();
+    m_capTimer.stop();
+    m_retryTimer.stop();
+    m_ticket = 0; // a late acknowledgement belongs to a note no longer shown
+    m_noteId.clear();
+    m_revision = m_updatedAt = m_deletedAt = 0;
+    m_pinned = false;
+    if (m_doc)
+        loadBody(RichDocument{{Block::paragraph()}});
+    setSaveState(Saved);
+    emit noteChanged();
+    emit noteMetaChanged();
+    emit savedChanged();
+}
+
+void EditorController::setPinned(bool pinned)
+{
+    if (m_library && !m_noteId.isEmpty() && pinned != m_pinned)
+        m_library->setPinned(m_noteId, pinned);
+}
+
+// Pinning, moving, deleting or recovering happened in the library; pick up
+// the note's new state, or let go of it if it's gone.
+void EditorController::onLibraryNoteChanged(const QString &noteId)
+{
+    if (noteId != m_noteId || !m_library)
+        return;
+    const auto record = m_library->service()->loadNote(noteId);
+    if (!record) {
+        closeNote();
+        return;
+    }
+    m_revision = std::max(m_revision, record->revision);
+    m_pinned = record->pinned;
+    m_deletedAt = record->deletedAt;
+    emit noteMetaChanged();
 }
 
 void EditorController::loadBody(const RichDocument &body)
@@ -320,7 +368,7 @@ void EditorController::reloadPresentation()
 
 void EditorController::onContentsChange(int position, int removed, int added)
 {
-    if (m_loading || m_noteId.isEmpty() || (removed == 0 && added == 0))
+    if (m_loading || m_noteId.isEmpty() || readOnly() || (removed == 0 && added == 0))
         return;
     if (m_applyingPending)
         return; // counted with the insertion it formats
@@ -410,7 +458,7 @@ void EditorController::onSaveFinished(quint64 ticket, const QString &noteId, con
     case SaveResult::Status::Saved:
         m_retryCount = 0;
         if (m_library)
-            m_library->notes()->applySaved(noteId, m_inFlightBody, result.updatedAt);
+            m_library->noteSaved(noteId, m_inFlightBody, result.updatedAt);
         if (noteId != m_noteId)
             return;
         m_revision = result.revision;

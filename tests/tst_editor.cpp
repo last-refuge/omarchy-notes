@@ -23,6 +23,7 @@
 #include <QQuickWindow>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QUrl>
 #include <QTest>
 #include <QTextBlock>
 #include <QTextDocument>
@@ -140,6 +141,25 @@ class TestEditor : public QObject
         return r;
     }
 
+    void resetView()
+    {
+        m_library->setSearchText({});
+        m_library->showKey(u"all"_s);
+    }
+
+    void call(const char *function, const QVariant &arg = {})
+    {
+        if (arg.isValid())
+            QMetaObject::invokeMethod(m_window, function, Q_ARG(QVariant, arg));
+        else
+            QMetaObject::invokeMethod(m_window, function);
+    }
+
+    QQuickItem *item(const char *name) const
+    {
+        return m_window->findChild<QQuickItem *>(QString::fromLatin1(name));
+    }
+
     void screenshot(const QString &name)
     {
         QDir().mkpath(QStringLiteral(SCREENSHOT_DIR));
@@ -164,7 +184,7 @@ private slots:
 
         m_theme = std::make_unique<ThemeController>();
         ThemeController::setInstance(m_theme.get());
-        m_library = std::make_unique<AppLibrary>(m_service.get());
+        m_library = std::make_unique<AppLibrary>(m_service.get(), m_dataDir.filePath(u"settings.ini"_s));
         AppLibrary::setInstance(m_library.get());
 
         m_engine = std::make_unique<QQmlApplicationEngine>();
@@ -472,6 +492,132 @@ private slots:
         m_window->resize(1200, 1300);
     }
 
+    void foldersAndNewNotes()
+    {
+        resetView();
+        const QVariantMap made = m_library->createFolder(u"Work"_s, {});
+        QVERIFY2(made.value(u"ok"_s).toBool(), qPrintable(made.value(u"error"_s).toString()));
+        const QString folder = made.value(u"id"_s).toString();
+        QVERIFY(!m_library->createFolder(u"work"_s, {}).value(u"ok"_s).toBool());
+
+        call("showView", folder);
+        QCOMPARE(m_library->currentKey(), folder);
+        QCOMPARE(m_library->viewTitle(), u"Work"_s);
+        QCOMPARE(m_library->notes()->count(), 0);
+        QVERIFY(!m_editor->hasNote()); // an empty folder opens nothing
+        screenshot(u"empty-folder"_s);
+
+        call("newNote");
+        QVERIFY(m_editor->hasNote());
+        QCOMPARE(m_service->loadNote(m_editor->noteId())->folderId, folder);
+        type(u"Standup"_s);
+        QVERIFY(m_editor->flush());
+        QCOMPARE(m_library->notes()->titleOf(m_editor->noteId()), u"Standup"_s);
+
+        QVERIFY(m_library->moveNote(m_editor->noteId(), {}));
+        QCOMPARE(m_library->notes()->count(), 0);
+        QCOMPARE(m_service->loadNote(m_editor->noteId())->folderId, QString());
+    }
+
+    void deleteAndRecoverFromTheList()
+    {
+        resetView();
+        const QString older = open(paragraphs({u"Alpha note"_s}));
+        const QString newer = open(paragraphs({u"Beta note"_s}));
+        QCOMPARE(m_library->notes()->idAt(0), newer);
+
+        item("noteListView")->forceActiveFocus();
+        QTest::keyClick(m_window, Qt::Key_Delete);
+        QVERIFY(m_service->loadNote(newer)->deletedAt > 0);
+        QCOMPARE(m_editor->noteId(), older); // the neighbour opens
+        QCOMPARE(m_library->notes()->indexOf(newer), -1);
+
+        call("showView", u"trash"_s);
+        QVERIFY(m_library->inTrash());
+        call("openNote", newer);
+        QVERIFY(m_editor->readOnly());
+        QVERIFY(m_text->property("readOnly").toBool());
+        setCursor(4);
+        type(u"xyz"_s);
+        QCOMPARE(current().plainText(), u"Beta note"_s); // read-only
+        screenshot(u"recently-deleted"_s);
+
+        call("recoverNote", newer);
+        QCOMPARE(m_service->loadNote(newer)->deletedAt, 0);
+        QCOMPARE(m_library->notes()->indexOf(newer), -1); // left the trash list
+    }
+
+    void deletePermanentlyAsksFirst()
+    {
+        resetView();
+        const QString doomed = open(paragraphs({u"Scratch"_s}));
+        QVERIFY(m_library->trashNote(doomed));
+        call("showView", u"trash"_s);
+        call("deleteForever", doomed);
+        QQuickItem *dialog = item("confirmDialog");
+        Q_UNUSED(dialog);
+        QObject *confirm = m_window->findChild<QObject *>(u"confirmDialog"_s);
+        QTRY_VERIFY(confirm->property("opened").toBool());
+        QVERIFY(m_service->loadNote(doomed)); // nothing happens until confirmed
+        QTest::keyClick(m_window, Qt::Key_Return);
+        QTRY_VERIFY(!m_service->loadNote(doomed));
+    }
+
+    void searchFromTheSearchField()
+    {
+        resetView();
+        const QString target = open(paragraphs({u"Quarterly benchmark review"_s, u"Numbers look good."_s}));
+        QVERIFY(m_editor->flush());
+        item("searchField")->forceActiveFocus();
+        type(u"quarterl bench"_s);
+        QVERIFY(m_library->searching());
+        QCOMPARE(m_library->viewTitle(), u"Search"_s);
+        // Results arrive asynchronously, with the matching words in bold.
+        auto snippetOfTarget = [&] {
+            const int row = m_library->notes()->indexOf(target);
+            return row < 0 ? QString() : m_library->notes()->index(row).data(NotesModel::SnippetRole).toString();
+        };
+        QTRY_VERIFY(snippetOfTarget().contains(u"<b>"_s));
+        screenshot(u"search"_s);
+
+        QTest::keyClick(m_window, Qt::Key_Return); // opens the best match
+        QCOMPARE(m_editor->noteId(), m_library->notes()->idAt(0));
+        item("searchField")->forceActiveFocus();
+        QTest::keyClick(m_window, Qt::Key_Escape);
+        QVERIFY(!m_library->searching());
+        QCOMPARE(m_library->viewTitle(), u"All Notes"_s);
+    }
+
+    void pinningPutsANoteFirst()
+    {
+        resetView();
+        open(paragraphs({u"Recent"_s}));
+        const QString oldest = m_library->notes()->idAt(m_library->notes()->count() - 1);
+        m_editor->openNote(oldest);
+        m_editor->setPinned(true);
+        QVERIFY(m_editor->pinned());
+        QCOMPARE(m_library->notes()->idAt(0), oldest);
+        QVERIFY(m_library->notes()->hasPinned());
+        screenshot(u"pinned"_s);
+        m_editor->setPinned(false);
+        QVERIFY(!m_library->notes()->hasPinned());
+    }
+
+    void deletingAFolderMovesItsNotesToTheTrash()
+    {
+        resetView();
+        const QString folder = m_library->createFolder(u"Temporary"_s, {}).value(u"id"_s).toString();
+        call("showView", folder);
+        call("newNote");
+        const QString inside = m_editor->noteId();
+        type(u"Inside"_s);
+        QVERIFY(m_editor->flush());
+        QVERIFY(m_library->deleteFolder(folder));
+        QCOMPARE(m_library->currentKey(), u"all"_s); // the view moved off the gone folder
+        QVERIFY(m_service->loadNote(inside)->deletedAt > 0);
+        QVERIFY(m_editor->noteId() != inside || m_editor->readOnly());
+    }
+
     void largeNoteResponsiveness()
     {
         RichDocument big;
@@ -514,6 +660,38 @@ private slots:
         qInfo("large note (%lld blocks): open %lld ms, worst keystroke %lld ms, snapshot for save %lld ms",
               qint64(body.blocks.size()), openMs, worstKeyMs, readMs);
         QVERIFY(m_editor->flush());
+    }
+    // Last: replaces the whole library.
+    void backupAndRestoreReopenTheLibrary()
+    {
+        resetView();
+        QTemporaryDir backups;
+        const QString kept = open(paragraphs({u"Before the backup"_s}));
+        QVERIFY(m_editor->flush());
+        const int notesBefore = m_service->noteCount();
+        const QVariantMap backup = m_library->backupTo(QUrl::fromLocalFile(backups.path()), u"nightly"_s);
+        QVERIFY2(backup.value(u"ok"_s).toBool(), qPrintable(backup.value(u"error"_s).toString()));
+
+        const QString later = open(paragraphs({u"After the backup"_s}));
+        QVERIFY(m_editor->flush());
+        const QUrl source = QUrl::fromLocalFile(backups.filePath(u"nightly"_s));
+        QVERIFY(m_library->inspectBackup(source).value(u"ok"_s).toBool());
+
+        m_editor->closeNote();
+        const QVariantMap restored = m_library->restoreFrom(source);
+        QVERIFY2(restored.value(u"ok"_s).toBool(), qPrintable(restored.value(u"error"_s).toString()));
+        QCOMPARE(m_service->noteCount(), notesBefore);
+        QVERIFY(!m_service->loadNote(later));
+        QTRY_VERIFY(m_editor->hasNote()); // the window reopened a note
+
+        // The restored library is fully usable.
+        m_editor->openNote(kept);
+        m_text->forceActiveFocus();
+        setCursor(doc()->characterCount() - 1);
+        type(u"!"_s);
+        QVERIFY(m_editor->flush());
+        QCOMPARE(persisted().plainText(), u"Before the backup!"_s);
+        QDir(restored.value(u"previous"_s).toString()).removeRecursively();
     }
 };
 

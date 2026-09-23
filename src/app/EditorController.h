@@ -35,6 +35,10 @@ class EditorController : public QObject
     Q_PROPERTY(int maxImageWidth READ maxImageWidth WRITE setMaxImageWidth NOTIFY styleChanged)
 
     Q_PROPERTY(QString noteId READ noteId NOTIFY noteChanged)
+    Q_PROPERTY(bool hasNote READ hasNote NOTIFY noteChanged)
+    // Notes in Recently Deleted open read-only until recovered.
+    Q_PROPERTY(bool readOnly READ readOnly NOTIFY noteMetaChanged)
+    Q_PROPERTY(bool pinned READ pinned NOTIFY noteMetaChanged)
     Q_PROPERTY(QString editedText READ editedText NOTIFY savedChanged)
     Q_PROPERTY(SaveState saveState READ saveState NOTIFY saveStateChanged)
     Q_PROPERTY(QString saveError READ saveError NOTIFY saveStateChanged)
@@ -99,6 +103,9 @@ public:
     void setMaxImageWidth(int width);
 
     QString noteId() const { return m_noteId; }
+    bool hasNote() const { return !m_noteId.isEmpty(); }
+    bool readOnly() const { return m_deletedAt != 0; }
+    bool pinned() const { return m_pinned; }
     QString editedText() const;
     SaveState saveState() const { return m_saveState; }
     QString saveError() const { return m_saveError; }
@@ -120,6 +127,9 @@ public:
 
     // Notes
     Q_INVOKABLE bool openNote(const QString &id);
+    // Leaves the editor empty. Call flush() first to keep changes.
+    Q_INVOKABLE void closeNote();
+    Q_INVOKABLE void setPinned(bool pinned);
     // Saves outstanding changes and waits for the result; false if they
     // could not be saved (the draft stays in the editor).
     Q_INVOKABLE bool flush();
@@ -170,6 +180,7 @@ signals:
     void selectionChanged();
     void styleChanged();
     void noteChanged();
+    void noteMetaChanged();
     void savedChanged();
     void saveStateChanged();
     void formatChanged();
@@ -184,6 +195,7 @@ signals:
 private:
     void onContentsChange(int position, int removed, int added);
     void onSaveFinished(quint64 ticket, const QString &noteId, const onotes::SaveResult &result);
+    void onLibraryNoteChanged(const QString &noteId);
     void saveNow();
     void applyPendingFormat(int start, int end);
     QTextCharFormat pendingFormatAt(const QTextCursor &cursor) const;
@@ -223,6 +235,8 @@ private:
     QString m_pendingNoteId; // requested before the document was attached
     qint64 m_revision = 0;
     qint64 m_updatedAt = 0;
+    qint64 m_deletedAt = 0;
+    bool m_pinned = false;
     bool m_loading = false;
 
     // Autosave bookkeeping: every edit bumps m_generation; a save snapshots

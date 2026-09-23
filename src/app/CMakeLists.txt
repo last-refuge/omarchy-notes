@@ -15,6 +15,10 @@ qt_add_qml_module(notes_app_lib
         qml/ToolIcon.qml
         qml/NoteLinkPicker.qml
         qml/Toast.qml
+        qml/Sidebar.qml
+        qml/FolderNameDialog.qml
+        qml/ConfirmDialog.qml
+        qml/MoveNoteDialog.qml
     RESOURCES
         icons/compose.svg
         icons/bullets.svg
@@ -27,6 +31,16 @@ qt_add_qml_module(notes_app_lib
         icons/highlight.svg
         icons/back.svg
         icons/pin.svg
+        icons/trash.svg
+        icons/folder.svg
+        icons/folder-new.svg
+        icons/all-notes.svg
+        icons/note.svg
+        icons/search.svg
+        icons/sidebar.svg
+        icons/more.svg
+        icons/recover.svg
+        icons/close.svg
 )
 
 target_include_directories(notes_app_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

@@ -14,6 +14,11 @@ Rectangle {
     property bool narrow: false
     signal backRequested()
     signal openNoteRequested(string noteId)
+    signal newNoteRequested()
+    signal deleteRequested()
+    signal recoverRequested()
+    signal deleteForeverRequested()
+    signal notice(string message)
 
     function focusEditor() { textArea.forceActiveFocus() }
 
@@ -38,7 +43,7 @@ Rectangle {
         onCursorRequested: position => textArea.cursorPosition = position
         onSelectionRequested: (start, end) => textArea.select(start, end)
         onOpenNoteRequested: noteId => root.openNoteRequested(noteId)
-        onNotice: message => toast.show(message)
+        onNotice: message => root.notice(message)
     }
 
     ColumnLayout {
@@ -46,121 +51,144 @@ Rectangle {
         spacing: 0
 
         // ------------------------------------------------------------ toolbar
-        Flow {
-            id: toolbar
+        RowLayout {
             Layout.fillWidth: true
             Layout.leftMargin: 10
             Layout.rightMargin: 10
             Layout.topMargin: 8
             Layout.bottomMargin: 8
             spacing: 2
-            Accessible.role: Accessible.ToolBar
-            Accessible.name: qsTr("Formatting")
 
             ToolIcon {
+                Layout.alignment: Qt.AlignTop
                 visible: root.narrow
                 iconName: "back"
                 text: qsTr("Back to notes")
                 onClicked: root.backRequested()
             }
 
-            ToolIcon {
-                id: styleButton
-                text: [qsTr("Body"), qsTr("Title"), qsTr("Heading"), qsTr("Subheading")][editor.blockStyle] + " ▾"
-                font.pixelSize: 13
-                width: 104
-                onClicked: styleMenu.popup(styleButton, 0, styleButton.height)
-                Menu {
-                    id: styleMenu
-                    MenuItem { text: qsTr("Title"); checkable: true; checked: editor.blockStyle === 1; onTriggered: editor.setBlockStyle(1) }
-                    MenuItem { text: qsTr("Heading"); checkable: true; checked: editor.blockStyle === 2; onTriggered: editor.setBlockStyle(2) }
-                    MenuItem { text: qsTr("Subheading"); checkable: true; checked: editor.blockStyle === 3; onTriggered: editor.setBlockStyle(3) }
-                    MenuItem { text: qsTr("Body"); checkable: true; checked: editor.blockStyle === 0; onTriggered: editor.setBlockStyle(0) }
+            Flow {
+                id: toolbar
+                readonly property bool editable: editor.hasNote && !editor.readOnly
+                Layout.fillWidth: true
+                spacing: 2
+                enabled: editable
+                opacity: editable ? 1 : 0.35
+                Accessible.role: Accessible.ToolBar
+                Accessible.name: qsTr("Formatting")
+
+                ToolIcon {
+                    id: styleButton
+                    text: [qsTr("Body"), qsTr("Title"), qsTr("Heading"), qsTr("Subheading")][editor.blockStyle] + " ▾"
+                    font.pixelSize: 13
+                    width: 104
+                    onClicked: styleMenu.popup(styleButton, 0, styleButton.height)
+                    Menu {
+                        id: styleMenu
+                        MenuItem { text: qsTr("Title"); checkable: true; checked: editor.blockStyle === 1; onTriggered: editor.setBlockStyle(1) }
+                        MenuItem { text: qsTr("Heading"); checkable: true; checked: editor.blockStyle === 2; onTriggered: editor.setBlockStyle(2) }
+                        MenuItem { text: qsTr("Subheading"); checkable: true; checked: editor.blockStyle === 3; onTriggered: editor.setBlockStyle(3) }
+                        MenuItem { text: qsTr("Body"); checkable: true; checked: editor.blockStyle === 0; onTriggered: editor.setBlockStyle(0) }
+                    }
                 }
-            }
 
-            ToolSeparator {}
+                ToolSeparator {}
 
-            ToolIcon {
-                text: qsTr("Bold"); shortcutHint: "Ctrl+B"
-                font.bold: true; font.pixelSize: 15
-                active: editor.bold
-                display: AbstractButton.TextOnly
-                contentItem: Text { text: "B"; font.bold: true; font.pixelSize: 15; color: Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                onClicked: root.toggleMark(NoteEditor.Bold)
-            }
-            ToolIcon {
-                text: qsTr("Italic"); shortcutHint: "Ctrl+I"
-                active: editor.italic
-                contentItem: Text { text: "I"; font.italic: true; font.pixelSize: 15; font.family: "serif"; color: Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                onClicked: root.toggleMark(NoteEditor.Italic)
-            }
-            ToolIcon {
-                text: qsTr("Underline"); shortcutHint: "Ctrl+U"
-                active: editor.underline
-                contentItem: Text { text: "U"; font.underline: true; font.pixelSize: 15; color: Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                onClicked: root.toggleMark(NoteEditor.Underline)
-            }
-            ToolIcon {
-                text: qsTr("Strikethrough"); shortcutHint: "Ctrl+Shift+X"
-                active: editor.strikethrough
-                contentItem: Text { text: "S"; font.strikeout: true; font.pixelSize: 15; color: Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                onClicked: root.toggleMark(NoteEditor.Strikethrough)
-            }
-            ToolIcon {
-                iconName: "highlight"; text: qsTr("Highlight"); shortcutHint: "Ctrl+Shift+Y"
-                active: editor.highlight
-                onClicked: root.toggleMark(NoteEditor.Highlight)
-            }
-
-            ToolSeparator {}
-
-            ToolIcon {
-                iconName: "bullets"; text: qsTr("Bulleted list"); shortcutHint: "Ctrl+Shift+8"
-                active: editor.listKind === NoteEditor.BulletList
-                onClicked: editor.toggleList(NoteEditor.BulletList)
-            }
-            ToolIcon {
-                iconName: "numbers"; text: qsTr("Numbered list"); shortcutHint: "Ctrl+Shift+7"
-                active: editor.listKind === NoteEditor.OrderedList
-                onClicked: editor.toggleList(NoteEditor.OrderedList)
-            }
-            ToolIcon {
-                iconName: "checklist"; text: qsTr("Checklist"); shortcutHint: "Ctrl+Shift+L"
-                active: editor.listKind === NoteEditor.CheckList
-                onClicked: editor.toggleList(NoteEditor.CheckList)
-            }
-
-            ToolSeparator {}
-
-            ToolIcon {
-                id: tableButton
-                iconName: "table"
-                text: editor.inTable ? qsTr("Table options") : qsTr("Insert table")
-                shortcutHint: editor.inTable ? "" : "Ctrl+Alt+T"
-                active: editor.inTable
-                onClicked: editor.inTable ? tableMenu.popup(tableButton, 0, tableButton.height)
-                                          : editor.insertTable(2, 2)
-                Menu {
-                    id: tableMenu
-                    MenuItem { text: qsTr("Add Row Below"); onTriggered: editor.addTableRow() }
-                    MenuItem { text: qsTr("Add Column After"); onTriggered: editor.addTableColumn() }
-                    MenuSeparator {}
-                    MenuItem { text: qsTr("Delete Row"); onTriggered: editor.removeTableRow() }
-                    MenuItem { text: qsTr("Delete Column"); onTriggered: editor.removeTableColumn() }
+                ToolIcon {
+                    text: qsTr("Bold"); shortcutHint: "Ctrl+B"
+                    font.bold: true; font.pixelSize: 15
+                    active: editor.bold
+                    display: AbstractButton.TextOnly
+                    contentItem: Text { text: "B"; font.bold: true; font.pixelSize: 15; color: Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                    onClicked: root.toggleMark(NoteEditor.Bold)
                 }
-            }
-            ToolIcon {
-                iconName: "image"; text: qsTr("Insert image")
-                onClicked: imageDialog.open()
-            }
-            ToolIcon {
-                iconName: "attach"; text: qsTr("Attach file"); shortcutHint: "Ctrl+Shift+A"
-                onClicked: attachDialog.open()
-            }
-            ToolIcon {
-                iconName: "link"; text: qsTr("Link to note"); shortcutHint: "Ctrl+L"
-                onClicked: linkPicker.open()
+                ToolIcon {
+                    text: qsTr("Italic"); shortcutHint: "Ctrl+I"
+                    active: editor.italic
+                    contentItem: Text { text: "I"; font.italic: true; font.pixelSize: 15; font.family: "serif"; color: Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                    onClicked: root.toggleMark(NoteEditor.Italic)
+                }
+                ToolIcon {
+                    text: qsTr("Underline"); shortcutHint: "Ctrl+U"
+                    active: editor.underline
+                    contentItem: Text { text: "U"; font.underline: true; font.pixelSize: 15; color: Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                    onClicked: root.toggleMark(NoteEditor.Underline)
+                }
+                ToolIcon {
+                    text: qsTr("Strikethrough"); shortcutHint: "Ctrl+Shift+X"
+                    active: editor.strikethrough
+                    contentItem: Text { text: "S"; font.strikeout: true; font.pixelSize: 15; color: Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                    onClicked: root.toggleMark(NoteEditor.Strikethrough)
+                }
+                ToolIcon {
+                    iconName: "highlight"; text: qsTr("Highlight"); shortcutHint: "Ctrl+Shift+Y"
+                    active: editor.highlight
+                    onClicked: root.toggleMark(NoteEditor.Highlight)
+                }
+
+                ToolSeparator {}
+
+                ToolIcon {
+                    iconName: "bullets"; text: qsTr("Bulleted list"); shortcutHint: "Ctrl+Shift+8"
+                    active: editor.listKind === NoteEditor.BulletList
+                    onClicked: editor.toggleList(NoteEditor.BulletList)
+                }
+                ToolIcon {
+                    iconName: "numbers"; text: qsTr("Numbered list"); shortcutHint: "Ctrl+Shift+7"
+                    active: editor.listKind === NoteEditor.OrderedList
+                    onClicked: editor.toggleList(NoteEditor.OrderedList)
+                }
+                ToolIcon {
+                    iconName: "checklist"; text: qsTr("Checklist"); shortcutHint: "Ctrl+Shift+L"
+                    active: editor.listKind === NoteEditor.CheckList
+                    onClicked: editor.toggleList(NoteEditor.CheckList)
+                }
+
+                ToolSeparator {}
+
+                ToolIcon {
+                    id: tableButton
+                    iconName: "table"
+                    text: editor.inTable ? qsTr("Table options") : qsTr("Insert table")
+                    shortcutHint: editor.inTable ? "" : "Ctrl+Alt+T"
+                    active: editor.inTable
+                    onClicked: editor.inTable ? tableMenu.popup(tableButton, 0, tableButton.height)
+                                              : editor.insertTable(2, 2)
+                    Menu {
+                        id: tableMenu
+                        MenuItem { text: qsTr("Add Row Below"); onTriggered: editor.addTableRow() }
+                        MenuItem { text: qsTr("Add Column After"); onTriggered: editor.addTableColumn() }
+                        MenuSeparator {}
+                        MenuItem { text: qsTr("Delete Row"); onTriggered: editor.removeTableRow() }
+                        MenuItem { text: qsTr("Delete Column"); onTriggered: editor.removeTableColumn() }
+                    }
+                }
+                ToolIcon {
+                    iconName: "image"; text: qsTr("Insert image")
+                    onClicked: imageDialog.open()
+                }
+                ToolIcon {
+                    iconName: "attach"; text: qsTr("Attach file"); shortcutHint: "Ctrl+Shift+A"
+                    onClicked: attachDialog.open()
+                }
+                ToolIcon {
+                    iconName: "link"; text: qsTr("Link to note"); shortcutHint: "Ctrl+L"
+                    onClicked: linkPicker.open()
+                }
+
+                ToolSeparator {}
+
+                ToolIcon {
+                    iconName: "pin"
+                    text: editor.pinned ? qsTr("Unpin note") : qsTr("Pin note")
+                    active: editor.pinned
+                    onClicked: editor.setPinned(!editor.pinned)
+                }
+                ToolIcon {
+                    iconName: "trash"
+                    text: qsTr("Delete note")
+                    onClicked: root.deleteRequested()
+                }
             }
         }
 
@@ -170,12 +198,36 @@ Rectangle {
             color: Theme.divider
         }
 
+        // Notes in Recently Deleted open read-only.
+        Rectangle {
+            visible: editor.readOnly
+            Layout.fillWidth: true
+            Layout.preferredHeight: banner.implicitHeight + 16
+            color: Theme.raised
+            RowLayout {
+                id: banner
+                anchors.fill: parent
+                anchors.leftMargin: 16
+                anchors.rightMargin: 10
+                spacing: 8
+                Label {
+                    Layout.fillWidth: true
+                    text: qsTr("This note is in Recently Deleted. Recover it to make changes.")
+                    wrapMode: Text.Wrap
+                    color: Theme.text
+                }
+                ToolIcon { iconName: "recover"; text: qsTr("Recover"); display: AbstractButton.TextBesideIcon; implicitWidth: implicitContentWidth + 20; onClicked: root.recoverRequested() }
+                ToolIcon { text: qsTr("Delete Permanently…"); onClicked: root.deleteForeverRequested() }
+            }
+        }
+
         // ------------------------------------------------------------ document
         ScrollView {
             id: scroller
             Layout.fillWidth: true
             Layout.fillHeight: true
             contentWidth: availableWidth
+            visible: editor.hasNote
 
             TextArea {
                 id: textArea
@@ -185,6 +237,7 @@ Rectangle {
 
                 textFormat: TextEdit.RichText
                 wrapMode: TextEdit.Wrap
+                readOnly: editor.readOnly || !editor.hasNote
                 selectByMouse: true
                 persistentSelection: true
                 focus: true
@@ -258,6 +311,28 @@ Rectangle {
             }
         }
 
+        // Nothing open (empty folder, or the note was deleted).
+        ColumnLayout {
+            visible: !editor.hasNote
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 12
+            Item { Layout.fillHeight: true }
+            Label {
+                Layout.alignment: Qt.AlignHCenter
+                text: qsTr("No note selected")
+                font.pixelSize: 16
+                font.weight: Font.DemiBold
+                color: Theme.secondaryText
+            }
+            Button {
+                Layout.alignment: Qt.AlignHCenter
+                text: qsTr("New Note")
+                onClicked: root.newNoteRequested()
+            }
+            Item { Layout.fillHeight: true }
+        }
+
         // ------------------------------------------------------------ status
         Rectangle {
             Layout.fillWidth: true
@@ -265,6 +340,7 @@ Rectangle {
             color: Theme.divider
         }
         RowLayout {
+            visible: editor.hasNote && !editor.readOnly
             Layout.fillWidth: true
             Layout.preferredHeight: 30
             Layout.leftMargin: 14
@@ -307,13 +383,6 @@ Rectangle {
                 onClicked: editor.keepMyVersion()
             }
         }
-    }
-
-    Toast {
-        id: toast
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 44
     }
 
     NoteLinkPicker {
@@ -364,6 +433,6 @@ Rectangle {
     Shortcut { sequence: "Ctrl+]"; enabled: textArea.activeFocus; onActivated: editor.indent() }
     Shortcut { sequence: "Ctrl+["; enabled: textArea.activeFocus; onActivated: editor.outdent() }
     Shortcut { sequence: "Ctrl+Alt+T"; enabled: textArea.activeFocus; onActivated: editor.insertTable(2, 2) }
-    Shortcut { sequence: "Ctrl+Shift+A"; onActivated: attachDialog.open() }
-    Shortcut { sequence: "Ctrl+L"; onActivated: linkPicker.open() }
+    Shortcut { sequence: "Ctrl+Shift+A"; enabled: toolbar.editable; onActivated: attachDialog.open() }
+    Shortcut { sequence: "Ctrl+L"; enabled: toolbar.editable; onActivated: linkPicker.open() }
 }
