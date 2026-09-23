@@ -14,6 +14,18 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+## Install (per user)
+
+This installs the binary to `~/.local/bin`, plus a desktop entry and icon so Notes appears in the app launcher:
+
+```bash
+cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$HOME/.local"
+cmake --build build-release
+cmake --install build-release
+```
+
+Notes live in `~/.local/share/omarchy-notes`. Reinstalling or removing the app never touches them.
+
 ## Run
 
 ```bash
@@ -22,7 +34,7 @@ ctest --test-dir build --output-on-failure
 
 - `--data-dir <dir>` uses a separate library, which is useful for trying things out. The default is `$XDG_DATA_HOME/omarchy-notes`.
 - `--new` starts with a new note.
-- `--no-samples` skips the sample notes in an empty library.
+- `--samples` fills an empty library with sample notes (a meeting note with a table, image and PDF; research links; a checklist).
 - `--simulate-save-failure` makes saves fail, to exercise the failure path. Ctrl+Alt+Shift+F toggles it at runtime.
 
 ## Layout

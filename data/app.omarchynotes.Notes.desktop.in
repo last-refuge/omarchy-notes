@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Notes
+GenericName=Notes
+Comment=Rich notes with checklists, tables and attachments
+Exec=@ONOTES_BIN@
+Icon=@ONOTES_APP_ID@
+Terminal=false
+Categories=Office;
+Keywords=notes;notebook;checklist;todo;omarchy;
+StartupNotify=true
+StartupWMClass=@ONOTES_APP_ID@

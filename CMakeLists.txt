@@ -15,13 +15,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Qt 6.8 is the LTS floor; the spike relies on TextEdit.textDocument and
-# TextEdit.cursorSelection (6.7+).
+# Qt 6.8 is the LTS floor; the editor relies on TextEdit.textDocument (6.7+).
 find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Test)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SQLITE3 REQUIRED IMPORTED_TARGET sqlite3>=3.35)
 
 qt_standard_project_setup(REQUIRES 6.8)
+include(GNUInstallDirs)
 
 add_compile_options(-Wall -Wextra -Wpedantic)
 

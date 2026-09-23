@@ -55,6 +55,8 @@ ApplicationWindow {
         const first = window.initialNoteId || Library.notes.idAt(0)
         if (first)
             openNote(first)
+        else
+            newNote() // an empty library opens straight into a note
         editorPane.focusEditor()
     }
 

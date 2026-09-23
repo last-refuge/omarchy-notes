@@ -32,10 +32,10 @@ int main(int argc, char *argv[])
     const QCommandLineOption dataDir(u"data-dir"_s, u"Use the library in <dir>."_s, u"dir"_s);
     const QCommandLineOption newNote(u"new"_s, u"Start with a new note."_s);
     const QCommandLineOption openNote(u"note"_s, u"Open the note with <id>."_s, u"id"_s);
-    const QCommandLineOption noSamples(u"no-samples"_s, u"Don't add sample notes to an empty library."_s);
+    const QCommandLineOption samples(u"samples"_s, u"Add sample notes if the library is empty."_s);
     const QCommandLineOption failSaves(u"simulate-save-failure"_s,
                                        u"Make saves fail (for testing failure handling)."_s);
-    parser.addOptions({dataDir, newNote, openNote, noSamples, failSaves});
+    parser.addOptions({dataDir, newNote, openNote, samples, failSaves});
     parser.process(app);
 
     const onotes::LibraryPaths paths = parser.isSet(dataDir)
@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
         std::fprintf(stderr, "Could not open the notes library: %s\n", qPrintable(error));
         return 1;
     }
-    if (!parser.isSet(noSamples) && service.listNotes().isEmpty()) {
+    if (parser.isSet(samples) && service.listNotes().isEmpty()) {
         if (onotes::SampleLibrary::seed(service, &error).isEmpty())
             std::fprintf(stderr, "Could not add sample notes: %s\n", qPrintable(error));
     }
