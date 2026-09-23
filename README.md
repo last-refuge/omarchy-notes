@@ -51,11 +51,14 @@ The idea is simple: Apple Notes' easy note-taking, on Linux. Open it, start typi
 
 ## 🚀 Install
 
-**From the AUR** (on Omarchy or any Arch system):
+**From the latest release** (on Omarchy or any Arch system):
 
 ```bash
-yay -S omarchy-notes
+sudo pacman -U https://github.com/last-refuge/omarchy-notes/releases/download/v1.0.0/omarchy-notes-1.0.0-1-x86_64.pkg.tar.zst
 ```
+
+> [!NOTE]
+> **Coming soon to the AUR.** The AUR has paused new account sign-ups while it deals with a wave of automated registrations. Omarchy Notes will be published there as soon as registration reopens, and then `yay -S omarchy-notes` will work too. Until then, the package above is the same one the AUR recipe builds.
 
 Then press <kbd>Super</kbd> + <kbd>Space</kbd> and search for **Omarchy Notes**.
 

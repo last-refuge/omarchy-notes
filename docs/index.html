@@ -96,7 +96,7 @@
   .top nav a:hover { color: var(--ink); }
 
   /* ---------- hero ---------- */
-  .hero { padding-block: clamp(32px, 7vw, 72px) 0; display: grid; gap: 28px; }
+  .hero { padding-block: clamp(32px, 7vw, 72px) 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; }
   .hero h1 {
     font-size: clamp(2.6rem, 7vw, 4.8rem);
     font-weight: 800;
@@ -105,16 +105,18 @@
     max-width: 14ch;
   }
   .hero .lede { font-size: clamp(1.1rem, 2.2vw, 1.3rem); color: var(--ink-2); max-width: 38rem; }
-  .cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; min-width: 0; }
   .command {
     display: inline-flex; align-items: center; gap: 12px;
     background: var(--terminal); color: var(--terminal-ink);
     font-family: var(--mono); font-size: 0.95rem;
     padding: 10px 10px 10px 16px; border-radius: 10px;
-    max-width: 100%; overflow-x: auto;
+    max-width: 100%; min-width: 0;
   }
   .command .prompt { color: var(--terminal-dim); user-select: none; }
-  .command code { white-space: nowrap; }
+  .command code { white-space: nowrap; overflow-x: auto; min-width: 0; flex: 1 1 auto; scrollbar-width: thin; }
+  .copy { flex: none; }
+  .soon { color: var(--ink-2); font-size: 0.9rem; margin-top: -16px; }
   .copy {
     font: 600 0.8rem var(--body); cursor: pointer;
     background: transparent; color: var(--terminal-ink);
@@ -165,10 +167,16 @@
   .points li::before { content: ""; width: 10px; height: 10px; margin-top: 0.55em; border-radius: 50%; background: var(--accent); }
   .points b { color: var(--ink); font-weight: 600; }
 
-  .install { display: grid; gap: 22px; }
-  .step { display: grid; gap: 8px; }
+  .install { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  .step { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .step h3 { font-size: 1.1rem; font-weight: 700; }
   .step p { color: var(--ink-2); }
+  .step .note {
+    font-size: 0.92rem; padding: 10px 14px; border-radius: 8px;
+    border-left: 3px solid var(--accent);
+    background: color-mix(in srgb, var(--ink-2) 8%, transparent);
+  }
+  .step .note code { font-family: var(--mono); font-size: 0.88em; }
   pre.block {
     margin: 0; background: var(--terminal); color: var(--terminal-ink);
     font-family: var(--mono); font-size: 0.9rem; line-height: 1.7;
@@ -205,11 +213,12 @@
       <p class="lede">Apple Notes' easy capture, rebuilt as a fast native app for your desktop. Start typing and it's saved: checklists, tables, images, <span class="tag">#tags</span> and search, stored on your machine and dressed in your theme.</p>
       <div class="cta">
         <div class="command" aria-label="Install command">
-          <span class="prompt">$</span><code id="aur-cmd">yay -S omarchy-notes</code>
-          <button class="copy" type="button" data-copy="aur-cmd">Copy</button>
+          <span class="prompt">$</span><code id="install-cmd">sudo pacman -U https://github.com/last-refuge/omarchy-notes/releases/download/v1.0.0/omarchy-notes-1.0.0-1-x86_64.pkg.tar.zst</code>
+          <button class="copy" type="button" data-copy="install-cmd">Copy</button>
         </div>
         <a class="secondary" href="#install">Other ways to install</a>
       </div>
+      <p class="soon">Coming soon to the AUR, once it reopens new account sign-ups.</p>
       <div class="shot">
         <img src="images/screenshot-dark.png" width="1240" height="780"
              alt="Omarchy Notes in the Kanagawa theme: a folder sidebar with tags, a note list, and a meeting note with headings, round checkboxes and a table">
@@ -274,9 +283,10 @@
       </div>
       <div class="install">
         <div class="step">
-          <h3>From the AUR</h3>
-          <p>On Omarchy or any Arch system:</p>
-          <div class="command"><span class="prompt">$</span><code id="aur-cmd-2">yay -S omarchy-notes</code><button class="copy" type="button" data-copy="aur-cmd-2">Copy</button></div>
+          <h3>From the latest release</h3>
+          <p>On Omarchy or any Arch system, install the package from <a href="https://github.com/last-refuge/omarchy-notes/releases/latest">GitHub Releases</a>:</p>
+          <div class="command"><span class="prompt">$</span><code id="install-cmd-2">sudo pacman -U https://github.com/last-refuge/omarchy-notes/releases/download/v1.0.0/omarchy-notes-1.0.0-1-x86_64.pkg.tar.zst</code><button class="copy" type="button" data-copy="install-cmd-2">Copy</button></div>
+          <p class="note"><b>Coming soon to the AUR.</b> The AUR has paused new account sign-ups while it deals with a wave of automated registrations. Omarchy Notes will be published there as soon as registration reopens, and then <code>yay -S omarchy-notes</code> will work too.</p>
         </div>
         <div class="step">
           <h3>Then open it</h3>
