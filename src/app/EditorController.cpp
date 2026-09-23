@@ -127,6 +127,7 @@ EditorController::EditorController(QObject *parent) : QObject(parent)
             recountMatches();
         decorate(m_decorateFrom, m_decorateTo);
         m_decorateFrom = m_decorateTo = -1;
+        rebuildOverlays();
     });
 
     if (ThemeController *theme = ThemeController::instance())
@@ -351,6 +352,7 @@ void EditorController::loadBody(const RichDocument &body)
     if (!m_findText.isEmpty())
         recountMatches();
     decorateAll();
+    rebuildOverlays();
     updateFormatState();
 }
 
@@ -1079,9 +1081,15 @@ bool EditorController::handleBackspace()
 
 void EditorController::toggleCheckAtCursor()
 {
-    if (!m_doc)
+    if (m_doc)
+        toggleCheckAt(textCursor().position());
+}
+
+void EditorController::toggleCheckAt(int position)
+{
+    if (!m_doc || readOnly())
         return;
-    const QTextBlock block = textCursor().block();
+    const QTextBlock block = m_doc->findBlock(position);
     QTextBlockFormat bf = block.blockFormat();
     if (bf.marker() == QTextBlockFormat::MarkerType::NoMarker)
         return;
@@ -1394,6 +1402,61 @@ QString EditorController::tagAt(int position) const
             return m.tag;
     }
     return {};
+}
+
+// ---------------------------------------------------------------- overlays
+
+void EditorController::rebuildOverlays()
+{
+    QVariantList next;
+    if (m_doc) {
+        for (QTextBlock block = m_doc->begin(); block.isValid(); block = block.next()) {
+            const auto marker = block.blockFormat().marker();
+            if (marker != QTextBlockFormat::MarkerType::NoMarker && block.textList()) {
+                QString label = block.text().trimmed();
+                label.remove(QChar(kObjectReplacement));
+                next.append(QVariantMap{{u"kind"_s, u"check"_s},
+                                        {u"position"_s, block.position()},
+                                        {u"checked"_s, marker == QTextBlockFormat::MarkerType::Checked},
+                                        {u"name"_s, label.isEmpty() ? tr("Checklist item") : label}});
+            }
+            for (auto it = block.begin(); !it.atEnd(); ++it) {
+                const QTextFragment fragment = it.fragment();
+                if (!fragment.charFormat().isImageFormat())
+                    continue;
+                const QTextImageFormat fmt = fragment.charFormat().toImageFormat();
+                const QString resource = fmt.name();
+                QString kind;
+                QString name;
+                if (const QString id = DocumentConverter::attachmentIdFromResource(resource); !id.isEmpty()) {
+                    kind = u"attachment"_s;
+                    if (!m_attachmentNames.contains(id) && m_library) {
+                        const auto info = m_library->service()->attachment(id);
+                        m_attachmentNames.insert(id, info ? info->fileName : tr("missing file"));
+                    }
+                    name = tr("Attachment: %1").arg(m_attachmentNames.value(id));
+                } else if (!DocumentConverter::blobHashFromResource(resource).isEmpty()) {
+                    kind = u"image"_s;
+                    const QString alt = fmt.property(QTextFormat::ImageAltText).toString();
+                    name = alt.isEmpty() ? tr("Image") : tr("Image: %1").arg(alt);
+                } else {
+                    continue;
+                }
+                for (int i = 0; i < fragment.length(); ++i) {
+                    next.append(QVariantMap{{u"kind"_s, kind},
+                                            {u"position"_s, fragment.position() + i},
+                                            {u"checked"_s, false},
+                                            {u"name"_s, name}});
+                }
+            }
+        }
+    }
+    if (next != m_overlays) {
+        m_overlays = next;
+        emit overlaysChanged();
+    }
+    ++m_layoutRevision;
+    emit layoutRevisionChanged();
 }
 
 // ---------------------------------------------------------------- clipboard

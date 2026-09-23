@@ -354,7 +354,8 @@ private slots:
         screenshot(u"checklist"_s);
         const int itemStart = doc()->findBlockByNumber(1).position();
         const QRectF r = positionToRectangle(itemStart);
-        const QPointF marker = m_text->mapToScene(QPointF(r.x() - 12, r.center().y()));
+        // The round checkbox drawn over the text engine's glyph.
+        const QPointF marker = m_text->mapToScene(QPointF(r.x() - 11, r.center().y()));
         QTest::mouseClick(m_window, Qt::LeftButton, Qt::NoModifier, marker.toPoint());
         QTRY_VERIFY(current().blocks[1].checked);
         QTest::qWait(400); // keep the next click from being a double-click
@@ -802,6 +803,49 @@ private slots:
         m_app->handle({{u"action"_s, u"capture"_s}, {u"text"_s, u"Call the plumber\nTuesday"_s}});
         QCOMPARE(m_service->noteCount(), before + 1);
         QCOMPARE(m_library->notes()->titleOf(m_library->notes()->idAt(0)), u"Call the plumber"_s);
+    }
+
+    void checklistAndObjectsAreAccessible()
+    {
+        resetView();
+        m_editor->openNote(m_mixedId);
+        QTRY_VERIFY(m_editor->overlays().size() >= 7);
+        int checks = 0, images = 0, files = 0;
+        for (const QVariant &v : m_editor->overlays()) {
+            const QVariantMap o = v.toMap();
+            checks += o.value(u"kind"_s).toString() == u"check";
+            images += o.value(u"kind"_s).toString() == u"image";
+            files += o.value(u"kind"_s).toString() == u"attachment";
+        }
+        QCOMPARE(checks, 5);
+        QCOMPARE(images, 1);
+        QCOMPARE(files, 1);
+
+        // Screen readers see named checkboxes, images and attachments.
+        QStringList names;
+        std::function<void(QAccessibleInterface *)> walk = [&](QAccessibleInterface *iface) {
+            if (!iface)
+                return;
+            if (iface->role() == QAccessible::CheckBox || iface->role() == QAccessible::Graphic
+                || iface->role() == QAccessible::Button)
+                names << iface->text(QAccessible::Name);
+            for (int i = 0; i < iface->childCount(); ++i)
+                walk(iface->child(i));
+        };
+        walk(QAccessible::queryAccessibleInterface(m_text));
+        QVERIFY2(names.contains(u"Draft the migration guide"_s), qPrintable(names.join(u", "_s)));
+        QVERIFY(names.contains(u"Attachment: Q3 roadmap draft.pdf"_s));
+        QVERIFY(names.contains(u"Image: Bar chart of search latency by week"_s));
+
+        // The overlay reflects edits made any other way.
+        const int firstCheck = m_editor->overlays().first().toMap().value(u"position"_s).toInt();
+        const bool before = m_editor->overlays().first().toMap().value(u"checked"_s).toBool();
+        m_editor->toggleCheckAt(firstCheck);
+        QTRY_COMPARE(m_editor->overlays().first().toMap().value(u"checked"_s).toBool(), !before);
+        m_editor->toggleCheckAt(firstCheck);
+        QVERIFY(m_editor->flush());
+        m_text->setProperty("cursorPosition", firstCheck);
+        screenshot(u"checklist-round"_s);
     }
 
     void largeNoteResponsiveness()

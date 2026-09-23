@@ -60,6 +60,13 @@ class EditorController : public QObject
     Q_PROPERTY(int findCount READ findCount NOTIFY findChanged)
     Q_PROPERTY(int findIndex READ findIndex NOTIFY findChanged)
 
+    // Things drawn over the text: round checkboxes for checklist items and
+    // accessible stand-ins for images and attachments. Each entry has
+    // kind ("check", "image", "attachment"), position, checked and name.
+    Q_PROPERTY(QVariantList overlays READ overlays NOTIFY overlaysChanged)
+    // Bumped whenever text layout may have moved, so overlay positions refresh.
+    Q_PROPERTY(int layoutRevision READ layoutRevision NOTIFY layoutRevisionChanged)
+
 public:
     enum SaveState { Saved, Edited, Saving, Failed, Conflict };
     Q_ENUM(SaveState)
@@ -131,6 +138,8 @@ public:
     void setFindText(const QString &text);
     int findCount() const { return int(m_matchStarts.size()); }
     int findIndex() const { return m_findCurrent + 1; }
+    QVariantList overlays() const { return m_overlays; }
+    int layoutRevision() const { return m_layoutRevision; }
 
     onotes::DocumentStyle style() const;
     bool isDirty() const { return m_generation != m_savedGeneration; }
@@ -165,6 +174,7 @@ public:
 
     // Checklist items toggle natively on click; this is the keyboard path.
     Q_INVOKABLE void toggleCheckAtCursor();
+    Q_INVOKABLE void toggleCheckAt(int position);
     Q_INVOKABLE bool activateObjectAt(int position);
     Q_INVOKABLE void openLink(const QString &href);
     // The #tag at a document position, if any (for Ctrl+click).
@@ -200,6 +210,8 @@ signals:
     void saveStateChanged();
     void formatChanged();
     void findChanged();
+    void overlaysChanged();
+    void layoutRevisionChanged();
 
     // Requests for the view, which owns the visible cursor.
     void cursorRequested(int position);
@@ -228,6 +240,7 @@ private:
     void scheduleDecorate(int from, int to);
     void recountMatches();
     void selectMatch(int index);
+    void rebuildOverlays();
 
     QTextCursor textCursor() const;
     QList<QTextBlock> selectedBlocks() const;
@@ -286,6 +299,9 @@ private:
     QString m_findText;
     QList<int> m_matchStarts;
     int m_findCurrent = -1;
+    QVariantList m_overlays;
+    int m_layoutRevision = 0;
+    QHash<QString, QString> m_attachmentNames;
 
     // Marks to set/clear on the next text typed at m_pendingPosition.
     int m_pendingPosition = -1;

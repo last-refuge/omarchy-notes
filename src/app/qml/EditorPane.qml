@@ -205,26 +205,23 @@ Rectangle {
                 ToolSeparator {}
 
                 ToolIcon {
-                    iconName: "pin"
-                    text: editor.pinned ? qsTr("Unpin note") : qsTr("Pin note")
-                    active: editor.pinned
-                    onClicked: editor.setPinned(!editor.pinned)
-                }
-                ToolIcon {
-                    iconName: "trash"
-                    text: qsTr("Delete note")
-                    onClicked: root.deleteRequested()
-                }
-                ToolIcon {
-                    id: exportButton
-                    iconName: "share"
-                    text: qsTr("Export note")
-                    onClicked: exportMenu.popup(exportButton, 0, exportButton.height)
+                    id: noteMenuButton
+                    objectName: "noteMenuButton"
+                    iconName: "more"
+                    text: qsTr("Note actions")
+                    onClicked: noteMenu.popup(noteMenuButton, 0, noteMenuButton.height)
                     Menu {
-                        id: exportMenu
+                        id: noteMenu
+                        MenuItem {
+                            text: editor.pinned ? qsTr("Unpin Note") : qsTr("Pin Note")
+                            onTriggered: editor.setPinned(!editor.pinned)
+                        }
+                        MenuSeparator {}
                         MenuItem { text: qsTr("Export as Markdown…"); onTriggered: root.exportAs("md") }
                         MenuItem { text: qsTr("Export as HTML…"); onTriggered: root.exportAs("html") }
                         MenuItem { text: qsTr("Export as PDF…"); onTriggered: root.exportAs("pdf") }
+                        MenuSeparator {}
+                        MenuItem { text: qsTr("Delete Note"); onTriggered: root.deleteRequested() }
                     }
                 }
             }
@@ -378,6 +375,70 @@ Rectangle {
                     } else if (editor.hasPendingFormat && plain && event.text.length > 0
                                && event.text.charCodeAt(0) >= 32) {
                         event.accepted = editor.typeWithPendingFormat(event.text)
+                    }
+                }
+
+                // Round checkboxes over the text engine's box glyphs, and
+                // accessible stand-ins for images and attachments.
+                Repeater {
+                    model: editor.overlays
+                    delegate: Item {
+                        id: overlay
+
+                        required property var modelData
+                        readonly property bool isCheck: modelData.kind === "check"
+                        // Re-evaluated whenever the layout may have moved.
+                        readonly property rect at: {
+                            editor.layoutRevision
+                            textArea.width
+                            textArea.contentHeight
+                            return textArea.positionToRectangle(modelData.position)
+                        }
+
+                        x: isCheck ? at.x - 21 : at.x
+                        y: isCheck ? at.y + (at.height - height) / 2 : at.y
+                        width: isCheck ? 20 : 1
+                        height: isCheck ? 20 : Math.max(1, at.height)
+                        Accessible.role: isCheck ? Accessible.CheckBox
+                                       : modelData.kind === "image" ? Accessible.Graphic : Accessible.Button
+                        Accessible.name: modelData.name
+                        Accessible.checkable: isCheck
+                        Accessible.checked: modelData.checked
+                        Accessible.onToggleAction: editor.toggleCheckAt(modelData.position)
+                        Accessible.onPressAction: isCheck ? editor.toggleCheckAt(modelData.position)
+                                                          : editor.activateObjectAt(modelData.position)
+
+                        Rectangle {
+                            visible: overlay.isCheck
+                            anchors.centerIn: parent
+                            width: 20
+                            height: 20
+                            radius: 10
+                            color: Theme.canvas // hides the glyph underneath
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: 16
+                                height: 16
+                                radius: 8
+                                color: overlay.modelData.checked ? Theme.accent : "transparent"
+                                border.width: overlay.modelData.checked ? 0 : 1.5
+                                border.color: Theme.secondaryText
+                                Text {
+                                    anchors.centerIn: parent
+                                    visible: overlay.modelData.checked
+                                    text: "\u2713"
+                                    color: Theme.accentText
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                }
+                            }
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled: overlay.isCheck && !editor.readOnly
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: editor.toggleCheckAt(overlay.modelData.position)
+                        }
                     }
                 }
 
@@ -548,6 +609,8 @@ Rectangle {
     Shortcut { sequence: "Ctrl+Shift+A"; enabled: toolbar.editable; onActivated: attachDialog.open() }
     Shortcut { sequence: "Ctrl+L"; enabled: toolbar.editable; onActivated: linkPicker.open() }
     Shortcut { sequences: [StandardKey.Find]; enabled: editor.hasNote; onActivated: root.openFind() }
+    // Opens the image or attachment next to the cursor.
+    Shortcut { sequences: ["Ctrl+Return", "Ctrl+Enter"]; enabled: textArea.activeFocus; onActivated: editor.activateObjectAt(textArea.cursorPosition) }
     Shortcut { sequences: [StandardKey.FindNext]; enabled: findBar.visible; onActivated: editor.findNext() }
     Shortcut { sequences: [StandardKey.FindPrevious]; enabled: findBar.visible; onActivated: editor.findPrevious() }
 }
