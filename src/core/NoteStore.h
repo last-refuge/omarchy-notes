@@ -237,6 +237,8 @@ public:
     std::optional<QString> addImageFile(const QString &filePath, QString *error = nullptr);
 
     QString blobPath(const QString &hash) const { return m_blobs.path(hash); }
+    // The open connection, for maintenance tasks and failure-injection tests.
+    Database &database() { return m_db; }
     const LibraryPaths &paths() const { return m_paths; }
 
     // PRAGMA integrity_check plus attachment reference checks.

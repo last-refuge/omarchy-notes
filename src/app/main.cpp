@@ -8,6 +8,8 @@
 #include "ThemeController.h"
 
 #include <QCommandLineParser>
+#include <QElapsedTimer>
+#include <QQuickWindow>
 #include <QFile>
 #include <QJsonObject>
 #include <QThread>
@@ -24,8 +26,47 @@ Q_IMPORT_QML_PLUGIN(OmarchyNotesPlugin)
 
 using namespace Qt::StringLiterals;
 
+namespace {
+
+// Test and benchmark hook: report the first rendered frame, then quit.
+void exitAfterFirstFrame(QQmlApplicationEngine &engine, const QElapsedTimer &sinceStart)
+{
+    if (!qEnvironmentVariableIsSet("ONOTES_EXIT_AFTER_FIRST_FRAME") || engine.rootObjects().isEmpty())
+        return;
+    auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
+    if (!window)
+        return;
+    QObject::connect(window, &QQuickWindow::frameSwapped, window, [window, sinceStart] {
+        std::printf("first-frame %lld ms: %s\n", static_cast<long long>(sinceStart.elapsed()),
+                    qPrintable(window->title()));
+        std::fflush(stdout);
+        QCoreApplication::quit();
+    }, Qt::SingleShotConnection);
+}
+
+// Shows why the library can't be used, in a window, since a launch from the
+// app launcher has no terminal to print to.
+int showStartupError(QGuiApplication &app, const QString &heading, const QString &message,
+                     const QString &location, const QElapsedTimer &sinceStart)
+{
+    std::fprintf(stderr, "%s %s\n", qPrintable(heading), qPrintable(message));
+    ThemeController theme(nullptr);
+    ThemeController::setInstance(&theme);
+    QQuickStyle::setStyle(u"Basic"_s);
+    QQmlApplicationEngine engine;
+    engine.setInitialProperties({{u"heading"_s, heading}, {u"message"_s, message}, {u"location"_s, location}});
+    engine.loadFromModule("OmarchyNotes", "StartupError");
+    exitAfterFirstFrame(engine, sinceStart);
+    app.exec();
+    return 1;
+}
+
+} // namespace
+
 int main(int argc, char *argv[])
 {
+    QElapsedTimer sinceStart;
+    sinceStart.start();
     QGuiApplication app(argc, argv);
     QGuiApplication::setApplicationName(u"omarchy-notes"_s);
     QGuiApplication::setApplicationDisplayName(u"Omarchy Notes"_s);
@@ -91,22 +132,44 @@ int main(int argc, char *argv[])
         return 0;
     QDir().mkpath(paths.root);
     QLockFile lock(paths.root + u"/.lock"_s);
-    if (!lock.tryLock(200)) {
+    const bool locked = lock.tryLock(200);
+    if (!locked && lock.error() != QLockFile::LockFailedError) {
+        // Not "someone else has it": the folder itself is unusable.
+        const QString why = QObject::tr("Omarchy Notes can't write to its library at %1. Check that the folder "
+                                        "and its files belong to you and aren't read-only.").arg(paths.root);
+        if (parser.isSet(capture)) {
+            std::fprintf(stderr, "%s\n", qPrintable(why));
+            return 1;
+        }
+        return showStartupError(app, QObject::tr("Omarchy Notes can't open your notes."), why, paths.root,
+                                sinceStart);
+    }
+    if (!locked) {
         // Another instance is starting up; give it a moment to listen.
         for (int attempt = 0; attempt < 20; ++attempt) {
             QThread::msleep(150);
             if (delivered())
                 return 0;
         }
-        std::fprintf(stderr, "Omarchy Notes is running for %s but isn't responding.\n", qPrintable(paths.root));
-        return 1;
+        if (parser.isSet(capture)) {
+            std::fprintf(stderr, "Omarchy Notes is running for %s but isn't responding.\n", qPrintable(paths.root));
+            return 1;
+        }
+        return showStartupError(app, QObject::tr("Omarchy Notes is already running but isn't responding."),
+                                QObject::tr("Close the other Omarchy Notes window, or end it from a terminal "
+                                            "with \u201cpkill omarchy-notes\u201d, then open it again."),
+                                paths.root, sinceStart);
     }
 
     onotes::LibraryService service(paths);
     QString error;
     if (!service.start(&error)) {
-        std::fprintf(stderr, "Could not open the notes library: %s\n", qPrintable(error));
-        return 1;
+        if (parser.isSet(capture)) {
+            std::fprintf(stderr, "Could not open the notes library: %s\n", qPrintable(error));
+            return 1;
+        }
+        return showStartupError(app, QObject::tr("Omarchy Notes can't open your notes."), error, paths.root,
+                                sinceStart);
     }
     // Capturing without a running app needs no window.
     if (parser.isSet(capture)) {
@@ -148,5 +211,6 @@ int main(int argc, char *argv[])
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      [] { QCoreApplication::exit(1); }, Qt::QueuedConnection);
     engine.loadFromModule("OmarchyNotes", "Main");
+    exitAfterFirstFrame(engine, sinceStart);
     return app.exec();
 }

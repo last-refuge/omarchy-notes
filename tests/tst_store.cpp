@@ -15,6 +15,7 @@
 #include <QTest>
 
 #include <csignal>
+#include <unistd.h>
 
 using namespace onotes;
 using namespace Qt::StringLiterals;
@@ -621,6 +622,78 @@ private slots:
         QCOMPARE(library.listNotes(NoteQuery::tagged(u"vintage"_s)).size(), 1);
         QVERIFY(library.verify().isEmpty());
         QDir(safety).removeRecursively();
+    }
+
+    void fullDiskKeepsTheLastGoodVersion()
+    {
+        QTemporaryDir dir;
+        NoteStore store(LibraryPaths::at(dir.path()));
+        QVERIFY(store.open(nullptr));
+        const auto note = store.createNote(textDoc(u"small"_s));
+        // Cap the database at its current size, like a full disk.
+        Statement pages = store.database().prepare("PRAGMA page_count");
+        QVERIFY(pages.next());
+        const QByteArray cap = "PRAGMA max_page_count=" + QByteArray::number(pages.int64(0));
+        QVERIFY(store.database().exec(cap.constData()));
+
+        const SaveResult result = store.saveNote({note->id, note->revision, textDoc(QString(200000, u'x'))});
+        QCOMPARE(result.status, SaveResult::Status::Failed);
+        QVERIFY2(result.error.contains(u"disk is full"_s), qPrintable(result.error));
+        QCOMPARE(store.loadNote(note->id)->body.plainText(), u"small"_s); // nothing half-written
+        QVERIFY(store.verify().isEmpty());
+    }
+
+    void readOnlyLibraryIsExplained()
+    {
+        if (::geteuid() == 0)
+            QSKIP("root can write to read-only folders");
+        QTemporaryDir dir;
+        {
+            NoteStore store(LibraryPaths::at(dir.path()));
+            QVERIFY(store.open(nullptr));
+            store.createNote(textDoc(u"keep"_s));
+        }
+        QFile::setPermissions(dir.path(), QFileDevice::ReadOwner | QFileDevice::ExeOwner);
+        NoteStore store(LibraryPaths::at(dir.path()));
+        QString error;
+        const bool opened = store.open(&error);
+        QFile::setPermissions(dir.path(), QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+        QVERIFY(!opened);
+        QVERIFY2(error.contains(u"can't write"_s), qPrintable(error));
+    }
+
+    void failedMigrationLeavesTheLibraryAsItWas()
+    {
+        QTemporaryDir dir;
+        QString id;
+        {
+            NoteStore store(LibraryPaths::at(dir.path()));
+            QVERIFY(store.open(nullptr));
+            id = store.createNote(textDoc(u"Precious #data"_s))->id;
+        }
+        downgradeToV1(dir.filePath(u"library.sqlite3"_s));
+        {
+            // Something in the way of the upgrade: v2 can't create this table.
+            Database db;
+            QVERIFY(db.open(dir.filePath(u"library.sqlite3"_s), nullptr));
+            QVERIFY(db.exec("CREATE TABLE smart_folders (x)"));
+        }
+        {
+            NoteStore store(LibraryPaths::at(dir.path()));
+            QString error;
+            QVERIFY(!store.open(&error));
+            QVERIFY(error.contains(u"upgrade"_s));
+        }
+        Database db;
+        QVERIFY(db.open(dir.filePath(u"library.sqlite3"_s), nullptr));
+        QCOMPARE(db.userVersion(), 1); // rolled back, still usable by the old app
+        Statement check = db.prepare("SELECT body FROM notes WHERE id = ?1");
+        check.bind(1, id);
+        QVERIFY(check.next());
+        QVERIFY(check.text(0).contains(u"Precious"_s));
+        Statement noTags = db.prepare("SELECT COUNT(*) FROM sqlite_master WHERE name = 'note_tags'");
+        QVERIFY(noTags.next());
+        QCOMPARE(noTags.int64(0), 0);
     }
 
     // Kill the writer with SIGKILL at random points; every save it

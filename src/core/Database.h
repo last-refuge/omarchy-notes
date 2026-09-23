@@ -58,6 +58,8 @@ public:
     bool exec(const char *sql);
     Statement prepare(const char *sql);
     QString lastError() const;
+    // The last error in words a person can act on (disk full, read-only...).
+    QString friendlyError() const;
     int userVersion();
     // Rows changed by the most recent INSERT, UPDATE or DELETE.
     int changes() const;

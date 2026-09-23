@@ -26,6 +26,7 @@ qt_add_qml_module(notes_app_lib
         qml/NoteMenu.qml
         qml/AttachmentsView.qml
         qml/QuickNoteWindow.qml
+        qml/StartupError.qml
     RESOURCES
         icons/compose.svg
         icons/bullets.svg

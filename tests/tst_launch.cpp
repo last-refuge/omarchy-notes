@@ -4,7 +4,11 @@
 #include "InstanceChannel.h"
 #include "LibraryService.h"
 
+#include <QDir>
+#include <QFile>
 #include <QLocalSocket>
+
+#include <unistd.h>
 
 #include <QProcess>
 #include <QTemporaryDir>
@@ -79,6 +83,39 @@ private slots:
         const QStringList t = titles();
         QVERIFY(t.contains(u"Buy stamps"_s));
         QVERIFY(t.contains(u"From a pipe"_s));
+    }
+
+    void firstFrameAndStartupTime()
+    {
+        QProcess p;
+        QProcessEnvironment e = env();
+        e.insert(u"ONOTES_EXIT_AFTER_FIRST_FRAME"_s, u"1"_s);
+        p.setProcessEnvironment(e);
+        p.start(QStringLiteral(APP_PATH), {u"--data-dir"_s, m_dir.filePath(u"startup"_s)});
+        QVERIFY(p.waitForFinished(20000));
+        const QByteArray out = p.readAllStandardOutput();
+        QVERIFY2(out.contains("first-frame") && out.contains("Omarchy Notes"), out.constData());
+        qInfo("%s", out.trimmed().constData());
+    }
+
+    void unusableLibraryShowsAnErrorWindow()
+    {
+        if (::geteuid() == 0)
+            QSKIP("root can write to read-only folders");
+        const QString library = m_dir.filePath(u"locked"_s);
+        QDir().mkpath(library);
+        QFile::setPermissions(library, QFileDevice::ReadOwner | QFileDevice::ExeOwner);
+        QProcess p;
+        QProcessEnvironment e = env();
+        e.insert(u"ONOTES_EXIT_AFTER_FIRST_FRAME"_s, u"1"_s);
+        p.setProcessEnvironment(e);
+        p.start(QStringLiteral(APP_PATH), {u"--data-dir"_s, library});
+        const bool finished = p.waitForFinished(20000);
+        QFile::setPermissions(library, QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+        QVERIFY(finished);
+        QCOMPARE(p.exitCode(), 1);
+        QVERIFY(p.readAllStandardOutput().contains("first-frame")); // a window was shown
+        QVERIFY(p.readAllStandardError().contains("can't open your notes"));
     }
 
     void secondLaunchHandsOffToTheFirst()

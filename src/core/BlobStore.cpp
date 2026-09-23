@@ -29,7 +29,15 @@ bool fail(QString *error, const QString &message)
 
 QString errnoString()
 {
-    return QString::fromLocal8Bit(std::strerror(errno));
+    switch (errno) {
+    case ENOSPC:
+    case EDQUOT:
+        return u"your disk is full"_s;
+    case EROFS:
+        return u"your notes folder is read-only"_s;
+    default:
+        return QString::fromLocal8Bit(std::strerror(errno));
+    }
 }
 
 } // namespace

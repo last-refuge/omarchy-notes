@@ -151,6 +151,30 @@ QString Database::lastError() const
     return m_db ? QString::fromUtf8(sqlite3_errmsg(m_db)) : QString();
 }
 
+QString Database::friendlyError() const
+{
+    if (!m_db)
+        return QStringLiteral("The notes library isn't open.");
+    switch (sqlite3_extended_errcode(m_db) & 0xff) {
+    case SQLITE_FULL:
+        return QStringLiteral("Your disk is full. Free up some space and try again.");
+    case SQLITE_READONLY:
+        return QStringLiteral("Your notes folder is read-only, so changes can't be saved.");
+    case SQLITE_IOERR:
+        return QStringLiteral("The disk reported an error while saving.");
+    case SQLITE_CORRUPT:
+    case SQLITE_NOTADB:
+        return QStringLiteral("The notes database is damaged. Restore it from a backup.");
+    case SQLITE_BUSY:
+    case SQLITE_LOCKED:
+        return QStringLiteral("The notes database is busy. Try again in a moment.");
+    case SQLITE_CANTOPEN:
+        return QStringLiteral("The notes database can't be opened. Check the folder's permissions.");
+    default:
+        return lastError();
+    }
+}
+
 int Database::changes() const
 {
     return m_db ? sqlite3_changes(m_db) : 0;

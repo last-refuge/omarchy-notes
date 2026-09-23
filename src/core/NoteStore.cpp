@@ -161,6 +161,13 @@ bool NoteStore::open(QString *error)
 {
     if (!QDir().mkpath(m_paths.root))
         return setError(error, u"Could not create the library folder %1."_s.arg(m_paths.root));
+    // Say what's wrong plainly rather than failing somewhere inside SQLite.
+    const QFileInfo folder(m_paths.root);
+    const QFileInfo database(m_paths.database());
+    if (!folder.isWritable() || (database.exists() && !database.isWritable())) {
+        return setError(error, u"Omarchy Notes can't write to its library at %1. Check that the folder "
+                               "and its files belong to you and aren't read-only."_s.arg(m_paths.root));
+    }
     if (!m_blobs.prepare(error))
         return false;
     if (!m_db.open(m_paths.database(), error))
@@ -174,7 +181,7 @@ bool NoteStore::open(QString *error)
             return setError(error, u"The library database does not support write-ahead logging."_s);
     }
     if (!m_db.exec("PRAGMA synchronous=FULL") || !m_db.exec("PRAGMA foreign_keys=ON"))
-        return setError(error, m_db.lastError());
+        return setError(error, m_db.friendlyError());
 
     return migrate(error);
 }
@@ -466,7 +473,7 @@ SaveResult NoteStore::saveNote(const SaveRequest &request)
     SaveResult result;
     Transaction tx(m_db);
     if (!tx.isActive()) {
-        result.error = m_db.lastError();
+        result.error = m_db.friendlyError();
         return result;
     }
 
@@ -504,12 +511,12 @@ SaveResult NoteStore::saveNote(const SaveRequest &request)
         .bind(9, timestamp)
         .bind(10, revision);
     if (!update.exec()) {
-        result.error = m_db.lastError();
+        result.error = m_db.friendlyError();
         return result;
     }
 
     if (!writeDerived(request.noteId, body)) {
-        result.error = m_db.lastError();
+        result.error = m_db.friendlyError();
         return result;
     }
 
@@ -528,13 +535,13 @@ SaveResult NoteStore::saveNote(const SaveRequest &request)
             .bind(4, qint64(RichDocument::SchemaVersion))
             .bind(5, timestamp);
         if (!snap.exec()) {
-            result.error = m_db.lastError();
+            result.error = m_db.friendlyError();
             return result;
         }
     }
 
     if (!tx.commit()) {
-        result.error = m_db.lastError();
+        result.error = m_db.friendlyError();
         return result;
     }
     result.status = SaveResult::Status::Saved;
