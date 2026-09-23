@@ -268,6 +268,8 @@ public:
 
     // Import and export. Results are maps with ok/error plus details.
     Q_INVOKABLE QVariantMap importFiles(const QList<QUrl> &files);
+    // Imports a folder tree as folders and notes; shows the new folder.
+    Q_INVOKABLE QVariantMap importFolder(const QUrl &folder);
     Q_INVOKABLE QString exportFileName(const QString &noteId, const QString &format) const;
     Q_INVOKABLE QVariantMap exportNote(const QString &noteId, const QString &format, const QUrl &file);
     Q_INVOKABLE QVariantMap exportAll(const QUrl &folder);

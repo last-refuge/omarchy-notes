@@ -7,6 +7,7 @@ qt_add_qml_module(notes_app_lib
     SOURCES
         AppController.cpp AppController.h
         AppLibrary.cpp AppLibrary.h
+        HyprlandSetup.cpp HyprlandSetup.h
         InstanceChannel.cpp InstanceChannel.h
         BlobImageProvider.cpp BlobImageProvider.h
         EditorController.cpp EditorController.h

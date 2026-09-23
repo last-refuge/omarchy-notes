@@ -864,6 +864,22 @@ QVariantMap AppLibrary::importFiles(const QList<QUrl> &files)
     return out;
 }
 
+QVariantMap AppLibrary::importFolder(const QUrl &folder)
+{
+    QString folderId;
+    const ImportReport report = onotes::importFolder(*m_service, folder.toLocalFile(), {}, &folderId);
+    m_searchText.clear();
+    emit searchTextChanged();
+    refresh();
+    if (!folderId.isEmpty())
+        showKey(folderId);
+    QVariantMap out = result(!report.createdIds.isEmpty(), report.warnings.join(u'\n'));
+    out.insert(u"count"_s, report.createdIds.size());
+    out.insert(u"first"_s, report.createdIds.value(0));
+    out.insert(u"warnings"_s, report.warnings);
+    return out;
+}
+
 QString AppLibrary::exportFileName(const QString &noteId, const QString &format) const
 {
     const auto note = m_service->loadNote(noteId);

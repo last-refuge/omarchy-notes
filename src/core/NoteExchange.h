@@ -22,6 +22,14 @@ struct ImportReport {
 // stored with the note; anything that can't be kept is listed in warnings.
 ImportReport importFiles(LibraryService &library, const QStringList &paths, const QString &folderId);
 
+// Imports a folder tree: the folder becomes a folder inside `parentFolderId`
+// ("" is the top level), each subfolder with notes becomes a subfolder, and
+// every Markdown/text file becomes a note. Asset-only folders (images next to
+// the notes, as exporters write them) are not turned into folders; their
+// images come in through the notes that use them.
+ImportReport importFolder(LibraryService &library, const QString &directory, const QString &parentFolderId,
+                          QString *createdFolderId = nullptr);
+
 enum class ExportFormat { Markdown, Html, Pdf };
 
 // Writes one note to `file`. Markdown and HTML put attachments (and, for

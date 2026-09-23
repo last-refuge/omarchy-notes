@@ -191,6 +191,38 @@ Pack light, see the **tiles**. #travel
         QVERIFY2(link.match(linked).hasMatch(), qPrintable(linked));
     }
 
+    void importsAFolderTree()
+    {
+        const QString root = m_dir.filePath(u"Apple Notes Export"_s);
+        QDir().mkpath(root + u"/Work/Clients"_s);
+        QDir().mkpath(root + u"/Work/_resources"_s);
+        QDir().mkpath(root + u"/Empty"_s);
+        write(root + u"/Groceries.md"_s, "# Groceries\n\n- [ ] Milk\n");
+        write(root + u"/Work/Standup.md"_s, "# Standup\n\n![](_resources/chart.png)\n");
+        write(root + u"/Work/_resources/chart.png"_s, SampleLibrary::chartPng());
+        write(root + u"/Work/Clients/Acme.txt"_s, "Acme\nRenewal in March\n");
+
+        const ImportReport report = importFolder(*m_library, root, {});
+        QCOMPARE(report.createdIds.size(), 3);
+        QVERIFY2(report.warnings.isEmpty(), qPrintable(report.warnings.join(u'\n')));
+        QStringList names;
+        for (const FolderInfo &f : m_library->listFolders())
+            names << f.name;
+        QVERIFY(names.contains(u"Apple Notes Export"_s));
+        QVERIFY(names.contains(u"Work"_s));
+        QVERIFY(names.contains(u"Clients"_s));
+        QVERIFY(!names.contains(u"_resources"_s)); // assets only
+        QVERIFY(!names.contains(u"Empty"_s));
+
+        // Importing again makes a second, separate folder.
+        const ImportReport again = importFolder(*m_library, root, {});
+        QCOMPARE(again.createdIds.size(), 3);
+        names.clear();
+        for (const FolderInfo &f : m_library->listFolders())
+            names << f.name;
+        QVERIFY(names.contains(u"Apple Notes Export 2"_s));
+    }
+
     void fileNames()
     {
         QCOMPARE(fileNameForTitle(u"a/b: c?"_s), u"a b c"_s);

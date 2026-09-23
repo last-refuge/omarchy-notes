@@ -19,6 +19,7 @@ Rectangle {
     signal editSmartFolderRequested(string smartId)
     signal deleteSmartFolderRequested(string smartId, string name)
     signal importRequested()
+    signal importFolderRequested()
     signal exportAllRequested()
 
     function focusList() { list.forceActiveFocus() }
@@ -219,6 +220,7 @@ Rectangle {
                     MenuItem { text: qsTr("New Smart Folder…"); onTriggered: root.newSmartFolderRequested() }
                     MenuSeparator {}
                     MenuItem { text: qsTr("Import Markdown or Text…"); onTriggered: root.importRequested() }
+                    MenuItem { text: qsTr("Import a Folder of Notes…"); onTriggered: root.importFolderRequested() }
                     MenuItem { text: qsTr("Export All Notes as Markdown…"); onTriggered: root.exportAllRequested() }
                     MenuSeparator {}
                     MenuItem { text: qsTr("Back Up Library…"); onTriggered: root.backupRequested() }

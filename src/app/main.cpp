@@ -1,5 +1,6 @@
 #include "AppController.h"
 #include "DocumentConverter.h"
+#include "HyprlandSetup.h"
 #include "AppLibrary.h"
 #include "InstanceChannel.h"
 #include "BlobImageProvider.h"
@@ -84,10 +85,19 @@ int main(int argc, char *argv[])
     const QCommandLineOption capture(u"capture"_s, u"Save <text> as a new note (\"-\" reads standard input)."_s,
                                      u"text"_s);
     const QCommandLineOption samples(u"samples"_s, u"Add sample notes if the library is empty."_s);
+    const QCommandLineOption setupHyprland(u"setup-hyprland"_s,
+                                           u"Add a Quick Note key (Super+Alt+N) and floating rule to Hyprland."_s);
     const QCommandLineOption failSaves(u"simulate-save-failure"_s,
                                        u"Make saves fail (for testing failure handling)."_s);
-    parser.addOptions({dataDir, newNote, openNote, quickNote, capture, samples, failSaves});
+    parser.addOptions({dataDir, newNote, openNote, quickNote, capture, samples, setupHyprland, failSaves});
     parser.process(app);
+
+    if (parser.isSet(setupHyprland)) {
+        const HyprlandSetupResult setup = setUpHyprland();
+        for (const QString &line : setup.messages)
+            std::printf("%s\n", qPrintable(line));
+        return setup.ok ? 0 : 1;
+    }
 
     const onotes::LibraryPaths paths = parser.isSet(dataDir)
         ? onotes::LibraryPaths::at(parser.value(dataDir))

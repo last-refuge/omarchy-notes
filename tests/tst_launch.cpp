@@ -118,6 +118,57 @@ private slots:
         QVERIFY(p.readAllStandardError().contains("can't open your notes"));
     }
 
+    void hyprlandSetupIsSafe()
+    {
+        const QString config = m_dir.filePath(u"hyprconfig"_s);
+        const QString omarchy = m_dir.filePath(u"omarchy"_s);
+        QDir().mkpath(config + u"/hypr"_s);
+        QDir().mkpath(omarchy + u"/default/hypr/bindings"_s);
+        auto writeFile = [](const QString &path, const QByteArray &data) {
+            QFile f(path);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write(data);
+        };
+        writeFile(config + u"/hypr/bindings.lua"_s, R"(o.bind("SUPER + B", "Browser", { launch = "chromium" }))" "\n");
+        writeFile(config + u"/hypr/hyprland.lua"_s, R"(require("bindings"))" "\n");
+        writeFile(omarchy + u"/default/hypr/bindings/utilities.lua"_s,
+                  R"(o.bind("SUPER + SPACE", "Omarchy menu", "omarchy-menu toggle"))" "\n");
+
+        auto setup = [&](QByteArray *out) {
+            QProcess p;
+            QProcessEnvironment e = env();
+            e.insert(u"XDG_CONFIG_HOME"_s, config);
+            e.insert(u"OMARCHY_PATH"_s, omarchy);
+            p.setProcessEnvironment(e);
+            p.start(QStringLiteral(APP_PATH), {u"--setup-hyprland"_s});
+            p.waitForFinished(15000);
+            *out = p.readAllStandardOutput();
+            return p.exitCode();
+        };
+        auto read = [](const QString &path) {
+            QFile f(path);
+            return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
+        };
+        QByteArray out;
+        QCOMPARE(setup(&out), 0);
+        QVERIFY(read(config + u"/hypr/bindings.lua"_s).contains(R"(o.bind("SUPER + ALT + N", "Quick Note")"));
+        QVERIFY(read(config + u"/hypr/hyprland.lua"_s).contains(R"(title = "^Quick Note$")"));
+
+        // Running it again changes nothing.
+        const QByteArray before = read(config + u"/hypr/bindings.lua"_s);
+        QCOMPARE(setup(&out), 0);
+        QCOMPARE(read(config + u"/hypr/bindings.lua"_s), before);
+        QVERIFY(out.contains("already set up"));
+
+        // A key that's taken (here by Omarchy's defaults) is never overwritten.
+        writeFile(config + u"/hypr/bindings.lua"_s, "-- fresh\n");
+        writeFile(omarchy + u"/default/hypr/bindings/utilities.lua"_s,
+                  R"(o.bind("SUPER + ALT + N", "Something else", "thing"))" "\n");
+        QCOMPARE(setup(&out), 1);
+        QVERIFY(out.contains("already bound"));
+        QCOMPARE(read(config + u"/hypr/bindings.lua"_s), QByteArray("-- fresh\n"));
+    }
+
     void secondLaunchHandsOffToTheFirst()
     {
         QProcess app;

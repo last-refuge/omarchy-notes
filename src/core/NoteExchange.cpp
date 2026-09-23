@@ -5,6 +5,7 @@
 
 #include <QDateTime>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
@@ -259,6 +260,82 @@ ImportReport importFiles(LibraryService &library, const QStringList &paths, cons
         else
             report.warnings << u"%1: %2"_s.arg(info.fileName(), error);
     }
+    return report;
+}
+
+namespace {
+
+const QStringList kImportable = {u"*.md"_s, u"*.markdown"_s, u"*.mdown"_s, u"*.txt"_s};
+
+bool hasImportableFiles(const QDir &dir)
+{
+    QDirIterator it(dir.path(), kImportable, QDir::Files, QDirIterator::Subdirectories);
+    return it.hasNext();
+}
+
+// A folder name that doesn't clash with a sibling.
+std::optional<FolderInfo> createUniqueFolder(LibraryService &library, const QString &name, const QString &parentId,
+                                             QString *error)
+{
+    for (int n = 1; n < 100; ++n) {
+        const QString candidate = n == 1 ? name : u"%1 %2"_s.arg(name).arg(n);
+        QString attempt;
+        if (auto folder = library.createFolder(candidate, parentId, &attempt))
+            return folder;
+        if (!attempt.contains(u"already"_s)) {
+            if (error)
+                *error = attempt;
+            return std::nullopt;
+        }
+    }
+    if (error)
+        *error = u"Too many folders with that name."_s;
+    return std::nullopt;
+}
+
+void importTree(LibraryService &library, const QDir &dir, const QString &folderId, ImportReport *report)
+{
+    QStringList files;
+    for (const QFileInfo &file : dir.entryInfoList(kImportable, QDir::Files, QDir::Name))
+        files << file.absoluteFilePath();
+    const ImportReport here = importFiles(library, files, folderId);
+    report->createdIds << here.createdIds;
+    report->warnings << here.warnings;
+
+    for (const QFileInfo &sub : dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+        const QDir child(sub.absoluteFilePath());
+        if (sub.fileName().startsWith(u'.') || !hasImportableFiles(child))
+            continue;
+        QString error;
+        const auto folder = createUniqueFolder(library, sub.fileName(), folderId, &error);
+        if (!folder) {
+            report->warnings << u"%1: %2"_s.arg(sub.fileName(), error);
+            continue;
+        }
+        importTree(library, child, folder->id, report);
+    }
+}
+
+} // namespace
+
+ImportReport importFolder(LibraryService &library, const QString &directory, const QString &parentFolderId,
+                          QString *createdFolderId)
+{
+    ImportReport report;
+    const QDir dir(directory);
+    if (!dir.exists() || !hasImportableFiles(dir)) {
+        report.warnings << u"%1 has no Markdown or text files to import."_s.arg(dir.dirName());
+        return report;
+    }
+    QString error;
+    const auto folder = createUniqueFolder(library, dir.dirName(), parentFolderId, &error);
+    if (!folder) {
+        report.warnings << error;
+        return report;
+    }
+    if (createdFolderId)
+        *createdFolderId = folder->id;
+    importTree(library, dir, folder->id, &report);
     return report;
 }
 

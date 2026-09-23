@@ -255,6 +255,7 @@ ApplicationWindow {
             onEditSmartFolderRequested: id => smartDialog.openForEdit(id)
             onDeleteSmartFolderRequested: (id, name) => window.deleteSmartFolder(id, name)
             onImportRequested: importDialog.open()
+            onImportFolderRequested: importFolderDialog.open()
             onExportAllRequested: exportAllDialog.open()
         }
         Rectangle {
@@ -332,6 +333,7 @@ ApplicationWindow {
             onEditSmartFolderRequested: id => { sidebarDrawer.close(); smartDialog.openForEdit(id) }
             onDeleteSmartFolderRequested: (id, name) => { sidebarDrawer.close(); window.deleteSmartFolder(id, name) }
             onImportRequested: { sidebarDrawer.close(); importDialog.open() }
+            onImportFolderRequested: { sidebarDrawer.close(); importFolderDialog.open() }
             onExportAllRequested: { sidebarDrawer.close(); exportAllDialog.open() }
         }
     }
@@ -366,6 +368,21 @@ ApplicationWindow {
             const result = Library.importFiles(selectedFiles)
             if (result.count > 0) {
                 window.openNote(result.first)
+                toast.show(result.warnings.length
+                           ? qsTr("Imported %n note(s). %1", "", result.count).arg(result.warnings.join(" "))
+                           : qsTr("Imported %n note(s).", "", result.count))
+            } else {
+                toast.show(result.error || qsTr("Nothing was imported."))
+            }
+        }
+    }
+    FolderDialog {
+        id: importFolderDialog
+        title: qsTr("Choose a Folder of Notes to Import")
+        onAccepted: {
+            const result = Library.importFolder(selectedFolder)
+            if (result.count > 0) {
+                window.openFirstNote()
                 toast.show(result.warnings.length
                            ? qsTr("Imported %n note(s). %1", "", result.count).arg(result.warnings.join(" "))
                            : qsTr("Imported %n note(s).", "", result.count))
