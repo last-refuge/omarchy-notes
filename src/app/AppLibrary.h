@@ -233,6 +233,12 @@ public:
 
     // Notes. createNote files the note in the folder being viewed.
     Q_INVOKABLE QString createNote();
+    // A Quick Note always starts in Notes, whatever is being viewed.
+    Q_INVOKABLE QString createQuickNote();
+    // Removes a note that was never written in (an abandoned Quick Note).
+    Q_INVOKABLE bool discardIfEmpty(const QString &noteId);
+    // Saves text as a new note in Notes (command-line capture).
+    QString captureText(const QString &text);
     Q_INVOKABLE void setPinned(const QString &id, bool pinned);
     Q_INVOKABLE bool moveNote(const QString &noteId, const QString &folderId);
     Q_INVOKABLE QString duplicateNote(const QString &noteId);

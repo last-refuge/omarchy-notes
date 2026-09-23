@@ -2,6 +2,7 @@
 // behaviour end to end against storage. Screenshots land in SCREENSHOT_DIR
 // for visual review of rendering (tables, checkboxes, images, themes).
 
+#include "AppController.h"
 #include "AppLibrary.h"
 #include "BlobImageProvider.h"
 #include "DocumentConverter.h"
@@ -88,6 +89,7 @@ class TestEditor : public QObject
     std::unique_ptr<LibraryService> m_service;
     std::unique_ptr<ThemeController> m_theme;
     std::unique_ptr<AppLibrary> m_library;
+    std::unique_ptr<AppController> m_app;
     std::unique_ptr<QQmlApplicationEngine> m_engine;
     QString m_mixedId;
     QQuickWindow *m_window = nullptr;
@@ -183,10 +185,12 @@ private slots:
         m_mixedId = SampleLibrary::seed(*m_service, &error);
         QVERIFY2(!m_mixedId.isEmpty(), qPrintable(error));
 
-        m_theme = std::make_unique<ThemeController>();
+        m_theme = std::make_unique<ThemeController>(nullptr);
         ThemeController::setInstance(m_theme.get());
         m_library = std::make_unique<AppLibrary>(m_service.get(), m_dataDir.filePath(u"settings.ini"_s));
         AppLibrary::setInstance(m_library.get());
+        m_app = std::make_unique<AppController>(nullptr);
+        AppController::setInstance(m_app.get());
 
         m_engine = std::make_unique<QQmlApplicationEngine>();
         m_engine->addImageProvider(u"blob"_s, new BlobImageProvider(m_service.get()));
@@ -197,9 +201,11 @@ private slots:
         QVERIFY(m_window);
         m_window->resize(1200, 1300);
         QVERIFY(QTest::qWaitForWindowExposed(m_window));
-        m_text = m_window->findChild<QQuickItem *>(u"noteText"_s);
+        // The Quick Note window has its own editor; use the main window's.
         m_pane = m_window->findChild<QQuickItem *>(u"editorPane"_s);
-        m_editor = m_window->findChild<EditorController *>(u"noteEditor"_s);
+        QVERIFY(m_pane);
+        m_text = m_pane->findChild<QQuickItem *>(u"noteText"_s);
+        m_editor = m_pane->findChild<EditorController *>(u"noteEditor"_s);
         QVERIFY(m_text && m_pane && m_editor);
         QCOMPARE(m_editor->noteId(), m_mixedId);
     }
@@ -749,6 +755,53 @@ private slots:
         QFile out(files.filePath(u"out.md"_s));
         QVERIFY(out.open(QIODevice::ReadOnly));
         QVERIFY(out.readAll().contains("- [ ] Try the importer #imported"));
+    }
+
+    void quickNote()
+    {
+        resetView();
+        QQuickWindow *quick = m_window->findChild<QQuickWindow *>(u"quickNote"_s);
+        QVERIFY(quick);
+        const int before = m_service->noteCount();
+        // QML must talk to the same controller the process uses.
+        QCOMPARE(m_engine->singletonInstance<AppController *>("OmarchyNotes", "App"), m_app.get());
+        QCOMPARE(m_engine->singletonInstance<ThemeController *>("OmarchyNotes", "Theme"), m_theme.get());
+        m_app->handle({{u"action"_s, u"quick-note"_s}});
+        QTRY_VERIFY(quick->isVisible());
+        QVERIFY(QTest::qWaitForWindowExposed(quick));
+        auto *pane = quick->findChild<QQuickItem *>(u"quickNotePane"_s);
+        auto *quickEditor = pane->findChild<EditorController *>(u"noteEditor"_s);
+        QVERIFY(quickEditor->hasNote());
+        QCOMPARE(m_service->noteCount(), before + 1);
+        QDir().mkpath(QStringLiteral(SCREENSHOT_DIR));
+        quick->grabWindow().save(QStringLiteral(SCREENSHOT_DIR) + u"/quick-note.png"_s);
+
+        // Closing an untouched Quick Note leaves nothing behind.
+        quick->close();
+        QTRY_VERIFY(!quick->isVisible());
+        QCOMPARE(m_service->noteCount(), before);
+
+        // One that was written in is kept, in Notes.
+        m_app->handle({{u"action"_s, u"quick-note"_s}});
+        QTRY_VERIFY(quick->isVisible());
+        auto *quickText = pane->findChild<QQuickItem *>(u"noteText"_s);
+        quickText->forceActiveFocus();
+        QTest::keyClick(quick, 'h');
+        QTest::keyClick(quick, 'i');
+        const QString id = quickEditor->noteId();
+        quick->close();
+        QTRY_VERIFY(!quick->isVisible());
+        QCOMPARE(m_service->loadNote(id)->body.plainText(), u"hi"_s);
+        QCOMPARE(m_service->loadNote(id)->folderId, QString());
+    }
+
+    void captureFromAnotherLaunch()
+    {
+        resetView();
+        const int before = m_service->noteCount();
+        m_app->handle({{u"action"_s, u"capture"_s}, {u"text"_s, u"Call the plumber\nTuesday"_s}});
+        QCOMPARE(m_service->noteCount(), before + 1);
+        QCOMPARE(m_library->notes()->titleOf(m_library->notes()->idAt(0)), u"Call the plumber"_s);
     }
 
     void largeNoteResponsiveness()

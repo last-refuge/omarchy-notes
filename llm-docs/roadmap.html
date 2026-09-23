@@ -317,10 +317,10 @@
       <span class="label">jasona / omarchy-notes · Roadmap</span>
     </div>
     <h1>Omarchy Notes <span>roadmap</span></h1>
-    <p class="lede">A native, local-first notebook for Omarchy. It aims for Apple Notes' fast capture and rich documents, drawn in your active theme. The daily-use alpha is done: folders, search, trash and backups all work. Next is the complete local beta.</p>
+    <p class="lede">A native, local-first notebook for Omarchy. It aims for Apple Notes' fast capture and rich documents, drawn in your active theme. The complete local beta is done: tags, Smart Folders, gallery, attachments, import/export and Quick Note all work. Next is release quality and packaging.</p>
     <div class="facts">
-      <div class="fact"><span class="label">Now</span><strong>Milestone 2 complete</strong><small>Daily-use alpha · 23 Sep 2026</small></div>
-      <div class="fact"><span class="label">Next</span><strong>Complete local beta</strong><small>Tags, import/export, Quick Note</small></div>
+      <div class="fact"><span class="label">Now</span><strong>Milestone 3 complete</strong><small>Complete local beta · 23 Sep 2026</small></div>
+      <div class="fact"><span class="label">Next</span><strong>Release quality</strong><small>Packaging, accessibility, performance</small></div>
       <div class="fact"><span class="label">v1 estimate</span><strong class="num">12–18 eng-weeks</strong><small>+20–30% contingency</small></div>
       <div class="fact"><span class="label">Stack</span><strong>Qt 6.8+ · QML · SQLite</strong><small>C++20, native Wayland</small></div>
     </div>
@@ -333,7 +333,7 @@
       <p>Milestones are sequential, sized in engineer-weeks for one experienced native-app engineer with design support. These are planning ranges, not calendar dates. Solid bars are the optimistic estimate and hatching runs to the pessimistic one. Re-estimate now that the editor prototype exists.</p>
     </div>
 
-    <div class="timeline" role="img" aria-label="Gantt chart of milestones 0 to 4 on a scale of 0 to 24 engineer-weeks. Scope and design: 1 to 2 weeks, partly done. Editor and storage proof: 2 to 3 weeks, done. Daily-use alpha: 3 to 4 weeks, done. Complete local beta: 4 to 6 weeks, next. Release quality: 2 to 3 weeks. Total 12 to 18 weeks, with contingency up to about 23 weeks.">
+    <div class="timeline" role="img" aria-label="Gantt chart of milestones 0 to 4 on a scale of 0 to 24 engineer-weeks. Scope and design: 1 to 2 weeks, partly done. Editor and storage proof: 2 to 3 weeks, done. Daily-use alpha: 3 to 4 weeks, done. Complete local beta: 4 to 6 weeks, done. Release quality: next. Release quality: 2 to 3 weeks. Total 12 to 18 weeks, with contingency up to about 23 weeks.">
       <div class="gantt">
         <!-- scale: 0–24 weeks; 1 week = 4.1667% -->
         <div class="row is-partial">
@@ -369,8 +369,8 @@
             <div class="bar range" style="left:25%;width:12.5%"></div>
           </div>
         </div>
-        <div class="row">
-          <div class="row-label"><b>3 · Complete local beta</b><small class="num">4–6 wk · next</small></div>
+        <div class="row is-done">
+          <div class="row-label"><b>3 · Complete local beta</b><small class="num">4–6 wk · done</small></div>
           <div class="track">
             <div class="grid" aria-hidden="true">
               <i class="tick-line" style="left:0%"></i><i class="tick-line" style="left:16.667%"></i><i class="tick-line" style="left:33.333%"></i><i class="tick-line" style="left:50%"></i><i class="tick-line" style="left:66.667%"></i><i class="tick-line" style="left:83.333%"></i><i class="tick-line" style="left:100%"></i>
@@ -381,7 +381,7 @@
           </div>
         </div>
         <div class="row">
-          <div class="row-label"><b>4 · Release quality</b><small class="num">2–3 wk</small></div>
+          <div class="row-label"><b>4 · Release quality</b><small class="num">2–3 wk · next</small></div>
           <div class="track">
             <div class="grid" aria-hidden="true">
               <i class="tick-line" style="left:0%"></i><i class="tick-line" style="left:16.667%"></i><i class="tick-line" style="left:33.333%"></i><i class="tick-line" style="left:50%"></i><i class="tick-line" style="left:66.667%"></i><i class="tick-line" style="left:83.333%"></i><i class="tick-line" style="left:100%"></i>
@@ -470,29 +470,32 @@
         </div>
       </article>
 
-      <article class="ms current">
+      <article class="ms done-card">
         <div class="ms-index" aria-hidden="true">3</div>
         <div class="ms-body">
-          <div class="ms-top"><h3>Complete local beta</h3><span class="pill next">Next</span><span class="weeks num">4–6 eng-weeks</span></div>
+          <div class="ms-top"><h3>Complete local beta</h3><span class="pill done">Done · 23 Sep</span><span class="weeks num">4–6 eng-weeks</span></div>
           <p class="exit"><b>Exit:</b> tables, attachments, tags, Smart Folders, gallery, note links, import/export and Quick Note all integrated.</p>
           <ul class="ticks">
-            <li>Tags and Smart Folders</li>
-            <li>Gallery view and attachment browser</li>
-            <li>Markdown/text import; Markdown, HTML and PDF export</li>
-            <li>Quick Note window and command-line capture</li>
-            <li>In-note find</li>
+            <li class="y">#tags from note text, with a tag list and live counts</li>
+            <li class="y">Smart Folders (tags, checklists, attachments, pinned, dates, folder)</li>
+            <li class="y">Gallery view and attachment browser with async thumbnails</li>
+            <li class="y">Markdown/text import with images; Markdown, HTML and PDF export</li>
+            <li class="y">Quick Note window, desktop actions and command-line capture</li>
+            <li class="y">Single-instance hand-off between launches</li>
+            <li class="y">Find in note with highlighted matches</li>
+            <li class="y">Schema v2 migration for existing libraries and backups</li>
           </ul>
         </div>
       </article>
 
-      <article class="ms">
+      <article class="ms current">
         <div class="ms-index" aria-hidden="true">4</div>
         <div class="ms-body">
-          <div class="ms-top"><h3>Release quality</h3><span class="pill planned">Planned</span><span class="weeks num">2–3 eng-weeks</span></div>
+          <div class="ms-top"><h3>Release quality</h3><span class="pill next">Next</span><span class="weeks num">2–3 eng-weeks</span></div>
           <p class="exit"><b>Exit:</b> Omarchy packaging, theme integration, accessibility, performance and recovery gates pass; migration documentation complete.</p>
           <ul class="ticks">
             <li>Arch package with desktop entry, AppStream and MIME types</li>
-            <li>Single-instance activation over D-Bus</li>
+            <li class="y">Single-instance activation (local socket + Wayland activation token)</li>
             <li>Optional Quick Note Hyprland binding</li>
             <li>All five release gates pass</li>
           </ul>
@@ -514,10 +517,10 @@
         <tbody>
           <tr><td>Capture &amp; editing</td><td><div class="chips"><span class="chip y">Instant new note</span><span class="chip y">Autosave</span><span class="chip y">Headings</span><span class="chip y">Bold · italic · underline · strike</span><span class="chip y">Highlight</span><span class="chip y">Lists</span><span class="chip y">Checklists</span><span class="chip y">Undo / redo</span></div></td><td>Collapsible sections</td></tr>
           <tr><td>Structured content</td><td><div class="chips"><span class="chip y">Editable tables</span><span class="chip y">Note links</span><span class="chip y">Pasted links</span><span class="chip y">Inline images</span><span class="chip y">File &amp; PDF attachments</span></div></td><td>Rich link previews, PDF annotation, drawing</td></tr>
-          <tr><td>Organization</td><td><div class="chips"><span class="chip y">Nested folders</span><span class="chip y">Move / duplicate</span><span class="chip y">Pin</span><span class="chip y">Sorting</span><span class="chip">Tags</span><span class="chip">Smart Folders</span><span class="chip y">Recoverable trash</span></div></td><td>More filters</td></tr>
-          <tr><td>Browsing &amp; retrieval</td><td><div class="chips"><span class="chip y">Note list</span><span class="chip">Gallery</span><span class="chip">Attachment browser</span><span class="chip y">Full-text search</span><span class="chip y">Matching snippets</span><span class="chip">In-note find</span></div></td><td>OCR, attachment-content search</td></tr>
-          <tr><td>Quick capture</td><td><div class="chips"><span class="chip">Quick Note window</span><span class="chip">Desktop launch action</span><span class="chip">CLI capture</span></div></td><td>Browser capture, shell widget</td></tr>
-          <tr><td>Portability</td><td><div class="chips"><span class="chip">Markdown / text import</span><span class="chip">Markdown · HTML · PDF export</span><span class="chip y">Backup &amp; restore</span></div></td><td>ENEX and richer importers</td></tr>
+          <tr><td>Organization</td><td><div class="chips"><span class="chip y">Nested folders</span><span class="chip y">Move / duplicate</span><span class="chip y">Pin</span><span class="chip y">Sorting</span><span class="chip y">Tags</span><span class="chip y">Smart Folders</span><span class="chip y">Recoverable trash</span></div></td><td>More filters</td></tr>
+          <tr><td>Browsing &amp; retrieval</td><td><div class="chips"><span class="chip y">Note list</span><span class="chip y">Gallery</span><span class="chip y">Attachment browser</span><span class="chip y">Full-text search</span><span class="chip y">Matching snippets</span><span class="chip y">In-note find</span></div></td><td>OCR, attachment-content search</td></tr>
+          <tr><td>Quick capture</td><td><div class="chips"><span class="chip y">Quick Note window</span><span class="chip y">Desktop launch action</span><span class="chip y">CLI capture</span></div></td><td>Browser capture, shell widget</td></tr>
+          <tr><td>Portability</td><td><div class="chips"><span class="chip y">Markdown / text import</span><span class="chip y">Markdown · HTML · PDF export</span><span class="chip y">Backup &amp; restore</span></div></td><td>ENEX and richer importers</td></tr>
           <tr><td>Privacy</td><td><div class="chips"><span class="chip y">Offline</span><span class="chip y">No account</span></div></td><td>Encrypted locked notes</td></tr>
           <tr><td>Media</td><td><div class="chips"><span class="chip y">Open attachments with desktop apps</span></div></td><td>Audio + transcription, math, writing help</td></tr>
           <tr><td>Devices &amp; teams</td><td><div class="chips"><span class="chip y">Local library</span></div></td><td>Sync, then sharing and collaboration</td></tr>
@@ -550,7 +553,7 @@
           <li><span><b>Theme and font changes</b> rebuild the document and clear undo history.</span></li>
           <li><span><b>Image decoding</b> runs on the UI thread during note load.</span></li>
           <li><span><b>Very large notes</b> open in ~0.9 s at 3,000 blocks (offscreen); re-measure on real hardware.</span></li>
-          <li><span><b>Single instance</b> is a lock file; D-Bus activation is still to come.</span></li>
+          <li><span><b>Quick Note on a key</b> and its floating rule are documented, not installed; an optional, conflict-checked installer comes with packaging.</span></li>
           <li><span><b>Drag and drop</b>: notes move between folders by menu for now; dragging notes and folders comes later.</span></li>
           <li><span><b>Manual desktop checks:</b> fcitx5, Orca, fractional scaling, portal file dialogs.</span></li>
         </ul>

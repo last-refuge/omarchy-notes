@@ -1,5 +1,6 @@
 #include "AppLibrary.h"
 
+#include "DocumentConverter.h"
 #include "LibraryBackup.h"
 #include "LibraryPaths.h"
 #include "NoteExchange.h"
@@ -582,6 +583,44 @@ QString AppLibrary::createNote()
         emit searchTextChanged();
         m_key = u"all"_s;
         emit viewChanged();
+    }
+    refresh();
+    return note->id;
+}
+
+QString AppLibrary::createQuickNote()
+{
+    QString error;
+    const auto note = m_service->createNote(RichDocument{{Block::paragraph()}}, &error);
+    if (!note) {
+        emit errorOccurred(tr("Couldn't create a note: %1").arg(error));
+        return {};
+    }
+    refresh();
+    return note->id;
+}
+
+bool AppLibrary::discardIfEmpty(const QString &noteId)
+{
+    const auto note = m_service->loadNote(noteId);
+    if (!note || !note->body.plainText().trimmed().isEmpty() || !note->body.referencedBlobs().isEmpty()
+        || !note->body.referencedAttachments().isEmpty())
+        return false;
+    const bool removed = m_service->trashNote(noteId) && m_service->deleteNotePermanently(noteId);
+    refresh();
+    emit noteMetaChanged(noteId);
+    return removed;
+}
+
+QString AppLibrary::captureText(const QString &text)
+{
+    if (text.trimmed().isEmpty())
+        return {};
+    QString error;
+    const auto note = m_service->createNote(DocumentConverter::fromPlainText(text.trimmed()), &error);
+    if (!note) {
+        emit errorOccurred(tr("Couldn't save the captured note: %1").arg(error));
+        return {};
     }
     refresh();
     return note->id;

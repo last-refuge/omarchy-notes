@@ -11,7 +11,7 @@ Rich notes with checklists, tables, images and attachments. They live on your ma
 ![C++20](https://img.shields.io/badge/C%2B%2B-20-00599c?logo=cplusplus&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-FTS5-003b57?logo=sqlite&logoColor=white)
 ![Wayland](https://img.shields.io/badge/Wayland-native-ffbc00)
-![Status](https://img.shields.io/badge/status-alpha-orange)
+![Status](https://img.shields.io/badge/status-beta-yellow)
 
 <img src="docs/images/screenshot-dark.png" alt="Omarchy Notes showing a meeting note with headings, nested lists, checklists, a table, a chart image and a PDF attachment, in the Kanagawa theme" width="820">
 
@@ -24,7 +24,7 @@ Rich notes with checklists, tables, images and attachments. They live on your ma
 The idea is simple: Apple Notes' easy note-taking, on Linux. Open it, start typing, and trust it's saved. It's a real desktop app built with Qt, not a web page in a wrapper. It works offline with no account, and it follows whatever Omarchy theme you're using, even when you switch themes while it's open.
 
 > [!NOTE]
-> **This is an alpha.** Everyday note-taking works: writing, folders, search, trash and backups. Tags, import/export and a Quick Note window are still to come. Check the [roadmap](#-roadmap) for what's next.
+> **This is a beta.** Everything you'd use day to day is here: writing, folders, tags, search, Smart Folders, Quick Note, import/export and backups. Packaging and final polish come next. Check the [roadmap](#-roadmap) for what's left.
 
 ## ✨ What you can do today
 
@@ -35,7 +35,12 @@ The idea is simple: Apple Notes' easy note-taking, on Linux. Open it, start typi
 - 🖼️ **Images and attachments.** Add images from the toolbar or paste them in, and attach PDFs or any other file. Double-click one to open it in its usual app.
 - 🔗 **Link notes together.** Ctrl+L links to another note, and Ctrl+click follows a link.
 - 🗂️ **Folders.** Nest folders as deep as you like, move notes between them, and use All Notes to see everything at once.
-- 🔍 **Search everything.** Results appear as you type, with the matching words in bold. Partial words work too: "bench" finds "benchmark".
+- 🏷️ **Tags.** Type `#anything` in a note and it becomes a tag, listed in the sidebar with a count. Ctrl+click a tag to see every note that has it.
+- ✨ **Smart Folders.** Save a filter, like "tagged #work, has a checklist, edited this week", and it stays up to date by itself.
+- 🖼️ **Gallery and attachments.** Flip the note list to a gallery of cards with image previews, or browse every image and file across all your notes in one place.
+- ⚡ **Quick Note.** A small window for jotting something down without opening the whole app. It's in the launcher menu, and you can bind it to a key (see below).
+- 🔍 **Search everything.** Results appear as you type, with the matching words in bold. Partial words work too: "bench" finds "benchmark". Ctrl+F finds text inside the note you're reading.
+- 📤 **Your notes aren't locked in.** Import Markdown and text files (including their images), export any note as Markdown, HTML or PDF, or export everything as a folder of Markdown files.
 - 📌 **Pin what matters.** Pinned notes stay at the top. Sort the rest by date edited, date created or title.
 - 🗑️ **Undo a delete.** Deleted notes wait in Recently Deleted for 30 days before they're gone for good. Deleting a folder moves its notes there too.
 - 💾 **Backups you can trust.** One click saves a complete copy of your library, attachments included. Restoring checks the backup first and keeps your current notes aside, so you can always go back.
@@ -73,6 +78,20 @@ That puts `omarchy-notes` in `~/.local/bin` and adds it to your app launcher.
 
 To update later, `git pull` and run the last two `cmake` commands again. Your notes aren't touched.
 
+### ⚡ Quick Note on a key (optional)
+
+Add a binding to `~/.config/hypr/bindings.lua`. <kbd>Super</kbd> <kbd>Alt</kbd> <kbd>N</kbd> is free in a default Omarchy setup:
+
+```lua
+o.bind("SUPER + ALT + N", "Quick Note", { launch = "omarchy-notes --quick-note" })
+```
+
+To make the Quick Note window float, add this to `~/.config/hypr/hyprland.lua`:
+
+```lua
+o.window({ class = "^app\\.omarchynotes\\.Notes$", title = "^Quick Note$" }, { tag = "+floating-window" })
+```
+
 ## 🗂️ Where your notes live
 
 Everything is stored in `~/.local/share/omarchy-notes/`: an SQLite database for your notes, plus a folder of attached files. Reinstalling or removing the app never touches it.
@@ -93,6 +112,8 @@ omarchy-notes --data-dir /tmp/notes-playground --samples
 | `--data-dir <dir>` | Use a notes library in a different folder |
 | `--new` | Start with a fresh note |
 | `--note <id>` | Open a specific note |
+| `--quick-note` | Open a Quick Note window |
+| `--capture <text>` | Save text as a new note without opening a window (use `-` to read from a pipe, like `echo "idea" \| omarchy-notes --capture -`) |
 | `--samples` | Fill an empty library with example notes (a meeting note with a table, image and PDF, some research links, and a grocery list) |
 | `--simulate-save-failure` | Make saves fail on purpose, to see how the app handles it. <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> toggles this while running |
 
@@ -103,7 +124,7 @@ omarchy-notes --data-dir /tmp/notes-playground --samples
 | | Shortcut |
 |---|---|
 | New note · New folder | <kbd>Ctrl</kbd> <kbd>N</kbd> · <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>N</kbd> |
-| Search all notes | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>F</kbd> |
+| Search all notes · Find in note | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>F</kbd> · <kbd>Ctrl</kbd> <kbd>F</kbd> (then <kbd>F3</kbd> / <kbd>Enter</kbd> for the next match) |
 | Delete the selected note | <kbd>Delete</kbd> (in the note list) |
 | Duplicate note | <kbd>Ctrl</kbd> <kbd>D</kbd> |
 | Show or hide folders | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>S</kbd> |
@@ -115,7 +136,7 @@ omarchy-notes --data-dir /tmp/notes-playground --samples
 | Indent · Outdent a list item | <kbd>Tab</kbd> · <kbd>Shift</kbd> <kbd>Tab</kbd> |
 | Insert a table | <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>T</kbd> |
 | Attach a file · Link to a note | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>A</kbd> · <kbd>Ctrl</kbd> <kbd>L</kbd> |
-| Follow a link · Open an attachment | <kbd>Ctrl</kbd> + click · double-click |
+| Follow a link or #tag · Open an attachment | <kbd>Ctrl</kbd> + click · double-click |
 
 ## 🗺️ Roadmap
 
@@ -123,8 +144,8 @@ omarchy-notes --data-dir /tmp/notes-playground --samples
 |---|---|---|
 | ✅ | **Editor & storage** | Rich editing, autosave, crash-safe storage, theme support |
 | ✅ | **Daily-use alpha** | Delete & trash, folders, pinning, search, backup & restore |
-| 🔜 | **Local beta** | Tags, Smart Folders, gallery view, import/export, Quick Note, find in note |
-| 📅 | **1.0** | Arch package, accessibility polish, performance targets met |
+| ✅ | **Local beta** | Tags, Smart Folders, gallery view, import/export, Quick Note, find in note |
+| 🔜 | **1.0** | Arch package, accessibility polish, performance targets met |
 | 💭 | **After 1.0** | Locked notes, OCR, audio, sync between devices, sharing |
 
 The full plan is in [`llm-docs/omarchy-notes-plan.md`](llm-docs/omarchy-notes-plan.md), with a visual version in [`llm-docs/roadmap.html`](llm-docs/roadmap.html) (download it and open it in a browser). Big technical decisions are written up in [`docs/decisions/`](docs/decisions/).

@@ -40,7 +40,9 @@ class ThemeController : public QObject
     Q_PROPERTY(QColor tableBorder READ tableBorder NOTIFY changed)
 
 public:
-    explicit ThemeController(QObject *parent = nullptr);
+    // Not default-constructible on purpose: QML must use create(), which
+    // returns the one shared instance, rather than making its own.
+    explicit ThemeController(QObject *parent);
 
     static ThemeController *create(QQmlEngine *, QJSEngine *);
     static void setInstance(ThemeController *instance);

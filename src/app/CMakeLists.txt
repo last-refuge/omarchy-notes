@@ -5,7 +5,9 @@ qt_add_qml_module(notes_app_lib
     VERSION 1.0
     OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/qml/OmarchyNotes
     SOURCES
+        AppController.cpp AppController.h
         AppLibrary.cpp AppLibrary.h
+        InstanceChannel.cpp InstanceChannel.h
         BlobImageProvider.cpp BlobImageProvider.h
         EditorController.cpp EditorController.h
         ThemeController.cpp ThemeController.h
@@ -23,6 +25,7 @@ qt_add_qml_module(notes_app_lib
         qml/SmartFolderDialog.qml
         qml/NoteMenu.qml
         qml/AttachmentsView.qml
+        qml/QuickNoteWindow.qml
     RESOURCES
         icons/compose.svg
         icons/bullets.svg
@@ -54,7 +57,7 @@ qt_add_qml_module(notes_app_lib
 
 target_include_directories(notes_app_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(notes_app_lib PUBLIC
-    notes_core Qt6::Quick Qt6::Qml Qt6::QuickControls2)
+    notes_core Qt6::Quick Qt6::Qml Qt6::QuickControls2 Qt6::Network)
 
 qt_add_executable(${ONOTES_BINARY_NAME} main.cpp)
 target_link_libraries(${ONOTES_BINARY_NAME} PRIVATE notes_app_lib notes_app_libplugin)

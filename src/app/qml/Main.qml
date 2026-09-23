@@ -25,7 +25,8 @@ ApplicationWindow {
     height: 780
     minimumWidth: 360
     minimumHeight: 400
-    visible: true
+    // Launched for a Quick Note, only that window shows at first.
+    visible: !App.startHidden
     title: qsTr("Omarchy Notes")
     color: Theme.canvas
 
@@ -174,6 +175,37 @@ ApplicationWindow {
             showingEditor = false // reopen on the gallery or attachments
         else
             editorPane.focusEditor()
+        if (App.startWithQuickNote)
+            quickNote.start("")
+    }
+
+    // Requests from other launches (desktop actions, the command line).
+    Connections {
+        target: App
+        function onActivateRequested(token) { App.activate(window, token) }
+        function onNewNoteRequested(token) {
+            App.activate(window, token)
+            window.newNote()
+        }
+        function onQuickNoteRequested(token) { quickNote.start(token) }
+        function onOpenNoteRequested(noteId, token) {
+            App.activate(window, token)
+            window.openNote(noteId)
+        }
+        function onCaptured(noteId) {
+            if (window.visible)
+                toast.show(qsTr("Captured a new note."))
+        }
+    }
+
+    QuickNoteWindow {
+        id: quickNote
+        objectName: "quickNote"
+        onOpenInNotes: noteId => {
+            App.activate(window, "")
+            window.showView("all")
+            window.openNote(noteId)
+        }
     }
 
     onClosing: close => {

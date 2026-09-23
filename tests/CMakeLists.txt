@@ -22,3 +22,7 @@ if(TARGET notes_app_lib AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tst_editor.cpp)
     target_compile_definitions(tst_editor PRIVATE SCREENSHOT_DIR="${CMAKE_BINARY_DIR}/screenshots")
     set_tests_properties(tst_editor PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
 endif()
+
+onotes_test(tst_launch)
+target_compile_definitions(tst_launch PRIVATE APP_PATH="$<TARGET_FILE:${ONOTES_BINARY_NAME}>")
+add_dependencies(tst_launch ${ONOTES_BINARY_NAME})

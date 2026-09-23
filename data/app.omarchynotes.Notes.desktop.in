@@ -10,3 +10,12 @@ Categories=Office;
 Keywords=notes;notebook;checklist;todo;omarchy;
 StartupNotify=true
 StartupWMClass=@ONOTES_APP_ID@
+Actions=new-note;quick-note;
+
+[Desktop Action new-note]
+Name=New Note
+Exec=@ONOTES_BIN@ --new
+
+[Desktop Action quick-note]
+Name=Quick Note
+Exec=@ONOTES_BIN@ --quick-note

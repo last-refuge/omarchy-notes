@@ -1,10 +1,16 @@
+#include "AppController.h"
+#include "DocumentConverter.h"
 #include "AppLibrary.h"
+#include "InstanceChannel.h"
 #include "BlobImageProvider.h"
 #include "LibraryService.h"
 #include "SampleLibrary.h"
 #include "ThemeController.h"
 
 #include <QCommandLineParser>
+#include <QFile>
+#include <QJsonObject>
+#include <QThread>
 #include <QDir>
 #include <QGuiApplication>
 #include <QLockFile>
@@ -33,22 +39,66 @@ int main(int argc, char *argv[])
     const QCommandLineOption dataDir(u"data-dir"_s, u"Use the library in <dir>."_s, u"dir"_s);
     const QCommandLineOption newNote(u"new"_s, u"Start with a new note."_s);
     const QCommandLineOption openNote(u"note"_s, u"Open the note with <id>."_s, u"id"_s);
+    const QCommandLineOption quickNote(u"quick-note"_s, u"Open a Quick Note window."_s);
+    const QCommandLineOption capture(u"capture"_s, u"Save <text> as a new note (\"-\" reads standard input)."_s,
+                                     u"text"_s);
     const QCommandLineOption samples(u"samples"_s, u"Add sample notes if the library is empty."_s);
     const QCommandLineOption failSaves(u"simulate-save-failure"_s,
                                        u"Make saves fail (for testing failure handling)."_s);
-    parser.addOptions({dataDir, newNote, openNote, samples, failSaves});
+    parser.addOptions({dataDir, newNote, openNote, quickNote, capture, samples, failSaves});
     parser.process(app);
 
     const onotes::LibraryPaths paths = parser.isSet(dataDir)
         ? onotes::LibraryPaths::at(parser.value(dataDir))
         : onotes::LibraryPaths::standard();
 
-    // One process owns a library. Activating the running instance instead
-    // (D-Bus) comes with the desktop integration milestone.
+    // What this launch is asking for.
+    QString captured;
+    if (parser.isSet(capture)) {
+        captured = parser.value(capture);
+        if (captured == u"-") {
+            QFile in;
+            if (in.open(stdin, QIODevice::ReadOnly))
+                captured = QString::fromUtf8(in.readAll());
+        }
+        if (captured.trimmed().isEmpty()) {
+            std::fprintf(stderr, "Nothing to capture.\n");
+            return 1;
+        }
+    }
+    QJsonObject request{{u"token"_s, qEnvironmentVariable("XDG_ACTIVATION_TOKEN")}};
+    if (parser.isSet(capture))
+        request[u"action"_s] = u"capture"_s, request[u"text"_s] = captured;
+    else if (parser.isSet(quickNote))
+        request[u"action"_s] = u"quick-note"_s;
+    else if (parser.isSet(newNote))
+        request[u"action"_s] = u"new"_s;
+    else if (parser.isSet(openNote))
+        request[u"action"_s] = u"open"_s, request[u"note"_s] = parser.value(openNote);
+    else
+        request[u"action"_s] = u"activate"_s;
+
+    // One process owns a library: hand the request to it if it's running.
+    const QString socket = InstanceChannel::socketPath(paths);
+    auto delivered = [&] {
+        if (!InstanceChannel::send(socket, request))
+            return false;
+        if (parser.isSet(capture))
+            std::printf("Saved to Omarchy Notes.\n");
+        return true;
+    };
+    if (delivered())
+        return 0;
     QDir().mkpath(paths.root);
     QLockFile lock(paths.root + u"/.lock"_s);
     if (!lock.tryLock(200)) {
-        std::fprintf(stderr, "Omarchy Notes is already running for %s\n", qPrintable(paths.root));
+        // Another instance is starting up; give it a moment to listen.
+        for (int attempt = 0; attempt < 20; ++attempt) {
+            QThread::msleep(150);
+            if (delivered())
+                return 0;
+        }
+        std::fprintf(stderr, "Omarchy Notes is running for %s but isn't responding.\n", qPrintable(paths.root));
         return 1;
     }
 
@@ -58,16 +108,34 @@ int main(int argc, char *argv[])
         std::fprintf(stderr, "Could not open the notes library: %s\n", qPrintable(error));
         return 1;
     }
+    // Capturing without a running app needs no window.
+    if (parser.isSet(capture)) {
+        const auto note = service.createNote(onotes::DocumentConverter::fromPlainText(captured.trimmed()), &error);
+        if (!note) {
+            std::fprintf(stderr, "Could not save the note: %s\n", qPrintable(error));
+            return 1;
+        }
+        std::printf("Saved to Omarchy Notes.\n");
+        return 0;
+    }
     if (parser.isSet(samples) && service.listNotes().isEmpty()) {
         if (onotes::SampleLibrary::seed(service, &error).isEmpty())
             std::fprintf(stderr, "Could not add sample notes: %s\n", qPrintable(error));
     }
     service.setSimulatedSaveFailure(parser.isSet(failSaves));
 
-    ThemeController theme;
+    ThemeController theme(nullptr);
     ThemeController::setInstance(&theme);
     AppLibrary library(&service);
     AppLibrary::setInstance(&library);
+    AppController controller(nullptr);
+    controller.setStartWithQuickNote(parser.isSet(quickNote));
+    AppController::setInstance(&controller);
+    InstanceChannel channel;
+    QString listenError;
+    if (!channel.listen(socket, &listenError))
+        std::fprintf(stderr, "Other launches won't reach this window: %s\n", qPrintable(listenError));
+    QObject::connect(&channel, &InstanceChannel::requestReceived, &controller, &AppController::handle);
 
     QString initialNote = parser.value(openNote);
     if (parser.isSet(newNote))
