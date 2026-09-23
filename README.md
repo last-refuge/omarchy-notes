@@ -6,6 +6,7 @@
 
 Rich notes with checklists, tables, images and attachments. They live on your machine and match your Omarchy theme.
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Qt 6.8+](https://img.shields.io/badge/Qt-6.8%2B-41cd52?logo=qt&logoColor=white)
 ![C++20](https://img.shields.io/badge/C%2B%2B-20-00599c?logo=cplusplus&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-FTS5-003b57?logo=sqlite&logoColor=white)
@@ -148,9 +149,13 @@ The editor tests drive the real app off-screen and save screenshots to `build/sc
 
 Found a bug or have an idea? [Open an issue](https://github.com/jasona/omarchy-notes/issues). It's early days, so feedback shapes where this goes.
 
+## 🔒 Security
+
+If you find a security issue, please **don't** open a public issue. Report it privately by following the steps in [SECURITY.md](SECURITY.md).
+
 ## 📄 License
 
-No license has been chosen yet. Until one is added, all rights are reserved.
+Omarchy Notes is released under the [MIT License](LICENSE).
 
 ---
 
