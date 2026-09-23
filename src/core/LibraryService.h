@@ -44,7 +44,10 @@ public:
     // Queues a save; the result arrives through saveFinished with the ticket.
     quint64 saveNote(const SaveRequest &request);
     // Blocks until every queued save has been committed or has failed.
+    // Their saveFinished signals are still delivered through the event loop;
+    // call deliverPendingResults() to receive them immediately.
     void waitForIdle();
+    void deliverPendingResults();
 
     // Makes subsequent saves fail, for exercising failure handling.
     void setSimulatedSaveFailure(bool fail) { m_simulateFailure = fail; }

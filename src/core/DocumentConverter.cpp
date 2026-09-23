@@ -69,8 +69,7 @@ private:
     {
         beginBlock();
 
-        QTextBlockFormat bf;
-        bf.setLineHeight(m_style.lineHeightPercent, QTextBlockFormat::ProportionalHeight);
+        QTextBlockFormat bf = m_style.bodyBlockFormat();
         if (block.type == Block::Type::Heading) {
             bf.setHeadingLevel(block.level);
             bf.setTopMargin(block.level == 1 ? 4 : 10);
@@ -153,6 +152,7 @@ private:
             fmt.setName(DocumentConverter::attachmentResourceName(span.ref));
             fmt.setWidth(m_style.attachmentChipSize.width());
             fmt.setHeight(m_style.attachmentChipSize.height());
+            fmt.setVerticalAlignment(QTextCharFormat::AlignMiddle);
             m_cursor.insertImage(fmt);
             break;
         }
@@ -407,6 +407,13 @@ qreal DocumentStyle::headingPixelSize(int level) const
     }
 }
 
+QTextBlockFormat DocumentStyle::bodyBlockFormat() const
+{
+    QTextBlockFormat bf;
+    bf.setLineHeight(std::round(bodyPixelSize * lineSpacing), QTextBlockFormat::LineDistanceHeight);
+    return bf;
+}
+
 void ConversionReport::warn(const QString &message)
 {
     if (!warnings.contains(message))
@@ -483,8 +490,8 @@ RichDocument DocumentConverter::fromPlainText(const QString &text)
 
 QTextCharFormat DocumentConverter::charFormatForBlock(const Block &block, const DocumentStyle &style)
 {
+    // Plain text color is left to the editor so theme changes need no rebuild.
     QTextCharFormat fmt;
-    fmt.setForeground(style.text);
     if (block.type == Block::Type::Heading) {
         fmt.setProperty(QTextFormat::FontPixelSize, int(style.headingPixelSize(block.level)));
         fmt.setFontWeight(QFont::Bold);

@@ -1,5 +1,6 @@
 #include "LibraryService.h"
 
+#include <QCoreApplication>
 #include <QMetaObject>
 
 using namespace Qt::StringLiterals;
@@ -127,6 +128,12 @@ void LibraryService::waitForIdle()
     // The persistence thread processes calls in order, so a blocking no-op
     // returns only after every earlier save.
     blocking([] { return true; });
+}
+
+void LibraryService::deliverPendingResults()
+{
+    waitForIdle();
+    QCoreApplication::sendPostedEvents(this, QEvent::MetaCall);
 }
 
 } // namespace onotes

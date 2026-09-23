@@ -20,8 +20,9 @@ namespace onotes {
 // user font settings, and changing them means reloading the document.
 struct DocumentStyle {
     qreal bodyPixelSize = 15;
-    qreal lineHeightPercent = 135;
-    QColor text = QColor(0x20, 0x20, 0x20);
+    // Extra space between lines, as a fraction of the body size. A fixed
+    // distance (not a proportional height) keeps lines holding images tight.
+    qreal lineSpacing = 0.35;
     QColor link = QColor(0x2f, 0x6f, 0xd0);
     QColor highlight = QColor(255, 204, 0, 110);
     QColor tableBorder = QColor(0x90, 0x90, 0x90);
@@ -30,6 +31,7 @@ struct DocumentStyle {
     int maxImageWidth = 640;
 
     qreal headingPixelSize(int level) const;
+    QTextBlockFormat bodyBlockFormat() const;
 };
 
 // Semantic markers stored on QTextFormats so that reading a document back
