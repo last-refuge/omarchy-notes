@@ -1,0 +1,616 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Omarchy Notes Roadmap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,650;12..96,750&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --ground: #f3f4f7;
+    --surface: #ffffff;
+    --sunken: #e8eaf0;
+    --ink: #1f1f28;
+    --ink-2: #44475a;
+    --ink-3: #62657a;
+    --rule: #d5d8e2;
+    --accent: #2d4f8e;
+    --accent-soft: #dde5f4;
+    --done: #3b6a2b;
+    --done-soft: #e1edd8;
+    --warn: #7f5c10;
+    --warn-soft: #f4e8cb;
+    --hatch: rgba(45, 79, 142, 0.28);
+    --contingency: rgba(127, 92, 16, 0.10);
+
+    --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    --body: "IBM Plex Sans", "Helvetica Neue", Arial, system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+    --step--1: 0.8125rem;
+    --step-0: 1rem;
+    --step-1: 1.1875rem;
+    --step-2: 1.5rem;
+    --step-3: 2.25rem;
+    --step-4: clamp(2.5rem, 6vw, 3.75rem);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ground: #1f1f28;
+      --surface: #262634;
+      --sunken: #17171e;
+      --ink: #dcd7ba;
+      --ink-2: #c1bca2;
+      --ink-3: #9b9783;
+      --rule: #363646;
+      --accent: #7e9cd8;
+      --accent-soft: #29344d;
+      --done: #98bb6c;
+      --done-soft: #2a3423;
+      --warn: #e6c384;
+      --warn-soft: #3a3222;
+      --hatch: rgba(126, 156, 216, 0.30);
+      --contingency: rgba(230, 195, 132, 0.09);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ground: #1f1f28;
+    --surface: #262634;
+    --sunken: #17171e;
+    --ink: #dcd7ba;
+    --ink-2: #c1bca2;
+    --ink-3: #9b9783;
+    --rule: #363646;
+    --accent: #7e9cd8;
+    --accent-soft: #29344d;
+    --done: #98bb6c;
+    --done-soft: #2a3423;
+    --warn: #e6c384;
+    --warn-soft: #3a3222;
+    --hatch: rgba(126, 156, 216, 0.30);
+    --contingency: rgba(230, 195, 132, 0.09);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: var(--step-0);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page {
+    max-width: 68rem;
+    margin: 0 auto;
+    padding-inline: clamp(16px, 4vw, 40px);
+    padding-block: clamp(32px, 6vw, 64px) 48px;
+    display: grid;
+    gap: clamp(48px, 7vw, 80px);
+  }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+  h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+  h2 { font-size: var(--step-3); font-weight: 650; letter-spacing: -0.015em; line-height: 1.1; }
+  h3 { font-size: var(--step-1); font-weight: 650; line-height: 1.25; }
+  p { margin: 0; }
+  .label {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .muted { color: var(--ink-2); }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ---------- header ---------- */
+  header { display: grid; gap: 20px; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .glyph {
+    width: 34px; height: 34px; border-radius: 8px;
+    background: var(--ink); color: var(--ground);
+    display: grid; place-items: center;
+    font-family: var(--mono); font-weight: 600; font-size: 0.9rem;
+  }
+  h1 { font-size: var(--step-4); font-weight: 750; letter-spacing: -0.03em; line-height: 1; }
+  h1 span { color: var(--ink-3); font-weight: 500; }
+  .lede { font-size: var(--step-1); max-width: 40rem; color: var(--ink-2); line-height: 1.55; }
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  .fact { background: var(--surface); padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+  .fact strong { font-family: var(--display); font-size: 1.15rem; font-weight: 650; line-height: 1.25; }
+  .fact small { color: var(--ink-3); font-size: var(--step--1); }
+
+  /* ---------- section heads ---------- */
+  section { display: grid; gap: 24px; }
+  .sec-head { display: grid; gap: 8px; max-width: 44rem; }
+  .sec-head p { color: var(--ink-2); }
+
+  /* ---------- status pills ---------- */
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 0.72rem; font-weight: 600;
+    letter-spacing: 0.04em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+  }
+  .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .pill.done { color: var(--done); background: var(--done-soft); }
+  .pill.next { color: var(--accent); background: var(--accent-soft); }
+  .pill.partial { color: var(--warn); background: var(--warn-soft); }
+  .pill.planned { color: var(--ink-3); background: var(--sunken); }
+  .pill.planned::before { background: transparent; border: 1.5px solid currentColor; }
+
+  /* ---------- timeline ---------- */
+  .timeline {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    padding: 20px clamp(14px, 3vw, 24px) 16px;
+    overflow-x: auto;
+  }
+  .gantt { min-width: 560px; display: grid; gap: 10px; }
+  .row { display: grid; grid-template-columns: 12.5rem 1fr; align-items: center; gap: 16px; }
+  .row-label { display: grid; gap: 2px; }
+  .row-label b { font-family: var(--display); font-weight: 650; font-size: 1rem; }
+  .row-label small { color: var(--ink-3); font-size: var(--step--1); }
+  .track { position: relative; height: 30px; }
+  .track .grid, .axis .grid { position: absolute; inset: 0; }
+  .tick-line { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--rule); }
+  .band {
+    position: absolute; top: -10px; bottom: -10px;
+    background: var(--contingency);
+    border-left: 1px dashed var(--warn);
+  }
+  .bar {
+    position: absolute; top: 5px; height: 20px; border-radius: 5px;
+  }
+  .bar.solid { background: var(--accent); }
+  .bar.range {
+    background: repeating-linear-gradient(135deg, var(--hatch) 0 5px, transparent 5px 9px);
+    border: 1px solid var(--hatch);
+    border-left: none;
+    border-radius: 0 5px 5px 0;
+  }
+  .row.is-done .bar.solid { background: var(--done); }
+  .row.is-partial .bar.solid {
+    background: linear-gradient(90deg, var(--done) 0 50%, var(--accent) 50% 100%);
+  }
+  .axis { position: relative; height: 22px; margin-top: 4px; }
+  .axis-row { display: grid; grid-template-columns: 12.5rem 1fr; gap: 16px; }
+  .tick {
+    position: absolute; transform: translateX(-50%);
+    font-family: var(--mono); font-size: 0.7rem; color: var(--ink-3);
+  }
+  .tick:first-child { transform: none; }
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 14px;
+    font-size: var(--step--1); color: var(--ink-2);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .sw { width: 22px; height: 10px; border-radius: 3px; display: inline-block; }
+  .sw.solid { background: var(--accent); }
+  .sw.done { background: var(--done); }
+  .sw.range { background: repeating-linear-gradient(135deg, var(--hatch) 0 4px, transparent 4px 7px); border: 1px solid var(--hatch); }
+  .sw.cont { background: var(--contingency); border-left: 1px dashed var(--warn); }
+
+  /* ---------- milestones ---------- */
+  .milestones { display: grid; gap: 14px; }
+  .ms {
+    display: grid;
+    grid-template-columns: 4.5rem 1fr;
+    gap: 20px;
+    padding: 22px clamp(16px, 3vw, 26px);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+  }
+  .ms.current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .ms-index {
+    font-family: var(--display); font-weight: 750; font-size: 2.6rem; line-height: 1;
+    color: var(--ink-3);
+  }
+  .ms.done-card .ms-index { color: var(--done); }
+  .ms.current .ms-index { color: var(--accent); }
+  .ms-body { display: grid; gap: 12px; min-width: 0; }
+  .ms-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; }
+  .ms-top h3 { font-size: 1.35rem; }
+  .ms-top .weeks { font-family: var(--mono); font-size: 0.8rem; color: var(--ink-3); }
+  .exit { color: var(--ink-2); max-width: 46rem; }
+  .exit b { color: var(--ink); font-weight: 600; }
+  .ticks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px 24px; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); }
+  .ticks li { position: relative; padding-left: 22px; font-size: 0.95rem; color: var(--ink-2); }
+  .ticks li::before {
+    content: ""; position: absolute; left: 2px; top: 0.55em;
+    width: 10px; height: 10px; border-radius: 50%;
+    border: 1.5px solid var(--ink-3);
+  }
+  .ticks li.y::before { background: var(--done); border-color: var(--done); }
+  .ticks li.y::after {
+    content: ""; position: absolute; left: 5.5px; top: calc(0.55em + 2.5px);
+    width: 3px; height: 5px; border: solid var(--surface); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg);
+  }
+  .ticks li.p::before { border-color: var(--warn); border-style: dashed; }
+
+  /* ---------- scope table ---------- */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 12px; background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; min-width: 640px; }
+  th, td { text-align: left; vertical-align: top; padding: 14px 18px; border-bottom: 1px solid var(--rule); }
+  tr:last-child td { border-bottom: none; }
+  th { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; background: var(--sunken); }
+  td:first-child { font-family: var(--display); font-weight: 650; white-space: nowrap; }
+  td:last-child { color: var(--ink-3); font-size: 0.93rem; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font-size: 0.85rem; line-height: 1.35;
+    padding: 3px 9px; border-radius: 6px;
+    background: var(--sunken); color: var(--ink-2);
+  }
+  .chip.y { background: var(--done-soft); color: var(--done); font-weight: 500; }
+  .key { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: var(--step--1); color: var(--ink-3); align-items: center; }
+
+  /* ---------- gates ---------- */
+  .gates { display: grid; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); gap: 14px; }
+  .gate { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 20px; display: grid; gap: 10px; align-content: start; }
+  .gate p { color: var(--ink-2); font-size: 0.95rem; }
+  .perf { display: grid; gap: 0; margin-top: 4px; }
+  .perf div { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; padding: 8px 0; border-top: 1px solid var(--rule); font-size: 0.9rem; align-items: baseline; }
+  .perf dt { color: var(--ink-2); }
+  .perf dd { margin: 0; font-family: var(--mono); font-size: 0.82rem; }
+  .perf dd.meas { color: var(--ink-3); }
+  .perf .head { border-top: none; padding-top: 0; }
+  .perf .head dt, .perf .head dd { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+
+  /* ---------- two column blocks ---------- */
+  .split { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 14px; }
+  .panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 22px; display: grid; gap: 14px; align-content: start; }
+  .decisions { margin: 0; display: grid; gap: 14px; }
+  .decisions div { display: grid; gap: 2px; }
+  .decisions dt { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+  .decisions dd { margin: 0; color: var(--ink); }
+  .gaps { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+  .gaps li { display: grid; grid-template-columns: auto 1fr; gap: 10px; font-size: 0.95rem; color: var(--ink-2); }
+  .gaps li::before { content: ""; width: 6px; height: 6px; margin-top: 0.62em; border-radius: 1px; background: var(--warn); transform: rotate(45deg); }
+  .gaps b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- beyond v1 ---------- */
+  .beyond { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border-left: 2px solid var(--rule); margin-left: 8px; }
+  .beyond li { position: relative; padding: 0 0 26px 28px; display: grid; gap: 4px; }
+  .beyond li:last-child { padding-bottom: 0; }
+  .beyond li::before {
+    content: ""; position: absolute; left: -7px; top: 0.45em;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--ground); border: 2px solid var(--ink-3);
+  }
+  .beyond h3 { font-size: 1.1rem; }
+  .beyond p { color: var(--ink-2); max-width: 46rem; font-size: 0.95rem; }
+
+  footer { border-top: 1px solid var(--rule); padding-top: 20px; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; font-size: var(--step--1); color: var(--ink-3); }
+  code { font-family: var(--mono); font-size: 0.88em; background: var(--sunken); padding: 1px 5px; border-radius: 4px; }
+
+  @media (max-width: 640px) {
+    .ms { grid-template-columns: 1fr; gap: 8px; }
+    .ms-index { font-size: 1.8rem; }
+    td:first-child { white-space: normal; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .bar { transition: filter 0.15s ease; }
+    .row:hover .bar { filter: brightness(1.08); }
+  }
+</style>
+
+<div class="page">
+
+  <header>
+    <div class="brand">
+      <div class="glyph" aria-hidden="true">on</div>
+      <span class="label">jasona / omarchy-notes · Roadmap</span>
+    </div>
+    <h1>Omarchy Notes <span>roadmap</span></h1>
+    <p class="lede">A native, local-first notebook for Omarchy. It aims for Apple Notes' fast capture and rich documents, drawn in your active theme. The editor feasibility gate is passed; the next milestone is a daily-use alpha.</p>
+    <div class="facts">
+      <div class="fact"><span class="label">Now</span><strong>Milestone 1 complete</strong><small>Editor gate passed · 23 Sep 2026</small></div>
+      <div class="fact"><span class="label">Next</span><strong>Daily-use alpha</strong><small>Folders, search, trash, backup</small></div>
+      <div class="fact"><span class="label">v1 estimate</span><strong class="num">12–18 eng-weeks</strong><small>+20–30% contingency</small></div>
+      <div class="fact"><span class="label">Stack</span><strong>Qt 6.8+ · QML · SQLite</strong><small>C++20, native Wayland</small></div>
+    </div>
+  </header>
+
+  <section aria-labelledby="timeline-h">
+    <div class="sec-head">
+      <span class="label">Local v1</span>
+      <h2 id="timeline-h">Effort timeline</h2>
+      <p>Milestones are sequential, sized in engineer-weeks for one experienced native-app engineer with design support. These are planning ranges, not calendar dates. Solid bars are the optimistic estimate and hatching runs to the pessimistic one. Re-estimate now that the editor prototype exists.</p>
+    </div>
+
+    <div class="timeline" role="img" aria-label="Gantt chart of milestones 0 to 4 on a scale of 0 to 24 engineer-weeks. Scope and design: 1 to 2 weeks, partly done. Editor and storage proof: 2 to 3 weeks, done. Daily-use alpha: 3 to 4 weeks, next. Complete local beta: 4 to 6 weeks. Release quality: 2 to 3 weeks. Total 12 to 18 weeks, with contingency up to about 23 weeks.">
+      <div class="gantt">
+        <!-- scale: 0–24 weeks; 1 week = 4.1667% -->
+        <div class="row is-partial">
+          <div class="row-label"><b>0 · Scope &amp; design</b><small class="num">1–2 wk · partly done</small></div>
+          <div class="track">
+            <div class="grid" aria-hidden="true">
+              <i class="tick-line" style="left:0%"></i><i class="tick-line" style="left:16.667%"></i><i class="tick-line" style="left:33.333%"></i><i class="tick-line" style="left:50%"></i><i class="tick-line" style="left:66.667%"></i><i class="tick-line" style="left:83.333%"></i><i class="tick-line" style="left:100%"></i>
+              <i class="band" style="left:75%;width:22.5%"></i>
+            </div>
+            <div class="bar solid" style="left:0%;width:4.167%"></div>
+            <div class="bar range" style="left:4.167%;width:4.167%"></div>
+          </div>
+        </div>
+        <div class="row is-done">
+          <div class="row-label"><b>1 · Editor &amp; storage proof</b><small class="num">2–3 wk · done</small></div>
+          <div class="track">
+            <div class="grid" aria-hidden="true">
+              <i class="tick-line" style="left:0%"></i><i class="tick-line" style="left:16.667%"></i><i class="tick-line" style="left:33.333%"></i><i class="tick-line" style="left:50%"></i><i class="tick-line" style="left:66.667%"></i><i class="tick-line" style="left:83.333%"></i><i class="tick-line" style="left:100%"></i>
+              <i class="band" style="left:75%;width:22.5%"></i>
+            </div>
+            <div class="bar solid" style="left:4.167%;width:8.333%"></div>
+            <div class="bar range" style="left:12.5%;width:8.333%"></div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-label"><b>2 · Daily-use alpha</b><small class="num">3–4 wk · next</small></div>
+          <div class="track">
+            <div class="grid" aria-hidden="true">
+              <i class="tick-line" style="left:0%"></i><i class="tick-line" style="left:16.667%"></i><i class="tick-line" style="left:33.333%"></i><i class="tick-line" style="left:50%"></i><i class="tick-line" style="left:66.667%"></i><i class="tick-line" style="left:83.333%"></i><i class="tick-line" style="left:100%"></i>
+              <i class="band" style="left:75%;width:22.5%"></i>
+            </div>
+            <div class="bar solid" style="left:12.5%;width:12.5%"></div>
+            <div class="bar range" style="left:25%;width:12.5%"></div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-label"><b>3 · Complete local beta</b><small class="num">4–6 wk</small></div>
+          <div class="track">
+            <div class="grid" aria-hidden="true">
+              <i class="tick-line" style="left:0%"></i><i class="tick-line" style="left:16.667%"></i><i class="tick-line" style="left:33.333%"></i><i class="tick-line" style="left:50%"></i><i class="tick-line" style="left:66.667%"></i><i class="tick-line" style="left:83.333%"></i><i class="tick-line" style="left:100%"></i>
+              <i class="band" style="left:75%;width:22.5%"></i>
+            </div>
+            <div class="bar solid" style="left:25%;width:16.667%"></div>
+            <div class="bar range" style="left:41.667%;width:20.833%"></div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-label"><b>4 · Release quality</b><small class="num">2–3 wk</small></div>
+          <div class="track">
+            <div class="grid" aria-hidden="true">
+              <i class="tick-line" style="left:0%"></i><i class="tick-line" style="left:16.667%"></i><i class="tick-line" style="left:33.333%"></i><i class="tick-line" style="left:50%"></i><i class="tick-line" style="left:66.667%"></i><i class="tick-line" style="left:83.333%"></i><i class="tick-line" style="left:100%"></i>
+              <i class="band" style="left:75%;width:22.5%"></i>
+            </div>
+            <div class="bar solid" style="left:41.667%;width:8.333%"></div>
+            <div class="bar range" style="left:50%;width:25%"></div>
+          </div>
+        </div>
+        <div class="axis-row" aria-hidden="true">
+          <span class="label">Engineer-weeks</span>
+          <div class="axis">
+            <span class="tick num" style="left:0%">0</span>
+            <span class="tick num" style="left:16.667%">4</span>
+            <span class="tick num" style="left:33.333%">8</span>
+            <span class="tick num" style="left:50%">12</span>
+            <span class="tick num" style="left:66.667%">16</span>
+            <span class="tick num" style="left:83.333%">20</span>
+            <span class="tick num" style="left:100%">24</span>
+          </div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i class="sw done"></i>Done</span>
+        <span><i class="sw solid"></i>Optimistic estimate</span>
+        <span><i class="sw range"></i>Up to pessimistic estimate</span>
+        <span><i class="sw cont"></i>20–30% contingency after week 18 (to ~23.4)</span>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="ms-h">
+    <div class="sec-head">
+      <span class="label">Milestones</span>
+      <h2 id="ms-h">What each one delivers</h2>
+      <p>Each milestone ends on an exit condition, not a date. Once the document contract is stable, two engineers can split storage and UI work, but the editor still sets the critical path.</p>
+    </div>
+
+    <div class="milestones">
+      <article class="ms">
+        <div class="ms-index" aria-hidden="true">0</div>
+        <div class="ms-body">
+          <div class="ms-top"><h3>Scope and design</h3><span class="pill partial">Partly done</span><span class="weeks num">1–2 eng-weeks</span></div>
+          <p class="exit"><b>Exit:</b> versioned parity checklist, priority workflows, a realistic sample library, annotated visual direction.</p>
+          <ul class="ticks">
+            <li class="y">Kickoff decisions settled</li>
+            <li class="y">Realistic sample library (meeting note, checklist, research links, image, PDF)</li>
+            <li>Parity checklist against a frozen macOS Notes version</li>
+            <li>Annotated light and dark mockups, including failure states</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="ms done-card">
+        <div class="ms-index" aria-hidden="true">1</div>
+        <div class="ms-body">
+          <div class="ms-top"><h3>Editor and storage proof</h3><span class="pill done">Done · 23 Sep</span><span class="weeks num">2–3 eng-weeks</span></div>
+          <p class="exit"><b>Exit:</b> mixed-content editing round-trips without loss; undo, IME, accessibility and crash-recovery tests pass; toolkit decision recorded (<code>docs/decisions/0001</code>).</p>
+          <ul class="ticks">
+            <li class="y">Lossless schema ↔ editor round trip, including merged-cell tables</li>
+            <li class="y">Qt Quick chosen; minimum Qt 6.8; no Widgets fallback needed</li>
+            <li class="y">Every acknowledged save survives kill -9</li>
+            <li class="y">IME composition, emoji, RTL and CJK</li>
+            <li class="y">Single-step undo for formatting and for typing after Ctrl+B</li>
+            <li class="y">Live Omarchy theme following with contrast repair</li>
+            <li class="p">Accessible names for images and attachments</li>
+            <li class="p">Round checklist markers (currently ☐/☒ glyphs)</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="ms current">
+        <div class="ms-index" aria-hidden="true">2</div>
+        <div class="ms-body">
+          <div class="ms-top"><h3>Daily-use alpha</h3><span class="pill next">Next</span><span class="weeks num">3–4 eng-weeks</span></div>
+          <p class="exit"><b>Exit:</b> capture, edit, save, reopen, folders, pinning, search, trash and backup/restore work end to end.</p>
+          <ul class="ticks">
+            <li class="y">Capture, edit, autosave, reopen</li>
+            <li>Nested folders, move and duplicate</li>
+            <li>Pinning and sorting in the note list</li>
+            <li>Full-text search (FTS5) with matching snippets</li>
+            <li>Recoverable trash</li>
+            <li>Full-library backup and tested restore</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="ms">
+        <div class="ms-index" aria-hidden="true">3</div>
+        <div class="ms-body">
+          <div class="ms-top"><h3>Complete local beta</h3><span class="pill planned">Planned</span><span class="weeks num">4–6 eng-weeks</span></div>
+          <p class="exit"><b>Exit:</b> tables, attachments, tags, Smart Folders, gallery, note links, import/export and Quick Note all integrated.</p>
+          <ul class="ticks">
+            <li>Tags and Smart Folders</li>
+            <li>Gallery view and attachment browser</li>
+            <li>Markdown/text import; Markdown, HTML and PDF export</li>
+            <li>Quick Note window and command-line capture</li>
+            <li>In-note find</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="ms">
+        <div class="ms-index" aria-hidden="true">4</div>
+        <div class="ms-body">
+          <div class="ms-top"><h3>Release quality</h3><span class="pill planned">Planned</span><span class="weeks num">2–3 eng-weeks</span></div>
+          <p class="exit"><b>Exit:</b> Omarchy packaging, theme integration, accessibility, performance and recovery gates pass; migration documentation complete.</p>
+          <ul class="ticks">
+            <li>Arch package with desktop entry, AppStream and MIME types</li>
+            <li>Single-instance activation over D-Bus</li>
+            <li>Optional Quick Note Hyprland binding</li>
+            <li>All five release gates pass</li>
+          </ul>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section aria-labelledby="scope-h">
+    <div class="sec-head">
+      <span class="label">Feature scope</span>
+      <h2 id="scope-h">First release vs. later</h2>
+      <p>Apple's macOS Notes guide is the feature inventory. The first release is an everyday notebook, not full parity.</p>
+    </div>
+    <div class="key"><span class="chip y">Working in the spike</span><span class="chip">Planned for v1</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Capability</th><th scope="col">First public release</th><th scope="col">Later</th></tr></thead>
+        <tbody>
+          <tr><td>Capture &amp; editing</td><td><div class="chips"><span class="chip y">Instant new note</span><span class="chip y">Autosave</span><span class="chip y">Headings</span><span class="chip y">Bold · italic · underline · strike</span><span class="chip y">Highlight</span><span class="chip y">Lists</span><span class="chip y">Checklists</span><span class="chip y">Undo / redo</span></div></td><td>Collapsible sections</td></tr>
+          <tr><td>Structured content</td><td><div class="chips"><span class="chip y">Editable tables</span><span class="chip y">Note links</span><span class="chip y">Pasted links</span><span class="chip y">Inline images</span><span class="chip y">File &amp; PDF attachments</span></div></td><td>Rich link previews, PDF annotation, drawing</td></tr>
+          <tr><td>Organization</td><td><div class="chips"><span class="chip">Nested folders</span><span class="chip">Move / duplicate</span><span class="chip">Pin</span><span class="chip">Sorting</span><span class="chip">Tags</span><span class="chip">Smart Folders</span><span class="chip">Recoverable trash</span></div></td><td>More filters</td></tr>
+          <tr><td>Browsing &amp; retrieval</td><td><div class="chips"><span class="chip y">Note list</span><span class="chip">Gallery</span><span class="chip">Attachment browser</span><span class="chip">Full-text search</span><span class="chip">Matching snippets</span><span class="chip">In-note find</span></div></td><td>OCR, attachment-content search</td></tr>
+          <tr><td>Quick capture</td><td><div class="chips"><span class="chip">Quick Note window</span><span class="chip">Desktop launch action</span><span class="chip">CLI capture</span></div></td><td>Browser capture, shell widget</td></tr>
+          <tr><td>Portability</td><td><div class="chips"><span class="chip">Markdown / text import</span><span class="chip">Markdown · HTML · PDF export</span><span class="chip">Backup &amp; restore</span></div></td><td>ENEX and richer importers</td></tr>
+          <tr><td>Privacy</td><td><div class="chips"><span class="chip y">Offline</span><span class="chip y">No account</span></div></td><td>Encrypted locked notes</td></tr>
+          <tr><td>Media</td><td><div class="chips"><span class="chip y">Open attachments with desktop apps</span></div></td><td>Audio + transcription, math, writing help</td></tr>
+          <tr><td>Devices &amp; teams</td><td><div class="chips"><span class="chip y">Local library</span></div></td><td>Sync, then sharing and collaboration</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="state-h">
+    <div class="sec-head">
+      <span class="label">Where things stand</span>
+      <h2 id="state-h">Settled, and carried forward</h2>
+    </div>
+    <div class="split">
+      <div class="panel">
+        <h3>Kickoff decisions</h3>
+        <dl class="decisions">
+          <div><dt>v1 scope</dt><dd>Local-only. No sync, locking or collaboration; stable ids and revisions keep sync possible later.</dd></div>
+          <div><dt>Visual target</dt><dd>A familiar three-pane Notes layout in the active Omarchy theme, not an Apple recreation.</dd></div>
+          <div><dt>Audience</dt><dd>Personal first, but every choice must hold for the public app that follows.</dd></div>
+          <div><dt>Editor toolkit</dt><dd>Qt Quick <code>TextEdit</code> over an owned <code>QTextDocument</code>.</dd></div>
+          <div><dt>Still open</dt><dd>Final app ID (<code>app.omarchynotes.Notes</code> is a placeholder), the macOS reference version, and which Omarchy releases to support.</dd></div>
+        </dl>
+      </div>
+      <div class="panel">
+        <h3>Gaps from the spike</h3>
+        <ul class="gaps">
+          <li><span><b>Checklist markers</b> draw as ☐/☒ glyphs; overlay round, themed checkboxes.</span></li>
+          <li><span><b>Screen readers</b> see images and attachments as unnamed placeholders.</span></li>
+          <li><span><b>Theme and font changes</b> rebuild the document and clear undo history.</span></li>
+          <li><span><b>Image decoding</b> runs on the UI thread during note load.</span></li>
+          <li><span><b>Very large notes</b> open in ~0.9 s at 3,000 blocks (offscreen); re-measure on real hardware.</span></li>
+          <li><span><b>Single instance</b> is a lock file; D-Bus activation is still to come.</span></li>
+          <li><span><b>Unused attachments</b> aren't cleaned up yet; references are recorded so it can be added safely.</span></li>
+          <li><span><b>Manual desktop checks:</b> fcitx5, Orca, fractional scaling, portal file dialogs.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="gates-h">
+    <div class="sec-head">
+      <span class="label">Release gates</span>
+      <h2 id="gates-h">What v1 must prove</h2>
+      <p>Targets are benchmarked on a documented reference machine with a 10,000-note / 1 GB attachment fixture. Spike measurements come from offscreen runs with software rendering, so they are indicative only.</p>
+    </div>
+    <div class="gates">
+      <div class="gate">
+        <h3>Editing</h3>
+        <p>Round-trip a fixture library: nested lists, check states, tables, note links, images, attachment metadata, emoji, RTL, IME and long documents. Unsupported import content is reported, never discarded.</p>
+      </div>
+      <div class="gate">
+        <h3>Reliability</h3>
+        <p>Inject failures during save, attachment import, migration and backup. Kill and reopen at persistence boundaries; every acknowledged save must survive. Test full-disk and read-only storage.</p>
+      </div>
+      <div class="gate">
+        <h3>Accessibility</h3>
+        <p>Capture, edit, organize, search and export using only the keyboard. Screen-reader names and structure, visible focus, large text, reduced motion, readable contrast across themes.</p>
+      </div>
+      <div class="gate">
+        <h3>Performance</h3>
+        <dl class="perf">
+          <div class="head"><dt>Measure</dt><dd>Target</dd><dd class="meas">Spike</dd></div>
+          <div><dt>Cold launch</dt><dd class="num">&lt; 1.5 s</dd><dd class="meas num">—</dd></div>
+          <div><dt>Warm launch</dt><dd class="num">&lt; 500 ms</dd><dd class="meas num">—</dd></div>
+          <div><dt>Search p95</dt><dd class="num">&lt; 150 ms</dd><dd class="meas num">—</dd></div>
+          <div><dt>UI stall while editing</dt><dd class="num">&lt; 50 ms</dd><dd class="meas num">45 ms*</dd></div>
+        </dl>
+        <small class="muted">* Worst keystroke in a 3,000-paragraph note with 20 tables.</small>
+      </div>
+      <div class="gate">
+        <h3>Desktop fit</h3>
+        <p>Wide, narrow and floating layouts; 100%, 150% and 200% scaling; light and dark themes; live theme switches; clean package install, upgrade and removal.</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="beyond-h">
+    <div class="sec-head">
+      <span class="label">After v1</span>
+      <h2 id="beyond-h">Expansion, in order</h2>
+      <p>Outside the v1 estimate. Each step gets its own acceptance and resource-budget tests.</p>
+    </div>
+    <ol class="beyond">
+      <li><h3>Private and searchable media</h3><p>Encrypted locked notes (content, attachments, revisions and previews protected together, with a dedicated security review), PDF text extraction and OCR, annotation and drawing.</p></li>
+      <li><h3>Audio and math</h3><p>Recording, offline transcription after an explicit model download, searchable transcripts, and a constrained math parser. Expensive work stays cancellable and off the UI thread.</p></li>
+      <li><h3>Device sync</h3><p>Choose platforms and a transport; authentication, attachment transfer, offline edits, deletion propagation, conflict recovery and encryption. Never sync the live SQLite file as the protocol.</p></li>
+      <li><h3>Collaboration</h3><p>Prove a CRDT (or equivalent) merge model on rich documents first, then permissions, invitations, concurrent editing, activity and mentions.</p></li>
+      <li><h3>Ecosystem conveniences</h3><p>Browser capture, an optional shell widget, richer importers, and optional writing help through a replaceable provider.</p></li>
+    </ol>
+  </section>
+
+  <footer>
+    <span>Sources: <code>llm-docs/omarchy-notes-plan.md</code> · <code>docs/decisions/0001-editor-toolkit.md</code></span>
+    <span>Updated 23 September 2026 · <a href="https://github.com/jasona/omarchy-notes">github.com/jasona/omarchy-notes</a></span>
+  </footer>
+</div>
