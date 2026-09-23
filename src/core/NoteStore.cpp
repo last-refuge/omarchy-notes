@@ -2,8 +2,14 @@
 
 #include <QDateTime>
 #include <QDir>
+#include <QDirIterator>
+#include <QFile>
 #include <QFileInfo>
 #include <QMimeDatabase>
+#include <QRegularExpression>
+#include <QSet>
+
+#include <algorithm>
 
 #include <sqlite3.h>
 
@@ -172,30 +178,105 @@ bool NoteStore::migrate(QString *error)
     return true;
 }
 
-QList<NoteSummary> NoteStore::listNotes()
+namespace {
+
+constexpr const char *kSummaryColumns =
+    "n.id, n.folder_id, n.title, n.snippet, n.created_at, n.updated_at, n.deleted_at, "
+    "n.pinned, n.has_attachments, n.has_checklist";
+
+NoteSummary readSummary(const Statement &s)
 {
-    QList<NoteSummary> out;
-    Statement s = m_db.prepare(
-        "SELECT id, title, snippet, updated_at, pinned, has_attachments, has_checklist FROM notes "
-        "WHERE deleted_at IS NULL ORDER BY pinned DESC, updated_at DESC");
-    while (s.next()) {
-        NoteSummary n;
-        n.id = s.text(0);
-        n.title = s.text(1);
-        n.snippet = s.text(2);
-        n.updatedAt = s.int64(3);
-        n.pinned = s.int64(4) != 0;
-        n.hasAttachments = s.int64(5) != 0;
-        n.hasChecklist = s.int64(6) != 0;
-        out.append(n);
+    NoteSummary n;
+    n.id = s.text(0);
+    n.folderId = s.text(1);
+    n.title = s.text(2);
+    n.snippet = s.text(3);
+    n.createdAt = s.int64(4);
+    n.updatedAt = s.int64(5);
+    n.deletedAt = s.isNull(6) ? 0 : s.int64(6);
+    n.pinned = s.int64(7) != 0;
+    n.hasAttachments = s.int64(8) != 0;
+    n.hasChecklist = s.int64(9) != 0;
+    return n;
+}
+
+// Turns what someone typed into an FTS5 query: every word must match, each
+// as a prefix, with FTS syntax characters treated as plain text.
+QString ftsQuery(const QString &text)
+{
+    QStringList terms;
+    for (QString word : text.split(QRegularExpression(u"\\s+"_s), Qt::SkipEmptyParts)) {
+        word.remove(u'"');
+        const bool hasWordChar = std::any_of(word.cbegin(), word.cend(),
+                                             [](QChar c) { return c.isLetterOrNumber(); });
+        if (hasWordChar)
+            terms << u'"' + word + u"\"*"_s;
     }
+    return terms.join(u' ');
+}
+
+} // namespace
+
+QList<NoteSummary> NoteStore::listNotes(const NoteQuery &query)
+{
+    QByteArray sql = "SELECT ";
+    sql += kSummaryColumns;
+    sql += " FROM notes n WHERE ";
+    switch (query.scope) {
+    case NoteQuery::Scope::All:
+        sql += "n.deleted_at IS NULL";
+        break;
+    case NoteQuery::Scope::Folder:
+        sql += query.folderId.isEmpty() ? "n.deleted_at IS NULL AND n.folder_id IS NULL"
+                                        : "n.deleted_at IS NULL AND n.folder_id = ?1";
+        break;
+    case NoteQuery::Scope::Trash:
+        sql += "n.deleted_at IS NOT NULL";
+        break;
+    }
+    if (query.scope == NoteQuery::Scope::Trash) {
+        sql += " ORDER BY n.deleted_at DESC";
+    } else {
+        sql += " ORDER BY n.pinned DESC, ";
+        switch (query.sort) {
+        case NoteSort::Edited: sql += "n.updated_at DESC"; break;
+        case NoteSort::Created: sql += "n.created_at DESC"; break;
+        case NoteSort::Title: sql += "n.title = '', n.title COLLATE NOCASE, n.updated_at DESC"; break;
+        }
+    }
+
+    Statement s = m_db.prepare(sql.constData());
+    if (query.scope == NoteQuery::Scope::Folder && !query.folderId.isEmpty())
+        s.bind(1, query.folderId);
+    QList<NoteSummary> out;
+    while (s.next())
+        out.append(readSummary(s));
+    return out;
+}
+
+QList<NoteSummary> NoteStore::search(const QString &text, int limit)
+{
+    const QString match = ftsQuery(text);
+    if (match.isEmpty())
+        return {};
+    QByteArray sql = "SELECT ";
+    sql += QByteArray(kSummaryColumns).replace("n.snippet", "snippet(notes_fts, -1, char(2), char(3), '…', 12)");
+    sql += " FROM notes_fts JOIN notes n ON n.rowid = notes_fts.rowid "
+           "WHERE notes_fts MATCH ?1 AND n.deleted_at IS NULL "
+           "ORDER BY bm25(notes_fts, 4.0, 1.0) LIMIT ?2";
+    Statement s = m_db.prepare(sql.constData());
+    s.bind(1, match).bind(2, qint64(limit));
+    QList<NoteSummary> out;
+    while (s.next())
+        out.append(readSummary(s));
     return out;
 }
 
 std::optional<NoteRecord> NoteStore::loadNote(const QString &id, QString *error)
 {
     Statement s = m_db.prepare(
-        "SELECT folder_id, body, created_at, updated_at, revision, pinned FROM notes WHERE id = ?1");
+        "SELECT folder_id, body, created_at, updated_at, revision, pinned, deleted_at "
+        "FROM notes WHERE id = ?1");
     s.bind(1, id);
     if (!s.next()) {
         setError(error, s.failed() ? m_db.lastError() : u"The note no longer exists."_s);
@@ -215,29 +296,43 @@ std::optional<NoteRecord> NoteStore::loadNote(const QString &id, QString *error)
     r.updatedAt = s.int64(3);
     r.revision = s.int64(4);
     r.pinned = s.int64(5) != 0;
+    r.deletedAt = s.isNull(6) ? 0 : s.int64(6);
     return r;
 }
 
-std::optional<NoteRecord> NoteStore::createNote(const RichDocument &body, QString *error)
+std::optional<NoteRecord> NoteStore::createNote(const RichDocument &body, QString *error,
+                                                const QString &folderId)
 {
+    if (!folderId.isEmpty() && !folderExists(folderId)) {
+        setError(error, u"That folder no longer exists."_s);
+        return std::nullopt;
+    }
     NoteRecord r;
     r.id = newId();
+    r.folderId = folderId;
     r.body = body;
     r.body.assignMissingIds();
     r.createdAt = r.updatedAt = now();
     r.revision = 1;
 
+    const bool media = !r.body.referencedAttachments().isEmpty() || !r.body.referencedBlobs().isEmpty();
     Statement s = m_db.prepare(
-        "INSERT INTO notes (id, title, snippet, plain_text, body, body_schema, has_checklist, "
-        "created_at, updated_at, revision) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8, 1)");
-    s.bind(1, r.id)
-        .bind(2, r.body.title())
-        .bind(3, r.body.snippet())
-        .bind(4, r.body.plainText())
-        .bind(5, QString::fromUtf8(r.body.toJsonBytes()))
-        .bind(6, qint64(RichDocument::SchemaVersion))
-        .bind(7, qint64(hasChecklist(r.body.blocks)))
-        .bind(8, r.createdAt);
+        "INSERT INTO notes (id, folder_id, title, snippet, plain_text, body, body_schema, "
+        "has_attachments, has_checklist, created_at, updated_at, revision) "
+        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10, 1)");
+    s.bind(1, r.id);
+    if (folderId.isEmpty())
+        s.bindNull(2);
+    else
+        s.bind(2, folderId);
+    s.bind(3, r.body.title())
+        .bind(4, r.body.snippet())
+        .bind(5, r.body.plainText())
+        .bind(6, QString::fromUtf8(r.body.toJsonBytes()))
+        .bind(7, qint64(RichDocument::SchemaVersion))
+        .bind(8, qint64(media))
+        .bind(9, qint64(hasChecklist(r.body.blocks)))
+        .bind(10, r.createdAt);
     if (!s.exec()) {
         setError(error, m_db.lastError());
         return std::nullopt;
@@ -354,6 +449,349 @@ int NoteStore::revisionCount(const QString &noteId)
     Statement s = m_db.prepare("SELECT COUNT(*) FROM note_revisions WHERE note_id = ?1");
     s.bind(1, noteId);
     return s.next() ? int(s.int64(0)) : 0;
+}
+
+// ---------------------------------------------------------------- notes
+
+bool NoteStore::moveNote(const QString &noteId, const QString &folderId, QString *error)
+{
+    if (!folderId.isEmpty() && !folderExists(folderId))
+        return setError(error, u"That folder no longer exists."_s);
+    Statement s = m_db.prepare("UPDATE notes SET folder_id = ?2 WHERE id = ?1 AND deleted_at IS NULL");
+    s.bind(1, noteId);
+    if (folderId.isEmpty())
+        s.bindNull(2);
+    else
+        s.bind(2, folderId);
+    if (!s.exec())
+        return setError(error, m_db.lastError());
+    return m_db.changes() == 1 || setError(error, u"The note no longer exists."_s);
+}
+
+std::optional<NoteRecord> NoteStore::duplicateNote(const QString &noteId, QString *error)
+{
+    auto source = loadNote(noteId, error);
+    if (!source)
+        return std::nullopt;
+
+    Transaction tx(m_db);
+    if (!tx.isActive()) {
+        setError(error, m_db.lastError());
+        return std::nullopt;
+    }
+    // Attachments belong to one note, so the copy gets its own records
+    // pointing at the same stored bytes.
+    QHash<QString, QString> renamed;
+    for (const QString &id : source->body.referencedAttachments()) {
+        if (attachment(id))
+            renamed.insert(id, newId());
+    }
+
+    RichDocument body = source->body;
+    std::function<void(QList<Block> &)> rewrite = [&](QList<Block> &blocks) {
+        for (Block &b : blocks) {
+            for (Span &span : b.spans) {
+                if (span.kind == Span::Kind::Attachment && renamed.contains(span.ref))
+                    span.ref = renamed.value(span.ref);
+            }
+            for (TableCell &c : b.cells)
+                rewrite(c.blocks);
+        }
+    };
+    rewrite(body.blocks);
+
+    auto copy = createNote(body, error, source->folderId);
+    if (!copy)
+        return std::nullopt;
+    for (auto it = renamed.cbegin(); it != renamed.cend(); ++it) {
+        Statement s = m_db.prepare(
+            "INSERT INTO attachments (id, note_id, blob_hash, file_name, mime_type, size, created_at) "
+            "SELECT ?1, ?2, blob_hash, file_name, mime_type, size, ?3 FROM attachments WHERE id = ?4");
+        s.bind(1, it.value()).bind(2, copy->id).bind(3, now()).bind(4, it.key());
+        if (!s.exec()) {
+            setError(error, m_db.lastError());
+            return std::nullopt;
+        }
+    }
+    Statement refs = m_db.prepare(
+        "INSERT OR IGNORE INTO note_blob_refs (note_id, blob_hash) "
+        "SELECT ?2, blob_hash FROM note_blob_refs WHERE note_id = ?1");
+    refs.bind(1, noteId).bind(2, copy->id);
+    if (!refs.exec() || !tx.commit()) {
+        setError(error, m_db.lastError());
+        return std::nullopt;
+    }
+    return copy;
+}
+
+bool NoteStore::trashNote(const QString &noteId, QString *error)
+{
+    Statement s = m_db.prepare("UPDATE notes SET deleted_at = ?2 WHERE id = ?1 AND deleted_at IS NULL");
+    s.bind(1, noteId).bind(2, now());
+    if (!s.exec())
+        return setError(error, m_db.lastError());
+    return m_db.changes() == 1 || setError(error, u"The note is already in Recently Deleted."_s);
+}
+
+bool NoteStore::recoverNote(const QString &noteId, QString *error)
+{
+    Statement s = m_db.prepare("UPDATE notes SET deleted_at = NULL WHERE id = ?1 AND deleted_at IS NOT NULL");
+    s.bind(1, noteId);
+    if (!s.exec())
+        return setError(error, m_db.lastError());
+    return m_db.changes() == 1 || setError(error, u"The note isn't in Recently Deleted."_s);
+}
+
+bool NoteStore::deleteNotePermanently(const QString &noteId, QString *error)
+{
+    Statement s = m_db.prepare("DELETE FROM notes WHERE id = ?1 AND deleted_at IS NOT NULL");
+    s.bind(1, noteId);
+    if (!s.exec())
+        return setError(error, m_db.lastError());
+    return m_db.changes() == 1 || setError(error, u"Only notes in Recently Deleted can be deleted permanently."_s);
+}
+
+int NoteStore::emptyTrash(QString *error)
+{
+    Statement s = m_db.prepare("DELETE FROM notes WHERE deleted_at IS NOT NULL");
+    if (!s.exec()) {
+        setError(error, m_db.lastError());
+        return -1;
+    }
+    return m_db.changes();
+}
+
+int NoteStore::purgeExpiredTrash(qint64 at)
+{
+    Statement s = m_db.prepare("DELETE FROM notes WHERE deleted_at IS NOT NULL AND deleted_at < ?1");
+    s.bind(1, (at ? at : now()) - TrashRetentionMs);
+    return s.exec() ? m_db.changes() : -1;
+}
+
+int NoteStore::trashCount()
+{
+    Statement s = m_db.prepare("SELECT COUNT(*) FROM notes WHERE deleted_at IS NOT NULL");
+    return s.next() ? int(s.int64(0)) : 0;
+}
+
+int NoteStore::noteCount()
+{
+    Statement s = m_db.prepare("SELECT COUNT(*) FROM notes WHERE deleted_at IS NULL");
+    return s.next() ? int(s.int64(0)) : 0;
+}
+
+// ---------------------------------------------------------------- folders
+
+bool NoteStore::folderExists(const QString &id)
+{
+    Statement s = m_db.prepare("SELECT 1 FROM folders WHERE id = ?1");
+    s.bind(1, id);
+    return s.next();
+}
+
+QStringList NoteStore::folderAndDescendants(const QString &id)
+{
+    Statement s = m_db.prepare(
+        "WITH RECURSIVE sub(id) AS ("
+        "  SELECT id FROM folders WHERE id = ?1"
+        "  UNION ALL SELECT f.id FROM folders f JOIN sub ON f.parent_id = sub.id"
+        ") SELECT id FROM sub");
+    s.bind(1, id);
+    QStringList ids;
+    while (s.next())
+        ids << s.text(0);
+    return ids;
+}
+
+QList<FolderInfo> NoteStore::listFolders()
+{
+    Statement s = m_db.prepare(
+        "SELECT f.id, f.parent_id, f.name, "
+        "  (SELECT COUNT(*) FROM notes n WHERE n.folder_id = f.id AND n.deleted_at IS NULL) "
+        "FROM folders f ORDER BY f.name COLLATE NOCASE, f.created_at");
+    QList<FolderInfo> out;
+    while (s.next())
+        out.append({s.text(0), s.text(1), s.text(2), int(s.int64(3))});
+    return out;
+}
+
+namespace {
+
+// Validates a folder name and checks it is unique among its siblings.
+bool checkFolderName(Database &db, const QString &name, const QString &parentId, const QString &selfId,
+                     QString *error)
+{
+    if (name.isEmpty())
+        return setError(error, u"Give the folder a name."_s);
+    if (name.size() > 200)
+        return setError(error, u"That name is too long."_s);
+    Statement s = db.prepare(
+        "SELECT 1 FROM folders WHERE name = ?1 COLLATE NOCASE AND id != ?3 AND "
+        "((?2 IS NULL AND parent_id IS NULL) OR parent_id = ?2)");
+    s.bind(1, name);
+    if (parentId.isEmpty())
+        s.bindNull(2);
+    else
+        s.bind(2, parentId);
+    s.bind(3, selfId);
+    if (s.next())
+        return setError(error, u"There's already a folder called “%1” here."_s.arg(name));
+    return true;
+}
+
+} // namespace
+
+std::optional<FolderInfo> NoteStore::createFolder(const QString &rawName, const QString &parentId,
+                                                  QString *error)
+{
+    const QString name = rawName.simplified();
+    if (!parentId.isEmpty() && !folderExists(parentId)) {
+        setError(error, u"That folder no longer exists."_s);
+        return std::nullopt;
+    }
+    if (!checkFolderName(m_db, name, parentId, {}, error))
+        return std::nullopt;
+    FolderInfo folder{newId(), parentId, name, 0};
+    Statement s = m_db.prepare(
+        "INSERT INTO folders (id, parent_id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?4)");
+    s.bind(1, folder.id);
+    if (parentId.isEmpty())
+        s.bindNull(2);
+    else
+        s.bind(2, parentId);
+    s.bind(3, name).bind(4, now());
+    if (!s.exec()) {
+        setError(error, m_db.lastError());
+        return std::nullopt;
+    }
+    return folder;
+}
+
+bool NoteStore::renameFolder(const QString &id, const QString &rawName, QString *error)
+{
+    const QString name = rawName.simplified();
+    Statement parent = m_db.prepare("SELECT parent_id FROM folders WHERE id = ?1");
+    parent.bind(1, id);
+    if (!parent.next())
+        return setError(error, u"That folder no longer exists."_s);
+    if (!checkFolderName(m_db, name, parent.text(0), id, error))
+        return false;
+    Statement s = m_db.prepare("UPDATE folders SET name = ?2, updated_at = ?3 WHERE id = ?1");
+    s.bind(1, id).bind(2, name).bind(3, now());
+    return s.exec() || setError(error, m_db.lastError());
+}
+
+bool NoteStore::deleteFolder(const QString &id, QString *error)
+{
+    const QStringList ids = folderAndDescendants(id);
+    if (ids.isEmpty())
+        return setError(error, u"That folder no longer exists."_s);
+    Transaction tx(m_db);
+    if (!tx.isActive())
+        return setError(error, m_db.lastError());
+    const qint64 timestamp = now();
+    for (const QString &folder : ids) {
+        // Deleted notes can't return to a folder that's gone; they recover
+        // into Notes instead.
+        Statement notes = m_db.prepare(
+            "UPDATE notes SET deleted_at = COALESCE(deleted_at, ?2), folder_id = NULL WHERE folder_id = ?1");
+        notes.bind(1, folder).bind(2, timestamp);
+        if (!notes.exec())
+            return setError(error, m_db.lastError());
+    }
+    // Children first, so no folder is removed while another points at it.
+    for (auto it = ids.crbegin(); it != ids.crend(); ++it) {
+        Statement del = m_db.prepare("DELETE FROM folders WHERE id = ?1");
+        del.bind(1, *it);
+        if (!del.exec())
+            return setError(error, m_db.lastError());
+    }
+    return tx.commit() || setError(error, m_db.lastError());
+}
+
+// ---------------------------------------------------------------- garbage
+
+GarbageReport NoteStore::collectGarbage(qint64 at)
+{
+    GarbageReport report;
+    const qint64 cutoff = (at ? at : now()) - GarbageGraceMs;
+
+    // Everything any note or saved revision still refers to.
+    QSet<QString> blobs;
+    QSet<QString> attachments;
+    Statement bodies = m_db.prepare("SELECT body FROM notes UNION ALL SELECT body FROM note_revisions");
+    while (bodies.next()) {
+        const auto doc = RichDocument::fromJsonBytes(bodies.text(0).toUtf8());
+        if (!doc)
+            continue;
+        for (const QString &hash : doc->referencedBlobs())
+            blobs.insert(hash);
+        for (const QString &id : doc->referencedAttachments())
+            attachments.insert(id);
+    }
+
+    QStringList removedHashes;
+    {
+        Transaction tx(m_db);
+        if (!tx.isActive())
+            return report;
+        Statement rows = m_db.prepare("SELECT id FROM attachments WHERE created_at < ?1");
+        rows.bind(1, cutoff);
+        QStringList staleAttachments;
+        while (rows.next()) {
+            if (!attachments.contains(rows.text(0)))
+                staleAttachments << rows.text(0);
+        }
+        for (const QString &id : staleAttachments) {
+            Statement del = m_db.prepare("DELETE FROM attachments WHERE id = ?1");
+            del.bind(1, id);
+            if (!del.exec())
+                return report;
+        }
+
+        Statement candidates = m_db.prepare(
+            "SELECT hash, size FROM blobs WHERE created_at < ?1 "
+            "AND hash NOT IN (SELECT blob_hash FROM attachments) "
+            "AND hash NOT IN (SELECT blob_hash FROM note_blob_refs)");
+        candidates.bind(1, cutoff);
+        QList<QPair<QString, qint64>> stale;
+        while (candidates.next()) {
+            if (!blobs.contains(candidates.text(0)))
+                stale.append({candidates.text(0), candidates.int64(1)});
+        }
+        for (const auto &[hash, size] : stale) {
+            Statement del = m_db.prepare("DELETE FROM blobs WHERE hash = ?1");
+            del.bind(1, hash);
+            if (!del.exec())
+                return report;
+            removedHashes << hash;
+            report.bytesFreed += size;
+        }
+        if (!tx.commit())
+            return GarbageReport{};
+        report.attachmentsRemoved = int(staleAttachments.size());
+    }
+    // Files go only after the database no longer refers to them.
+    for (const QString &hash : removedHashes)
+        QFile::remove(m_blobs.path(hash));
+    report.blobsRemoved = int(removedHashes.size());
+
+    // Files left by an install that was interrupted before it was recorded.
+    QSet<QString> known;
+    Statement all = m_db.prepare("SELECT hash FROM blobs");
+    while (all.next())
+        known.insert(all.text(0));
+    const QDateTime cutoffTime = QDateTime::fromMSecsSinceEpoch(cutoff);
+    QDirIterator it(m_paths.blobs(), QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        const QFileInfo file(it.next());
+        if (!known.contains(file.fileName()) && file.lastModified() < cutoffTime) {
+            report.bytesFreed += file.size();
+            QFile::remove(file.filePath());
+            ++report.blobsRemoved;
+        }
+    }
+    return report;
 }
 
 bool NoteStore::registerBlob(const BlobStore::Installed &blob)

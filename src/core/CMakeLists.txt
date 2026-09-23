@@ -2,6 +2,7 @@ add_library(notes_core STATIC
     BlobStore.cpp BlobStore.h
     Database.cpp Database.h
     DocumentConverter.cpp DocumentConverter.h
+    LibraryBackup.cpp LibraryBackup.h
     LibraryPaths.cpp LibraryPaths.h
     LibraryService.cpp LibraryService.h
     NoteStore.cpp NoteStore.h

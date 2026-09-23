@@ -105,10 +105,18 @@ Database::~Database()
 
 bool Database::open(const QString &path, QString *error)
 {
+    return openWithFlags(path, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_NOMUTEX, error);
+}
+
+bool Database::openReadOnly(const QString &path, QString *error)
+{
+    return openWithFlags(path, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, error);
+}
+
+bool Database::openWithFlags(const QString &path, int flags, QString *error)
+{
     close();
-    const int rc = sqlite3_open_v2(QFile::encodeName(path).constData(), &m_db,
-                                   SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_NOMUTEX,
-                                   nullptr);
+    const int rc = sqlite3_open_v2(QFile::encodeName(path).constData(), &m_db, flags, nullptr);
     if (rc != SQLITE_OK) {
         if (error)
             *error = m_db ? QString::fromUtf8(sqlite3_errmsg(m_db)) : QStringLiteral("out of memory");
@@ -141,6 +149,11 @@ Statement Database::prepare(const char *sql)
 QString Database::lastError() const
 {
     return m_db ? QString::fromUtf8(sqlite3_errmsg(m_db)) : QString();
+}
+
+int Database::changes() const
+{
+    return m_db ? sqlite3_changes(m_db) : 0;
 }
 
 int Database::userVersion()

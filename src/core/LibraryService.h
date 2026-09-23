@@ -27,10 +27,36 @@ public:
     bool start(QString *error);
     const LibraryPaths &paths() const { return m_paths; }
 
-    QList<NoteSummary> listNotes();
+    QList<NoteSummary> listNotes(const NoteQuery &query = {});
     std::optional<NoteRecord> loadNote(const QString &id, QString *error = nullptr);
-    std::optional<NoteRecord> createNote(const RichDocument &body, QString *error = nullptr);
+    std::optional<NoteRecord> createNote(const RichDocument &body, QString *error = nullptr,
+                                         const QString &folderId = {});
     bool setPinned(const QString &id, bool pinned);
+
+    // Runs a search on the persistence thread; results arrive through
+    // searchFinished with the returned ticket.
+    quint64 search(const QString &text);
+
+    bool moveNote(const QString &noteId, const QString &folderId, QString *error = nullptr);
+    std::optional<NoteRecord> duplicateNote(const QString &noteId, QString *error = nullptr);
+    bool trashNote(const QString &noteId, QString *error = nullptr);
+    bool recoverNote(const QString &noteId, QString *error = nullptr);
+    bool deleteNotePermanently(const QString &noteId, QString *error = nullptr);
+    int emptyTrash(QString *error = nullptr);
+    int trashCount();
+    int noteCount();
+
+    QList<FolderInfo> listFolders();
+    std::optional<FolderInfo> createFolder(const QString &name, const QString &parentId = {},
+                                           QString *error = nullptr);
+    bool renameFolder(const QString &id, const QString &name, QString *error = nullptr);
+    bool deleteFolder(const QString &id, QString *error = nullptr);
+
+    std::optional<BackupManifest> backupTo(const QString &directory, QString *error = nullptr);
+    std::optional<BackupManifest> inspectBackup(const QString &directory, QString *error = nullptr);
+    // Replaces the library with a backup. The previous library is moved to
+    // `*safetyDir`; on any failure it is put back and false is returned.
+    bool restoreFrom(const QString &directory, QString *safetyDir, QString *error = nullptr);
     std::optional<AttachmentInfo> addAttachment(const QString &noteId, const QString &filePath,
                                                 QString *error = nullptr);
     std::optional<AttachmentInfo> attachment(const QString &id);
@@ -55,6 +81,7 @@ public:
 
 signals:
     void saveFinished(quint64 ticket, const QString &noteId, const onotes::SaveResult &result);
+    void searchFinished(quint64 ticket, const QList<onotes::NoteSummary> &results);
     void notesChanged();
 
 private:

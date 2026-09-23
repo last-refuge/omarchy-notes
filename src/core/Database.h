@@ -51,6 +51,7 @@ public:
     ~Database();
 
     bool open(const QString &path, QString *error);
+    bool openReadOnly(const QString &path, QString *error);
     void close();
     bool isOpen() const { return m_db != nullptr; }
 
@@ -58,10 +59,14 @@ public:
     Statement prepare(const char *sql);
     QString lastError() const;
     int userVersion();
+    // Rows changed by the most recent INSERT, UPDATE or DELETE.
+    int changes() const;
 
     sqlite3 *handle() const { return m_db; }
 
 private:
+    bool openWithFlags(const QString &path, int flags, QString *error);
+
     sqlite3 *m_db = nullptr;
 };
 
