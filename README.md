@@ -89,7 +89,7 @@ o.bind("SUPER + ALT + N", "Quick Note", { launch = "omarchy-notes --quick-note" 
 To make the Quick Note window float, add this to `~/.config/hypr/hyprland.lua`:
 
 ```lua
-o.window({ class = "^app\\.omarchynotes\\.Notes$", title = "^Quick Note$" }, { tag = "+floating-window" })
+o.window({ class = "^org\\.omarchy\\.Notes$", title = "^Quick Note$" }, { tag = "+floating-window" })
 ```
 
 ## 🗂️ Where your notes live

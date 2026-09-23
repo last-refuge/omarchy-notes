@@ -1,0 +1,58 @@
+.TH OMARCHY-NOTES 1 "September 2026" "omarchy-notes 1.0.0" "User Commands"
+.SH NAME
+omarchy-notes \- fast, native notes for Omarchy
+.SH SYNOPSIS
+.B omarchy-notes
+[\fIOPTION\fR]...
+.SH DESCRIPTION
+Omarchy Notes is a local-first notes app with rich text, checklists, tables,
+attachments, folders, tags, Smart Folders and search. Only one instance runs per
+library: launching it again brings the open window forward and passes along
+any request, such as a Quick Note or captured text.
+.SH OPTIONS
+.TP
+.B \-\-new
+Start a new note.
+.TP
+.B \-\-quick\-note
+Open a small Quick Note window.
+.TP
+.BI \-\-capture " text"
+Save \fItext\fR as a new note without opening a window. Use \fB\-\fR to read
+the text from standard input.
+.TP
+.BI \-\-note " id"
+Open the note with the given id.
+.TP
+.BI \-\-data\-dir " dir"
+Use the library in \fIdir\fR instead of the default.
+.TP
+.B \-\-samples
+Fill an empty library with sample notes.
+.TP
+.B \-\-setup\-hyprland
+Add an optional Quick Note key binding (Super+Alt+N) and a floating window rule
+to the Hyprland configuration, if they don't conflict with existing settings.
+.TP
+.B \-\-version
+Show the version.
+.TP
+.B \-\-help
+Show all options.
+.SH FILES
+.TP
+.I $XDG_DATA_HOME/omarchy-notes/
+The notes library: an SQLite database and a folder of attachments.
+Uninstalling the app never removes it.
+.TP
+.I $XDG_CONFIG_HOME/omarchy-notes/settings.ini
+View preferences (sort order, last folder, gallery mode).
+.SH EXAMPLES
+.nf
+omarchy-notes --capture "Call the plumber on Tuesday"
+echo "idea" | omarchy-notes --capture -
+.fi
+.SH SEE ALSO
+Project page: https://lastrefuge.ai/projects/omarchy-notes
+.br
+Source and issues: https://github.com/jasona/omarchy-notes

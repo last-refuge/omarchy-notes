@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    timeout-minutes: 30
+    steps:
+      - name: Install build dependencies
+        run: pacman -Syu --noconfirm appstream base-devel cmake desktop-file-utils git ninja qt6-base qt6-declarative qt6-svg sqlite ttf-dejavu
+      - uses: actions/checkout@v4
+      - name: Create unprivileged test user
+        run: |
+          useradd --create-home builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+      - name: Check release metadata
+        run: runuser -u builder -- ./tests/test-release-metadata.sh
+      - name: Verify production install tree
+        run: runuser -u builder -- ./tests/test-package-install.sh
+      - name: Build and test
+        run: |
+          runuser -u builder -- cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          runuser -u builder -- cmake --build build
+          runuser -u builder -- env QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            ctest --test-dir build --output-on-failure --timeout 300
+      - name: Keep editor screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: editor-screenshots
+          path: build/screenshots
+          if-no-files-found: ignore
+
+  arch-package:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+      options: --privileged
+    timeout-minutes: 30
+    steps:
+      - name: Install packaging tools
+        run: pacman -Syu --noconfirm base-devel devtools git namcap python sudo
+      - uses: actions/checkout@v4
+      - name: Prepare source and AUR files
+        run: |
+          useradd --create-home builder
+          echo 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
+          chmod 440 /etc/sudoers.d/builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          runuser -u builder -- git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          runuser -u builder -- python3 packaging/prepare-release.py --ref HEAD --output build-aur-ci
+      - name: Build in a clean Arch chroot
+        run: runuser -u builder -- bash -c 'cd build-aur-ci/aur && extra-x86_64-build'
+      - name: Validate package contents and dependencies
+        run: ./tests/check-arch-package.sh build-aur-ci/aur

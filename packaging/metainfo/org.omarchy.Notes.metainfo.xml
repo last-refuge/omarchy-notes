@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.omarchy.Notes</id>
+  <name>Omarchy Notes</name>
+  <summary>Fast, native notes for Omarchy</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>Omarchy Notes is a native, local-first notes app inspired by Apple Notes. Open it, start typing, and your note is saved.</p>
+    <ul>
+      <li>Rich notes with headings, checklists, tables, images and file attachments</li>
+      <li>Folders, #tags, Smart Folders, pinning, and search as you type</li>
+      <li>Quick Note window and command-line capture</li>
+      <li>Import Markdown; export Markdown, HTML and PDF; full-library backups</li>
+    </ul>
+    <p>It works offline with no account, keeps everything in a local SQLite library, and follows the active Omarchy theme.</p>
+  </description>
+  <launchable type="desktop-id">org.omarchy.Notes.desktop</launchable>
+  <provides>
+    <binary>omarchy-notes</binary>
+  </provides>
+  <url type="homepage">https://lastrefuge.ai/projects/omarchy-notes</url>
+  <url type="bugtracker">https://github.com/jasona/omarchy-notes/issues</url>
+  <url type="vcs-browser">https://github.com/jasona/omarchy-notes</url>
+  <developer id="com.github.jasona">
+    <name>Omarchy Notes contributors</name>
+  </developer>
+  <screenshots>
+    <screenshot type="default">
+      <caption>A meeting note with checklists, a table, a chart and a PDF attachment</caption>
+      <image>https://raw.githubusercontent.com/jasona/omarchy-notes/v1.0.0/docs/images/screenshot-dark.png</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="1.0.0" date="2026-09-23">
+      <description>
+        <p>First public release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    timeout-minutes: 40
+    steps:
+      - name: Install release dependencies
+        run: pacman -Syu --noconfirm appstream base-devel cmake desktop-file-utils git github-cli namcap ninja python qt6-base qt6-declarative qt6-svg sqlite
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Create unprivileged build user
+        run: |
+          useradd --create-home builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          runuser -u builder -- git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Verify tag and release metadata
+        run: runuser -u builder -- env GITHUB_REF_NAME="$GITHUB_REF_NAME" GITHUB_REF_TYPE="$GITHUB_REF_TYPE" ./tests/test-release-metadata.sh
+      - name: Verify production install
+        run: runuser -u builder -- ./tests/test-package-install.sh
+      - name: Prepare and validate release artifacts
+        run: |
+          runuser -u builder -- python3 packaging/prepare-release.py --ref "$GITHUB_REF_NAME" --output dist
+          runuser -u builder -- bash -c 'cd dist/aur && makepkg --noconfirm --cleanbuild'
+          ./tests/check-arch-package.sh dist/aur
+          cp dist/aur/omarchy-notes-*.pkg.tar.zst dist/
+          cd dist
+          sha256sum ./*.tar.gz ./*.pkg.tar.zst SOURCE_REVISION > SHA256SUMS
+      - name: Write release notes from the changelog
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '$0 ~ "^## \\[" v "\\]" {on=1; next} /^## \[/ {on=0} on' CHANGELOG.md > dist/NOTES.md
+          test -s dist/NOTES.md
+      - name: Create draft GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/*.pkg.tar.zst
+          dist/SHA256SUMS dist/SOURCE_REVISION --title "Omarchy Notes ${GITHUB_REF_NAME}"
+          --notes-file dist/NOTES.md --verify-tag --draft

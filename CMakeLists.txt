@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(OmarchyNotes
-    VERSION 0.1.0
+project(omarchy-notes
+    VERSION 1.0.0
     DESCRIPTION "Native notes for Omarchy"
     LANGUAGES CXX)
 
 # Working name; the application ID is what desktop files, Hyprland rules and
 # D-Bus activation will key on, so it lives in exactly one place.
-set(ONOTES_APP_ID "app.omarchynotes.Notes" CACHE STRING "Reverse-DNS application ID")
+set(ONOTES_APP_ID "org.omarchy.Notes" CACHE STRING "Reverse-DNS application ID")
 set(ONOTES_BINARY_NAME "omarchy-notes")
 
 set(CMAKE_CXX_STANDARD 20)
@@ -22,6 +22,8 @@ pkg_check_modules(SQLITE3 REQUIRED IMPORTED_TARGET sqlite3>=3.35)
 
 qt_standard_project_setup(REQUIRES 6.8)
 include(GNUInstallDirs)
+# Packages install into system paths; no runtime library search paths.
+set(CMAKE_SKIP_INSTALL_RPATH ON)
 
 add_compile_options(-Wall -Wextra -Wpedantic)
 
@@ -32,3 +34,8 @@ include(CTest)
 if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
+
+# Documentation, license and man page.
+install(FILES README.md CHANGELOG.md SECURITY.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/${ONOTES_BINARY_NAME})
+install(FILES packaging/man/omarchy-notes.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
