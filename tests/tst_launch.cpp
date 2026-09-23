@@ -1,7 +1,10 @@
 // Runs the real binary: headless capture, single-instance hand-off, and
 // capture delivered to a running instance.
 
+#include "InstanceChannel.h"
 #include "LibraryService.h"
+
+#include <QLocalSocket>
 
 #include <QProcess>
 #include <QTemporaryDir>
@@ -38,8 +41,11 @@ class TestLaunch : public QObject
             p.write(input);
             p.closeWriteChannel();
         }
-        if (!p.waitForFinished(15000))
+        if (!p.waitForFinished(15000)) {
+            p.kill();
+            p.waitForFinished();
             return -1;
+        }
         if (out)
             *out = p.readAllStandardOutput();
         return p.exitCode();
@@ -57,6 +63,12 @@ class TestLaunch : public QObject
     }
 
 private slots:
+    void initTestCase()
+    {
+        // The app and this test must agree on where the socket lives.
+        qputenv("XDG_RUNTIME_DIR", m_dir.path().toLocal8Bit());
+    }
+
     void captureWithoutARunningApp()
     {
         QByteArray out;
@@ -75,9 +87,16 @@ private slots:
         app.setProcessEnvironment(env());
         app.start(QStringLiteral(APP_PATH), {u"--data-dir"_s, m_dir.filePath(u"library"_s)});
         QVERIFY(app.waitForStarted());
-        // Wait until it's listening.
+        // Wait until it's listening, so the next launch can't race it for
+        // the library lock.
+        const QString socket = InstanceChannel::socketPath(LibraryPaths::at(m_dir.filePath(u"library"_s)));
+        QTRY_VERIFY_WITH_TIMEOUT([&] {
+            QLocalSocket probe;
+            probe.connectToServer(socket);
+            return probe.waitForConnected(100);
+        }(), 10000);
         QByteArray out;
-        QTRY_COMPARE_WITH_TIMEOUT(run({}, &out), 0, 10000);
+        QCOMPARE(run({}, &out), 0);
         QCOMPARE(app.state(), QProcess::Running); // the first instance kept running
 
         QCOMPARE(run({u"--capture"_s, u"Delivered to the running app"_s}, &out), 0);

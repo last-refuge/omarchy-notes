@@ -24,5 +24,6 @@ if(TARGET notes_app_lib AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tst_editor.cpp)
 endif()
 
 onotes_test(tst_launch)
+target_link_libraries(tst_launch PRIVATE notes_app_lib Qt6::Network)
 target_compile_definitions(tst_launch PRIVATE APP_PATH="$<TARGET_FILE:${ONOTES_BINARY_NAME}>")
 add_dependencies(tst_launch ${ONOTES_BINARY_NAME})
