@@ -290,12 +290,9 @@ private:
         } else if (bf.headingLevel() > 0) {
             block.type = Block::Type::Heading;
             block.level = std::min(bf.headingLevel(), 3);
-        } else if (bf.marker() != QTextBlockFormat::MarkerType::NoMarker) {
-            // A checkbox marker outside a list (possible from HTML/Markdown).
-            block.type = Block::Type::ListItem;
-            block.list = ListKind::Check;
-            block.checked = bf.marker() == QTextBlockFormat::MarkerType::Checked;
         }
+        // A checkbox marker outside a list is ignored: Qt's Markdown importer
+        // can leave one on blocks that follow a task list.
 
         const bool inHeading = block.type == Block::Type::Heading;
         for (auto it = textBlock.begin(); !it.atEnd(); ++it) {
@@ -493,7 +490,10 @@ QTextCharFormat DocumentConverter::charFormatForBlock(const Block &block, const 
     // Plain text color is left to the editor so theme changes need no rebuild.
     QTextCharFormat fmt;
     if (block.type == Block::Type::Heading) {
-        fmt.setProperty(QTextFormat::FontPixelSize, int(style.headingPixelSize(block.level)));
+        if (style.pointSizes)
+            fmt.setFontPointSize(style.headingPixelSize(block.level) * 0.75);
+        else
+            fmt.setProperty(QTextFormat::FontPixelSize, int(style.headingPixelSize(block.level)));
         fmt.setFontWeight(QFont::Bold);
     }
     return fmt;

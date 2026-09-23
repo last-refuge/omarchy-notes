@@ -5,6 +5,7 @@ add_library(notes_core STATIC
     LibraryBackup.cpp LibraryBackup.h
     LibraryPaths.cpp LibraryPaths.h
     LibraryService.cpp LibraryService.h
+    NoteExchange.cpp NoteExchange.h
     NoteStore.cpp NoteStore.h
     RichDocument.cpp RichDocument.h
     SampleLibrary.cpp SampleLibrary.h

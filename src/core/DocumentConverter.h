@@ -29,6 +29,8 @@ struct DocumentStyle {
     QString codeFamily = QStringLiteral("monospace");
     QSize attachmentChipSize = QSize(320, 52);
     int maxImageWidth = 640;
+    // Print output (PDF) sizes type in points; the screen uses pixels.
+    bool pointSizes = false;
 
     qreal headingPixelSize(int level) const;
     QTextBlockFormat bodyBlockFormat() const;

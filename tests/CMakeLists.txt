@@ -8,6 +8,7 @@ endfunction()
 onotes_test(tst_document)
 onotes_test(tst_theme)
 onotes_test(tst_store)
+onotes_test(tst_exchange)
 
 # Child process for the kill -9 durability test.
 add_executable(crash_helper crash_helper.cpp)
