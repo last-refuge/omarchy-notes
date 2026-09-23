@@ -23,6 +23,8 @@ jobs:
           useradd --create-home builder
           chown -R builder:builder "$GITHUB_WORKSPACE"
           runuser -u builder -- git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          # gh (run as root below) also reads the checkout, now owned by builder.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Verify tag and release metadata
         run: runuser -u builder -- env GITHUB_REF_NAME="$GITHUB_REF_NAME" GITHUB_REF_TYPE="$GITHUB_REF_TYPE" ./tests/test-release-metadata.sh
       - name: Verify production install
