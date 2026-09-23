@@ -294,7 +294,8 @@ bool EditorController::openNote(const QString &id)
     emit noteChanged();
     emit noteMetaChanged();
     emit savedChanged();
-    emit cursorRequested(m_doc->characterCount() - 1);
+    // Notes open at the top, like Notes; an empty new note is ready to type.
+    emit cursorRequested(0);
     m_library->setLastNoteId(id);
     return true;
 }

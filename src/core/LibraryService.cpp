@@ -3,6 +3,10 @@
 #include "LibraryBackup.h"
 
 #include <QCoreApplication>
+#include <QDateTime>
+#include <QFile>
+#include <QFileInfo>
+#include <QTimer>
 #include <QMetaObject>
 
 using namespace Qt::StringLiterals;
@@ -53,13 +57,24 @@ bool LibraryService::start(QString *error)
             *error = openError;
         return false;
     }
-    // Housekeeping runs after startup so it never delays the first window.
-    QMetaObject::invokeMethod(m_context, [this] {
-        const int purged = m_store->purgeExpiredTrash();
-        m_store->collectGarbage();
-        if (purged > 0)
-            QMetaObject::invokeMethod(this, &LibraryService::notesChanged, Qt::QueuedConnection);
-    }, Qt::QueuedConnection);
+    // Housekeeping (purging old deleted notes, removing unused attachment
+    // data) reads every note, so it waits until the app has settled and runs
+    // at most once a day. It never delays opening the window.
+    const QString marker = m_paths.root + u"/.last-cleanup"_s;
+    const QFileInfo last(marker);
+    if (!last.exists() || last.lastModified().secsTo(QDateTime::currentDateTime()) > 24 * 60 * 60) {
+        QMetaObject::invokeMethod(m_context, [this, marker] {
+            QTimer::singleShot(HousekeepingDelayMs, m_context, [this, marker] {
+                const int purged = m_store->purgeExpiredTrash();
+                m_store->collectGarbage();
+                QFile touch(marker);
+                if (touch.open(QIODevice::WriteOnly | QIODevice::Truncate))
+                    touch.write(QByteArray::number(QDateTime::currentSecsSinceEpoch()));
+                if (purged > 0)
+                    QMetaObject::invokeMethod(this, &LibraryService::notesChanged, Qt::QueuedConnection);
+            });
+        }, Qt::QueuedConnection);
+    }
     return true;
 }
 

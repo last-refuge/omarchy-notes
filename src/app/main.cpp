@@ -11,6 +11,7 @@
 #include <QCommandLineParser>
 #include <QElapsedTimer>
 #include <QQuickWindow>
+#include <QTimer>
 #include <QFile>
 #include <QJsonObject>
 #include <QThread>
@@ -29,19 +30,30 @@ using namespace Qt::StringLiterals;
 
 namespace {
 
-// Test and benchmark hook: report the first rendered frame, then quit.
+// Test, benchmark and documentation hooks:
+//   ONOTES_EXIT_AFTER_FIRST_FRAME=1  report the first rendered frame, then quit
+//   ONOTES_SCREENSHOT=<file.png>     save the window once images have loaded, then quit
 void exitAfterFirstFrame(QQmlApplicationEngine &engine, const QElapsedTimer &sinceStart)
 {
-    if (!qEnvironmentVariableIsSet("ONOTES_EXIT_AFTER_FIRST_FRAME") || engine.rootObjects().isEmpty())
+    const QString screenshot = qEnvironmentVariable("ONOTES_SCREENSHOT");
+    if ((!qEnvironmentVariableIsSet("ONOTES_EXIT_AFTER_FIRST_FRAME") && screenshot.isEmpty())
+        || engine.rootObjects().isEmpty())
         return;
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
     if (!window)
         return;
-    QObject::connect(window, &QQuickWindow::frameSwapped, window, [window, sinceStart] {
+    QObject::connect(window, &QQuickWindow::frameSwapped, window, [window, sinceStart, screenshot] {
         std::printf("first-frame %lld ms: %s\n", static_cast<long long>(sinceStart.elapsed()),
                     qPrintable(window->title()));
         std::fflush(stdout);
-        QCoreApplication::quit();
+        if (screenshot.isEmpty()) {
+            QCoreApplication::quit();
+            return;
+        }
+        QTimer::singleShot(1200, window, [window, screenshot] {
+            window->grabWindow().save(screenshot);
+            QCoreApplication::quit();
+        });
     }, Qt::SingleShotConnection);
 }
 

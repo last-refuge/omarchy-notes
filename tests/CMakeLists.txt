@@ -27,3 +27,8 @@ onotes_test(tst_launch)
 target_link_libraries(tst_launch PRIVATE notes_app_lib Qt6::Network)
 target_compile_definitions(tst_launch PRIVATE APP_PATH="$<TARGET_FILE:${ONOTES_BINARY_NAME}>")
 add_dependencies(tst_launch ${ONOTES_BINARY_NAME})
+
+# Release performance benchmark; run by hand: ./tests/bench_library [notes] [attachment-mb]
+add_executable(bench_library bench_library.cpp)
+target_link_libraries(bench_library PRIVATE notes_core Qt6::Gui)
+add_dependencies(bench_library ${ONOTES_BINARY_NAME})

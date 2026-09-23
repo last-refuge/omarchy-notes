@@ -21,6 +21,9 @@ class LibraryService : public QObject
     Q_OBJECT
 
 public:
+    // How long after startup the daily housekeeping runs.
+    static constexpr int HousekeepingDelayMs = 30000;
+
     explicit LibraryService(LibraryPaths paths, QObject *parent = nullptr);
     ~LibraryService() override;
 

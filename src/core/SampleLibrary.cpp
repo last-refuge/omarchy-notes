@@ -48,7 +48,7 @@ RichDocument mixedContentNote(const QString &imageHash, const QString &attachmen
     b << Block::heading(1, {t(u"Q3 planning — product sync"_s)});
     b << p({t(u"Met with Dana, Luis and Priya on 22 September. "_s),
             t(u"Decisions"_s, Bold),
-            t(u" are below; open questions are at the end."_s)});
+            t(u" are below; open questions are at the end. #planning #q3"_s)});
 
     b << Block::heading(2, {t(u"Decisions"_s)});
     b << li(ListKind::Bullet, 0, {t(u"Ship the offline importer in the October release"_s)});
