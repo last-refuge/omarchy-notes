@@ -26,7 +26,8 @@ cd build-aur-release/aur && makepkg --cleanbuild && cd ../..
 ./tests/check-arch-package.sh build-aur-release/aur
 ```
 
-Use `extra-x86_64-build` instead of `makepkg` for a clean-chroot build, like CI does.
+For a clean-chroot build, use `extra-x86_64-build` instead of `makepkg` (needs `devtools`).
+CI builds with `makepkg --syncdeps` in a fresh container, since a chroot can't run inside it.
 
 ## 3. Tag and publish
 
