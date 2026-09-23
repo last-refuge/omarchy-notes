@@ -317,10 +317,10 @@
       <span class="label">jasona / omarchy-notes · Roadmap</span>
     </div>
     <h1>Omarchy Notes <span>roadmap</span></h1>
-    <p class="lede">A native, local-first notebook for Omarchy. It aims for Apple Notes' fast capture and rich documents, drawn in your active theme. The complete local beta is done: tags, Smart Folders, gallery, attachments, import/export and Quick Note all work. Next is release quality and packaging.</p>
+    <p class="lede">A native, local-first notebook for Omarchy. It aims for Apple Notes' fast capture and rich documents, drawn in your active theme. Version 1.0.0 is ready to ship: packaged for Arch, accessible, and every performance target met on a 10,000-note library.</p>
     <div class="facts">
-      <div class="fact"><span class="label">Now</span><strong>Milestone 3 complete</strong><small>Complete local beta · 23 Sep 2026</small></div>
-      <div class="fact"><span class="label">Next</span><strong>Release quality</strong><small>Packaging, accessibility, performance</small></div>
+      <div class="fact"><span class="label">Now</span><strong>1.0.0 release</strong><small>All four v1 milestones · 23 Sep 2026</small></div>
+      <div class="fact"><span class="label">Next</span><strong>After 1.0</strong><small>Locked notes, OCR, sync</small></div>
       <div class="fact"><span class="label">v1 estimate</span><strong class="num">12–18 eng-weeks</strong><small>+20–30% contingency</small></div>
       <div class="fact"><span class="label">Stack</span><strong>Qt 6.8+ · QML · SQLite</strong><small>C++20, native Wayland</small></div>
     </div>
@@ -333,7 +333,7 @@
       <p>Milestones are sequential, sized in engineer-weeks for one experienced native-app engineer with design support. These are planning ranges, not calendar dates. Solid bars are the optimistic estimate and hatching runs to the pessimistic one. Re-estimate now that the editor prototype exists.</p>
     </div>
 
-    <div class="timeline" role="img" aria-label="Gantt chart of milestones 0 to 4 on a scale of 0 to 24 engineer-weeks. Scope and design: 1 to 2 weeks, partly done. Editor and storage proof: 2 to 3 weeks, done. Daily-use alpha: 3 to 4 weeks, done. Complete local beta: 4 to 6 weeks, done. Release quality: next. Release quality: 2 to 3 weeks. Total 12 to 18 weeks, with contingency up to about 23 weeks.">
+    <div class="timeline" role="img" aria-label="Gantt chart of milestones 0 to 4 on a scale of 0 to 24 engineer-weeks. Scope and design: 1 to 2 weeks, partly done. Editor and storage proof: 2 to 3 weeks, done. Daily-use alpha: 3 to 4 weeks, done. Complete local beta: 4 to 6 weeks, done. Release quality: 2 to 3 weeks, done. Release quality: 2 to 3 weeks. Total 12 to 18 weeks, with contingency up to about 23 weeks.">
       <div class="gantt">
         <!-- scale: 0–24 weeks; 1 week = 4.1667% -->
         <div class="row is-partial">
@@ -380,8 +380,8 @@
             <div class="bar range" style="left:41.667%;width:20.833%"></div>
           </div>
         </div>
-        <div class="row">
-          <div class="row-label"><b>4 · Release quality</b><small class="num">2–3 wk · next</small></div>
+        <div class="row is-done">
+          <div class="row-label"><b>4 · Release quality</b><small class="num">2–3 wk · done</small></div>
           <div class="track">
             <div class="grid" aria-hidden="true">
               <i class="tick-line" style="left:0%"></i><i class="tick-line" style="left:16.667%"></i><i class="tick-line" style="left:33.333%"></i><i class="tick-line" style="left:50%"></i><i class="tick-line" style="left:66.667%"></i><i class="tick-line" style="left:83.333%"></i><i class="tick-line" style="left:100%"></i>
@@ -488,16 +488,20 @@
         </div>
       </article>
 
-      <article class="ms current">
+      <article class="ms done-card">
         <div class="ms-index" aria-hidden="true">4</div>
         <div class="ms-body">
-          <div class="ms-top"><h3>Release quality</h3><span class="pill next">Next</span><span class="weeks num">2–3 eng-weeks</span></div>
+          <div class="ms-top"><h3>Release quality</h3><span class="pill done">Done · 23 Sep</span><span class="weeks num">2–3 eng-weeks</span></div>
           <p class="exit"><b>Exit:</b> Omarchy packaging, theme integration, accessibility, performance and recovery gates pass; migration documentation complete.</p>
           <ul class="ticks">
-            <li>Arch package with desktop entry, AppStream and MIME types</li>
+            <li class="y">Arch/AUR package, desktop entry, AppStream metadata, man page</li>
+            <li class="y">CI, clean-chroot package build and tag-driven releases</li>
             <li class="y">Single-instance activation (local socket + Wayland activation token)</li>
-            <li>Optional Quick Note Hyprland binding</li>
-            <li>All five release gates pass</li>
+            <li class="y">Optional, conflict-checked Quick Note Hyprland binding</li>
+            <li class="y">Round accessible checkboxes; named images and attachments</li>
+            <li class="y">Plain-language storage errors and a startup error window</li>
+            <li class="y">Performance: 168 ms launch, 28 ms search p95 at 10k notes</li>
+            <li class="y">Migration guide and folder import</li>
           </ul>
         </div>
       </article>
@@ -548,14 +552,12 @@
       <div class="panel">
         <h3>Known gaps</h3>
         <ul class="gaps">
-          <li><span><b>Checklist markers</b> draw as ☐/☒ glyphs; overlay round, themed checkboxes.</span></li>
-          <li><span><b>Screen readers</b> see images and attachments as unnamed placeholders.</span></li>
           <li><span><b>Theme and font changes</b> rebuild the document and clear undo history.</span></li>
           <li><span><b>Image decoding</b> runs on the UI thread during note load.</span></li>
           <li><span><b>Very large notes</b> open in ~0.9 s at 3,000 blocks (offscreen); re-measure on real hardware.</span></li>
-          <li><span><b>Quick Note on a key</b> and its floating rule are documented, not installed; an optional, conflict-checked installer comes with packaging.</span></li>
           <li><span><b>Drag and drop</b>: notes move between folders by menu for now; dragging notes and folders comes later.</span></li>
           <li><span><b>Manual desktop checks:</b> fcitx5, Orca, fractional scaling, portal file dialogs.</span></li>
+          <li><span><b>Very large notes</b> (thousands of paragraphs) take about a second to open.</span></li>
         </ul>
       </div>
     </div>

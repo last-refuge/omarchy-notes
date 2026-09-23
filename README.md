@@ -11,7 +11,7 @@ Rich notes with checklists, tables, images and attachments. They live on your ma
 ![C++20](https://img.shields.io/badge/C%2B%2B-20-00599c?logo=cplusplus&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-FTS5-003b57?logo=sqlite&logoColor=white)
 ![Wayland](https://img.shields.io/badge/Wayland-native-ffbc00)
-![Status](https://img.shields.io/badge/status-beta-yellow)
+![Version](https://img.shields.io/badge/version-1.0.0-2d4f8e)
 
 <img src="docs/images/screenshot-dark.png" alt="Omarchy Notes showing a meeting note with headings, nested lists, checklists, a table, a chart image and a PDF attachment, in the Kanagawa theme" width="820">
 
@@ -23,8 +23,8 @@ Rich notes with checklists, tables, images and attachments. They live on your ma
 
 The idea is simple: Apple Notes' easy note-taking, on Linux. Open it, start typing, and trust it's saved. It's a real desktop app built with Qt, not a web page in a wrapper. It works offline with no account, and it follows whatever Omarchy theme you're using, even when you switch themes while it's open.
 
-> [!NOTE]
-> **This is a beta.** Everything you'd use day to day is here: writing, folders, tags, search, Smart Folders, Quick Note, import/export and backups. Packaging and final polish come next. Check the [roadmap](#-roadmap) for what's left.
+> [!TIP]
+> **New here?** Visit the [project page](https://jasona.github.io/omarchy-notes/) for a quick tour, or jump straight to [installing](#-install).
 
 ## ✨ What you can do today
 
@@ -51,9 +51,17 @@ The idea is simple: Apple Notes' easy note-taking, on Linux. Open it, start typi
 
 ## 🚀 Install
 
-Omarchy Notes isn't packaged yet, so for now you build it from source. It only takes a minute.
+**From the AUR** (on Omarchy or any Arch system):
 
-**1. Install the build tools** (on Omarchy or any Arch system):
+```bash
+yay -S omarchy-notes
+```
+
+Then press <kbd>Super</kbd> + <kbd>Space</kbd> and search for **Omarchy Notes**.
+
+### Building from source
+
+**1. Install the build tools:**
 
 ```bash
 sudo pacman -S --needed qt6-base qt6-declarative qt6-wayland qt6-svg sqlite cmake ninja gcc
@@ -71,8 +79,6 @@ cmake --install build-release
 
 That puts `omarchy-notes` in `~/.local/bin` and adds it to your app launcher.
 
-**3. Open it:** press <kbd>Super</kbd> + <kbd>Space</kbd> and search for **Omarchy Notes**.
-
 > [!TIP]
 > If it doesn't show up in the launcher right away, run `omarchy restart shell` so the launcher picks up the new app.
 
@@ -80,7 +86,13 @@ To update later, `git pull` and run the last two `cmake` commands again. Your no
 
 ### ⚡ Quick Note on a key (optional)
 
-Add a binding to `~/.config/hypr/bindings.lua`. <kbd>Super</kbd> <kbd>Alt</kbd> <kbd>N</kbd> is free in a default Omarchy setup:
+Let the app set it up. It checks your existing bindings (and Omarchy's) first, never overwrites a key that's taken, and backs up anything it changes:
+
+```bash
+omarchy-notes --setup-hyprland
+```
+
+Or do it by hand. Add a binding to `~/.config/hypr/bindings.lua`. <kbd>Super</kbd> <kbd>Alt</kbd> <kbd>N</kbd> is free in a default Omarchy setup:
 
 ```lua
 o.bind("SUPER + ALT + N", "Quick Note", { launch = "omarchy-notes --quick-note" })
@@ -98,6 +110,8 @@ Everything is stored in `~/.local/share/omarchy-notes/`: an SQLite database for 
 
 To back up, click **⋯** at the bottom of the folder list and choose **Back Up Library…**. You get a normal folder with a consistent copy of everything, which is safe to make while you're writing. **Restore from Backup…** in the same menu checks a backup before using it and sets your current notes aside next to the library, so nothing is lost if you change your mind.
 
+Coming from Apple Notes, Obsidian or another app? See [moving your notes in](docs/migrating.md).
+
 Want a sandbox to play in? Point the app at a different folder and fill it with sample notes:
 
 ```bash
@@ -114,6 +128,7 @@ omarchy-notes --data-dir /tmp/notes-playground --samples
 | `--note <id>` | Open a specific note |
 | `--quick-note` | Open a Quick Note window |
 | `--capture <text>` | Save text as a new note without opening a window (use `-` to read from a pipe, like `echo "idea" \| omarchy-notes --capture -`) |
+| `--setup-hyprland` | Add a Quick Note key (<kbd>Super</kbd>+<kbd>Alt</kbd>+<kbd>N</kbd>) and floating rule to Hyprland, if the key is free |
 | `--samples` | Fill an empty library with example notes (a meeting note with a table, image and PDF, some research links, and a grocery list) |
 | `--simulate-save-failure` | Make saves fail on purpose, to see how the app handles it. <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> toggles this while running |
 
@@ -136,7 +151,7 @@ omarchy-notes --data-dir /tmp/notes-playground --samples
 | Indent · Outdent a list item | <kbd>Tab</kbd> · <kbd>Shift</kbd> <kbd>Tab</kbd> |
 | Insert a table | <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>T</kbd> |
 | Attach a file · Link to a note | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>A</kbd> · <kbd>Ctrl</kbd> <kbd>L</kbd> |
-| Follow a link or #tag · Open an attachment | <kbd>Ctrl</kbd> + click · double-click |
+| Follow a link or #tag · Open an attachment | <kbd>Ctrl</kbd> + click · double-click (or <kbd>Ctrl</kbd> <kbd>Enter</kbd> next to it) |
 
 ## 🗺️ Roadmap
 
@@ -145,7 +160,7 @@ omarchy-notes --data-dir /tmp/notes-playground --samples
 | ✅ | **Editor & storage** | Rich editing, autosave, crash-safe storage, theme support |
 | ✅ | **Daily-use alpha** | Delete & trash, folders, pinning, search, backup & restore |
 | ✅ | **Local beta** | Tags, Smart Folders, gallery view, import/export, Quick Note, find in note |
-| 🔜 | **1.0** | Arch package, accessibility polish, performance targets met |
+| ✅ | **1.0** | Arch package, accessibility polish, performance targets met ([numbers](docs/performance.md)) |
 | 💭 | **After 1.0** | Locked notes, OCR, audio, sync between devices, sharing |
 
 The full plan is in [`llm-docs/omarchy-notes-plan.md`](llm-docs/omarchy-notes-plan.md), with a visual version in [`llm-docs/roadmap.html`](llm-docs/roadmap.html) (download it and open it in a browser). Big technical decisions are written up in [`docs/decisions/`](docs/decisions/).
@@ -160,13 +175,14 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-The editor tests drive the real app off-screen and save screenshots to `build/screenshots/`, which is handy for checking what changed visually.
+The editor tests drive the real app off-screen and save screenshots to `build/screenshots/`, which is handy for checking what changed visually. `tests/bench_library` measures the performance targets, and [docs/arch-release.md](docs/arch-release.md) explains how releases are made.
 
 | Folder | What's inside |
 |---|---|
 | [`src/core`](src/core) | The engine: the note format, saving to SQLite, attachment storage and theme colours. There's no UI code in here. |
 | [`src/app`](src/app) | The app itself: the editor logic and the Qt Quick (QML) interface. |
-| [`tests`](tests) | Round-trip, storage (including a "kill it mid-save" durability test), theme contrast and end-to-end editor tests. |
+| [`tests`](tests) | Round-trip, storage (including a "kill it mid-save" durability test), theme contrast, end-to-end editor and launch tests, plus packaging checks. |
+| [`packaging`](packaging) | Desktop entry, icon, AppStream metadata, man page and the AUR recipe template. |
 
 Found a bug or have an idea? [Open an issue](https://github.com/jasona/omarchy-notes/issues). It's early days, so feedback shapes where this goes.
 

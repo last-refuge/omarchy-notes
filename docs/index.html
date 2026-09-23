@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Omarchy Notes</title>
+<meta name="description" content="Fast, native notes for Omarchy. Checklists, tables, images, tags and search, stored on your machine and dressed in your theme.">
+<meta property="og:title" content="Omarchy Notes">
+<meta property="og:description" content="Fast, native notes for Omarchy, inspired by Apple Notes.">
+<meta property="og:image" content="images/screenshot-dark.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --ground: #f2f1ec;
+    --surface: #fbfaf7;
+    --ink: #1f1f28;
+    --ink-2: #45475a;
+    --ink-3: #62657a;
+    --rule: #d9d7cf;
+    --accent: #2d4f8e;
+    --accent-ink: #ffffff;
+    --tag: #2d4f8e;
+    --terminal: #1f1f28;
+    --terminal-ink: #dcd7ba;
+    --terminal-dim: #8a8779;
+    --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    --body: "IBM Plex Sans", "Helvetica Neue", Arial, system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ground: #16161d;
+      --surface: #1f1f28;
+      --ink: #dcd7ba;
+      --ink-2: #c1bca2;
+      --ink-3: #9b9783;
+      --rule: #2f2f3d;
+      --accent: #7e9cd8;
+      --accent-ink: #16161d;
+      --tag: #7e9cd8;
+      --terminal: #0f0f14;
+      --terminal-ink: #dcd7ba;
+      --terminal-dim: #7a7768;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ground: #16161d;
+    --surface: #1f1f28;
+    --ink: #dcd7ba;
+    --ink-2: #c1bca2;
+    --ink-3: #9b9783;
+    --rule: #2f2f3d;
+    --accent: #7e9cd8;
+    --accent-ink: #16161d;
+    --tag: #7e9cd8;
+    --terminal: #0f0f14;
+    --terminal-ink: #dcd7ba;
+    --terminal-dim: #7a7768;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 1.0625rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  .wrap { max-width: 72rem; margin: 0 auto; padding-inline: clamp(16px, 4vw, 40px); }
+  h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; }
+  p { margin: 0; }
+  .eyebrow { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+  .tag { color: var(--tag); font-weight: 600; }
+
+  /* ---------- top bar ---------- */
+  .top {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding-block: 20px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: var(--display); font-weight: 700; font-size: 1.05rem; color: var(--ink); text-decoration: none; }
+  .brand img { width: 28px; height: 28px; }
+  .top nav { display: flex; gap: 20px; font-size: 0.95rem; }
+  .top nav a { color: var(--ink-2); text-decoration: none; }
+  .top nav a:hover { color: var(--ink); }
+
+  /* ---------- hero ---------- */
+  .hero { padding-block: clamp(32px, 7vw, 72px) 0; display: grid; gap: 28px; }
+  .hero h1 {
+    font-size: clamp(2.6rem, 7vw, 4.8rem);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 0.98;
+    max-width: 14ch;
+  }
+  .hero .lede { font-size: clamp(1.1rem, 2.2vw, 1.3rem); color: var(--ink-2); max-width: 38rem; }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .command {
+    display: inline-flex; align-items: center; gap: 12px;
+    background: var(--terminal); color: var(--terminal-ink);
+    font-family: var(--mono); font-size: 0.95rem;
+    padding: 10px 10px 10px 16px; border-radius: 10px;
+    max-width: 100%; overflow-x: auto;
+  }
+  .command .prompt { color: var(--terminal-dim); user-select: none; }
+  .command code { white-space: nowrap; }
+  .copy {
+    font: 600 0.8rem var(--body); cursor: pointer;
+    background: transparent; color: var(--terminal-ink);
+    border: 1px solid color-mix(in srgb, var(--terminal-ink) 30%, transparent);
+    border-radius: 6px; padding: 4px 10px;
+  }
+  .copy:hover { background: color-mix(in srgb, var(--terminal-ink) 12%, transparent); }
+  .secondary { color: var(--ink-2); font-size: 0.95rem; }
+
+  .shot {
+    margin-top: clamp(28px, 5vw, 48px);
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid var(--rule);
+    box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.45);
+    background: #1f1f28;
+  }
+  .shot img { display: block; width: 100%; height: auto; }
+
+  /* ---------- sections ---------- */
+  section { padding-block: clamp(56px, 9vw, 104px) 0; }
+  .section-head { display: grid; gap: 10px; max-width: 42rem; margin-bottom: 32px; }
+  .section-head h2 { font-size: clamp(1.9rem, 4vw, 2.6rem); font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+  .section-head p { color: var(--ink-2); }
+
+  .features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: 28px 40px;
+  }
+  .feature { display: grid; gap: 6px; align-content: start; border-top: 2px solid var(--rule); padding-top: 16px; }
+  .feature h3 { font-size: 1.15rem; font-weight: 700; }
+  .feature p { color: var(--ink-2); font-size: 0.98rem; }
+  kbd {
+    font-family: var(--mono); font-size: 0.8em;
+    border: 1px solid var(--rule); border-bottom-width: 2px;
+    border-radius: 5px; padding: 1px 6px; background: var(--surface); color: var(--ink);
+  }
+
+  .themes { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: 20px; }
+  .themes figure { margin: 0; display: grid; gap: 10px; }
+  .themes img { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--rule); display: block; }
+  .themes figcaption { font-size: 0.9rem; color: var(--ink-3); }
+
+  .split { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 40px; align-items: start; }
+  .points { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+  .points li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; color: var(--ink-2); }
+  .points li::before { content: ""; width: 10px; height: 10px; margin-top: 0.55em; border-radius: 50%; background: var(--accent); }
+  .points b { color: var(--ink); font-weight: 600; }
+
+  .install { display: grid; gap: 22px; }
+  .step { display: grid; gap: 8px; }
+  .step h3 { font-size: 1.1rem; font-weight: 700; }
+  .step p { color: var(--ink-2); }
+  pre.block {
+    margin: 0; background: var(--terminal); color: var(--terminal-ink);
+    font-family: var(--mono); font-size: 0.9rem; line-height: 1.7;
+    padding: 16px 18px; border-radius: 10px; overflow-x: auto;
+  }
+  pre.block .dim { color: var(--terminal-dim); }
+
+  footer {
+    margin-top: clamp(64px, 10vw, 120px);
+    border-top: 1px solid var(--rule);
+    padding-block: 28px 40px;
+    display: flex; flex-wrap: wrap; gap: 12px 28px; justify-content: space-between;
+    color: var(--ink-3); font-size: 0.9rem;
+  }
+  footer a { color: var(--ink-2); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <a class="brand" href="#"><img src="icon.svg" alt="">Omarchy Notes</a>
+    <nav aria-label="Page">
+      <a href="#features">Features</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/jasona/omarchy-notes">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="hero">
+      <span class="eyebrow">For Omarchy · Native Qt · Free and open source</span>
+      <h1>Notes that feel at home on Omarchy.</h1>
+      <p class="lede">Apple Notes' easy capture, rebuilt as a fast native app for your desktop. Start typing and it's saved: checklists, tables, images, <span class="tag">#tags</span> and search, stored on your machine and dressed in your theme.</p>
+      <div class="cta">
+        <div class="command" aria-label="Install command">
+          <span class="prompt">$</span><code id="aur-cmd">yay -S omarchy-notes</code>
+          <button class="copy" type="button" data-copy="aur-cmd">Copy</button>
+        </div>
+        <a class="secondary" href="#install">Other ways to install</a>
+      </div>
+      <div class="shot">
+        <img src="images/screenshot-dark.png" width="1240" height="780"
+             alt="Omarchy Notes in the Kanagawa theme: a folder sidebar with tags, a note list, and a meeting note with headings, round checkboxes and a table">
+      </div>
+    </div>
+
+    <section id="features" aria-labelledby="features-h">
+      <div class="section-head">
+        <span class="eyebrow">What's inside</span>
+        <h2 id="features-h">Everything you reach for, nothing you don't.</h2>
+        <p>Omarchy Notes does what you use Apple Notes for, the Linux way: keyboard-first, offline, and stored in files you own.</p>
+      </div>
+      <div class="features">
+        <div class="feature"><h3>Write, it's saved</h3><p>Autosave confirms "Saved" only once your words are really on disk. If saving ever fails, your text stays put with Retry and Export.</p></div>
+        <div class="feature"><h3>Checklists and tables</h3><p>Nested checklists with round checkboxes, numbered and bulleted lists, and tables where <kbd>Tab</kbd> moves between cells.</p></div>
+        <div class="feature"><h3>Images and files</h3><p>Paste images, attach PDFs and anything else, and browse every attachment across your notes in one place.</p></div>
+        <div class="feature"><h3>Folders, tags, Smart Folders</h3><p>Nest folders, type <span class="tag">#work</span> to tag, and save filters like "tagged #work with an open checklist" that stay current.</p></div>
+        <div class="feature"><h3>Find anything</h3><p>Search all notes as you type with <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>F</kbd>, or find inside a note with <kbd>Ctrl</kbd> <kbd>F</kbd>.</p></div>
+        <div class="feature"><h3>Quick Note</h3><p>A small capture window on a key of your choice, plus <code>omarchy-notes --capture "idea"</code> from any terminal.</p></div>
+      </div>
+    </section>
+
+    <section aria-labelledby="themes-h">
+      <div class="section-head">
+        <span class="eyebrow">Theming</span>
+        <h2 id="themes-h">It wears whatever theme you do.</h2>
+        <p>Colours come straight from your active Omarchy theme and change the moment you switch, with automatic fixes when a palette would be hard to read.</p>
+      </div>
+      <div class="themes">
+        <figure>
+          <img src="images/screenshot-light.png" width="1240" height="780" loading="lazy" alt="A note in the Catppuccin Latte theme">
+          <figcaption>Catppuccin Latte</figcaption>
+        </figure>
+        <figure>
+          <img src="images/screenshot-gallery.png" width="1240" height="780" loading="lazy" alt="The gallery view in the Rosé Pine theme, with an image preview card">
+          <figcaption>Rosé Pine, gallery view</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section aria-labelledby="yours-h">
+      <div class="split">
+        <div class="section-head">
+          <span class="eyebrow">Yours to keep</span>
+          <h2 id="yours-h">No account. No cloud. No lock-in.</h2>
+          <p>Your library is a folder in <code>~/.local/share/omarchy-notes</code>: one SQLite database and your attachments.</p>
+        </div>
+        <ul class="points">
+          <li><span><b>Works offline, always.</b> Nothing leaves your machine.</span></li>
+          <li><span><b>Crash-safe.</b> Every confirmed save survives a power cut, and deleted notes wait 30 days in Recently Deleted.</span></li>
+          <li><span><b>One-click backups.</b> Complete copies you can restore, checked before anything is replaced.</span></li>
+          <li><span><b>Leave any time.</b> Export notes as Markdown, HTML or PDF, or your whole library as Markdown folders.</span></li>
+          <li><span><b>Moving in.</b> Import Markdown files or whole folders from Apple Notes exporters, Obsidian and more.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="install" aria-labelledby="install-h">
+      <div class="section-head">
+        <span class="eyebrow">Install</span>
+        <h2 id="install-h">Up and running in a minute.</h2>
+      </div>
+      <div class="install">
+        <div class="step">
+          <h3>From the AUR</h3>
+          <p>On Omarchy or any Arch system:</p>
+          <div class="command"><span class="prompt">$</span><code id="aur-cmd-2">yay -S omarchy-notes</code><button class="copy" type="button" data-copy="aur-cmd-2">Copy</button></div>
+        </div>
+        <div class="step">
+          <h3>Then open it</h3>
+          <p>Press <kbd>Super</kbd> <kbd>Space</kbd> and search for <b>Omarchy Notes</b>. Optional: put Quick Note on <kbd>Super</kbd> <kbd>Alt</kbd> <kbd>N</kbd>. This checks your existing key bindings first and never overwrites one:</p>
+          <div class="command"><span class="prompt">$</span><code id="hypr-cmd">omarchy-notes --setup-hyprland</code><button class="copy" type="button" data-copy="hypr-cmd">Copy</button></div>
+        </div>
+        <div class="step">
+          <h3>Or build it yourself</h3>
+          <p>You'll need Qt 6.8 or newer, SQLite, CMake and Ninja.</p>
+<pre class="block">git clone https://github.com/jasona/omarchy-notes.git
+cd omarchy-notes
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$HOME/.local"
+cmake --build build &amp;&amp; cmake --install build</pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>Omarchy Notes is <a href="https://github.com/jasona/omarchy-notes/blob/master/LICENSE">MIT licensed</a>. Not affiliated with Apple or the Omarchy project.</span>
+    <span><a href="https://github.com/jasona/omarchy-notes">Source</a> · <a href="https://github.com/jasona/omarchy-notes/issues">Report a problem</a> · <a href="https://github.com/jasona/omarchy-notes/blob/master/SECURITY.md">Security</a></span>
+  </footer>
+</div>
+
+<script>
+  document.querySelectorAll('button[data-copy]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const code = document.getElementById(button.dataset.copy);
+      const done = () => { button.textContent = 'Copied'; setTimeout(() => { button.textContent = 'Copy'; }, 1600); };
+      const select = () => {
+        const range = document.createRange();
+        range.selectNodeContents(code);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code.textContent).then(done, select);
+      } else {
+        select();
+      }
+    });
+  });
+</script>
+</body>
+</html>
