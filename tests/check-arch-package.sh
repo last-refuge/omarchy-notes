@@ -21,7 +21,7 @@ for path in usr/bin/omarchy-notes \
             usr/share/applications/org.omarchy.Notes.desktop \
             usr/share/icons/hicolor/scalable/apps/org.omarchy.Notes.svg \
             usr/share/metainfo/org.omarchy.Notes.metainfo.xml \
-            usr/share/man/man1/omarchy-notes.1 \
+            usr/share/man/man1/omarchy-notes.1.gz \
             usr/share/doc/omarchy-notes/README.md; do
   [[ -s "$work_dir/$path" ]] || { echo "Missing package file: $path" >&2; exit 1; }
 done
