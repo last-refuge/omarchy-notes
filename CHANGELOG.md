@@ -26,5 +26,5 @@ All notable changes to Omarchy Notes are documented here. The project uses
 - Live Omarchy theme following with contrast correction.
 - Arch packaging with desktop entry, AppStream metadata and man page.
 
-[Unreleased]: https://github.com/jasona/omarchy-notes/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/jasona/omarchy-notes/releases/tag/v1.0.0
+[Unreleased]: https://github.com/last-refuge/omarchy-notes/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/last-refuge/omarchy-notes/releases/tag/v1.0.0

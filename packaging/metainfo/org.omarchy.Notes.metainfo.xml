@@ -20,15 +20,15 @@
     <binary>omarchy-notes</binary>
   </provides>
   <url type="homepage">https://lastrefuge.ai/projects/omarchy-notes</url>
-  <url type="bugtracker">https://github.com/jasona/omarchy-notes/issues</url>
-  <url type="vcs-browser">https://github.com/jasona/omarchy-notes</url>
-  <developer id="com.github.jasona">
+  <url type="bugtracker">https://github.com/last-refuge/omarchy-notes/issues</url>
+  <url type="vcs-browser">https://github.com/last-refuge/omarchy-notes</url>
+  <developer id="com.github.last-refuge">
     <name>Omarchy Notes contributors</name>
   </developer>
   <screenshots>
     <screenshot type="default">
       <caption>A meeting note with checklists, a table, a chart and a PDF attachment</caption>
-      <image>https://raw.githubusercontent.com/jasona/omarchy-notes/v1.0.0/docs/images/screenshot-dark.png</image>
+      <image>https://raw.githubusercontent.com/last-refuge/omarchy-notes/v1.0.0/docs/images/screenshot-dark.png</image>
     </screenshot>
   </screenshots>
   <content_rating type="oars-1.1"/>

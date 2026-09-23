@@ -24,7 +24,7 @@ Rich notes with checklists, tables, images and attachments. They live on your ma
 The idea is simple: Apple Notes' easy note-taking, on Linux. Open it, start typing, and trust it's saved. It's a real desktop app built with Qt, not a web page in a wrapper. It works offline with no account, and it follows whatever Omarchy theme you're using, even when you switch themes while it's open.
 
 > [!TIP]
-> **New here?** Visit the [project page](https://jasona.github.io/omarchy-notes/) for a quick tour, or jump straight to [installing](#-install).
+> **New here?** Visit the [project page](https://last-refuge.github.io/omarchy-notes/) for a quick tour, or jump straight to [installing](#-install).
 
 ## ✨ What you can do today
 
@@ -70,7 +70,7 @@ sudo pacman -S --needed qt6-base qt6-declarative qt6-wayland qt6-svg sqlite cmak
 **2. Build and install it for your user:**
 
 ```bash
-git clone https://github.com/jasona/omarchy-notes.git
+git clone https://github.com/last-refuge/omarchy-notes.git
 cd omarchy-notes
 cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$HOME/.local"
 cmake --build build-release
@@ -184,7 +184,7 @@ The editor tests drive the real app off-screen and save screenshots to `build/sc
 | [`tests`](tests) | Round-trip, storage (including a "kill it mid-save" durability test), theme contrast, end-to-end editor and launch tests, plus packaging checks. |
 | [`packaging`](packaging) | Desktop entry, icon, AppStream metadata, man page and the AUR recipe template. |
 
-Found a bug or have an idea? [Open an issue](https://github.com/jasona/omarchy-notes/issues). It's early days, so feedback shapes where this goes.
+Found a bug or have an idea? [Open an issue](https://github.com/last-refuge/omarchy-notes/issues). It's early days, so feedback shapes where this goes.
 
 ## 🔒 Security
 

@@ -12,7 +12,7 @@ makedepends=('cmake' 'ninja' 'pkgconf')
 optdepends=('qt6-wayland: native Wayland support'
             'qt6-imageformats: WebP, TIFF and other image formats in notes'
             'xdg-utils: open attachments in their default applications')
-source=("https://github.com/jasona/omarchy-notes/releases/download/v${pkgver}/${pkgname}-${pkgver}.tar.gz")
+source=("https://github.com/last-refuge/omarchy-notes/releases/download/v${pkgver}/${pkgname}-${pkgver}.tar.gz")
 b2sums=('@SOURCE_B2SUM@')
 
 build() {

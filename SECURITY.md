@@ -9,7 +9,7 @@ supported releases.
 ## Reporting a vulnerability
 
 Please report security issues privately through
-[GitHub Security Advisories](https://github.com/jasona/omarchy-notes/security/advisories/new).
+[GitHub Security Advisories](https://github.com/last-refuge/omarchy-notes/security/advisories/new).
 Do not include note content, attachments, backups, or other personal data in a
 public issue.
 
