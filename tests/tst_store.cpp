@@ -467,6 +467,162 @@ private slots:
         QVERIFY(library.verify().isEmpty());
     }
 
+    void tagsFollowTheText()
+    {
+        QTemporaryDir dir;
+        NoteStore store(LibraryPaths::at(dir.path()));
+        QVERIFY(store.open(nullptr));
+        const auto a = store.createNote(textDoc(u"Launch plan #work #Launch"_s));
+        const auto b = store.createNote(textDoc(u"Groceries #errands #work"_s));
+        QCOMPARE(store.listTags().size(), 3);
+        QCOMPARE(store.listNotes(NoteQuery::tagged(u"WORK"_s)).size(), 2);
+
+        // Editing the text updates the tags.
+        QVERIFY(store.saveNote({a->id, a->revision, textDoc(u"Launch plan #personal"_s)}).status
+                == SaveResult::Status::Saved);
+        QStringList names;
+        for (const TagInfo &t : store.listTags())
+            names << u"%1:%2"_s.arg(t.name).arg(t.noteCount);
+        QCOMPARE(names, (QStringList{u"errands:1"_s, u"personal:1"_s, u"work:1"_s}));
+
+        // Deleted notes don't count.
+        QVERIFY(store.trashNote(b->id));
+        QCOMPARE(store.listTags().size(), 1);
+        QCOMPARE(store.listNotes(NoteQuery::tagged(u"work"_s)).size(), 0);
+    }
+
+    void smartFolders()
+    {
+        QTemporaryDir dir;
+        NoteStore store(LibraryPaths::at(dir.path()));
+        QVERIFY(store.open(nullptr));
+        RichDocument checklist;
+        checklist.blocks = {Block::listItem(ListKind::Check, 0, {Span::plain(u"Pack #travel #work"_s)})};
+        checklist.assignMissingIds();
+        const auto trip = store.createNote(checklist);
+        store.createNote(textDoc(u"Notes from #work"_s));
+        const auto pinned = store.createNote(textDoc(u"Passport #travel"_s));
+        store.setPinned(pinned->id, true);
+
+        SmartCriteria any;
+        any.tags = {u"travel"_s, u"work"_s};
+        QCOMPARE(store.listNotes(NoteQuery::smart(any)).size(), 3);
+        SmartCriteria all = any;
+        all.matchAllTags = true;
+        QCOMPARE(store.listNotes(NoteQuery::smart(all)).size(), 1);
+        SmartCriteria checklistOnly;
+        checklistOnly.hasChecklist = true;
+        QCOMPARE(store.listNotes(NoteQuery::smart(checklistOnly)).value(0).id, trip->id);
+        SmartCriteria pinnedTravel;
+        pinnedTravel.tags = {u"travel"_s};
+        pinnedTravel.pinnedOnly = true;
+        QCOMPARE(store.listNotes(NoteQuery::smart(pinnedTravel)).size(), 1);
+        SmartCriteria recent;
+        recent.editedWithinDays = 7;
+        QCOMPARE(store.listNotes(NoteQuery::smart(recent)).size(), 3);
+
+        QString error;
+        QVERIFY(!store.createSmartFolder(u"Nothing"_s, SmartCriteria{}, &error)); // needs a filter
+        const auto travel = store.createSmartFolder(u"Travel & work"_s, all, &error);
+        QVERIFY2(travel, qPrintable(error));
+        QCOMPARE(travel->noteCount, 1);
+        QVERIFY(!store.createSmartFolder(u"travel & WORK"_s, any, &error)); // unique names
+        QVERIFY(store.updateSmartFolder(travel->id, u"Everything tagged"_s, any));
+        const auto folders = store.listSmartFolders();
+        QCOMPARE(folders.size(), 1);
+        QCOMPARE(folders[0].name, u"Everything tagged"_s);
+        QCOMPARE(folders[0].criteria, any);
+        QCOMPARE(folders[0].noteCount, 3);
+        QVERIFY(store.deleteSmartFolder(travel->id));
+        QVERIFY(store.listSmartFolders().isEmpty());
+    }
+
+    void attachmentBrowserItems()
+    {
+        QTemporaryDir dir;
+        LibraryService library(LibraryPaths::at(dir.path()));
+        QString error;
+        QVERIFY(library.start(&error));
+        const QString mixed = SampleLibrary::seed(library, &error);
+        const QList<AttachmentItem> items = library.listAttachmentItems();
+        QCOMPARE(items.size(), 2);
+        int images = 0;
+        for (const AttachmentItem &item : items) {
+            QCOMPARE(item.noteId, mixed);
+            images += item.isImage;
+            if (!item.isImage)
+                QCOMPARE(item.fileName, u"Q3 roadmap draft.pdf"_s);
+        }
+        QCOMPARE(images, 1);
+        QVERIFY(!library.listNotes().first().thumbnail.isEmpty() || !library.listNotes().last().thumbnail.isEmpty());
+        library.trashNote(mixed);
+        QVERIFY(library.listAttachmentItems().isEmpty());
+    }
+
+    // Turn a current library back into a real v1 database.
+    static void downgradeToV1(const QString &databasePath)
+    {
+        Database db;
+        QVERIFY(db.open(databasePath, nullptr));
+        QVERIFY(db.exec("DROP TABLE note_tags; DROP TABLE note_attachment_refs; DROP TABLE smart_folders;"));
+        QVERIFY(db.exec("ALTER TABLE notes DROP COLUMN thumbnail"));
+        QVERIFY(db.exec("PRAGMA user_version=1"));
+    }
+
+    void migratesVersion1Libraries()
+    {
+        QTemporaryDir dir;
+        QString mixed;
+        {
+            LibraryService library(LibraryPaths::at(dir.path()));
+            QString error;
+            QVERIFY(library.start(&error));
+            mixed = SampleLibrary::seed(library, &error);
+            library.createNote(textDoc(u"Old note with #legacy tag"_s));
+        }
+        downgradeToV1(dir.filePath(u"library.sqlite3"_s));
+
+        NoteStore store(LibraryPaths::at(dir.path()));
+        QString error;
+        QVERIFY2(store.open(&error), qPrintable(error));
+        QCOMPARE(store.listNotes(NoteQuery::tagged(u"legacy"_s)).size(), 1);
+        QCOMPARE(store.listAttachmentItems().size(), 2);
+        bool thumbnail = false;
+        for (const NoteSummary &n : store.listNotes())
+            thumbnail = thumbnail || (n.id == mixed && !n.thumbnail.isEmpty());
+        QVERIFY(thumbnail);
+        QVERIFY(store.verify().isEmpty());
+        Database check;
+        QVERIFY(check.open(dir.filePath(u"library.sqlite3"_s), nullptr));
+        QCOMPARE(check.userVersion(), NoteStore::SchemaVersion);
+    }
+
+    void restoresVersion1Backups()
+    {
+        QTemporaryDir dir;
+        QTemporaryDir backups;
+        LibraryService library(LibraryPaths::at(dir.filePath(u"library"_s)));
+        QString error;
+        QVERIFY(library.start(&error));
+        QVERIFY(!SampleLibrary::seed(library, &error).isEmpty());
+        library.createNote(textDoc(u"From an older app #vintage"_s));
+        const QString target = backups.filePath(u"old"_s);
+        QVERIFY(library.backupTo(target));
+        downgradeToV1(target + u"/library.sqlite3"_s);
+        QFile manifest(target + u"/manifest.json"_s);
+        QVERIFY(manifest.open(QIODevice::ReadWrite));
+        QByteArray json = manifest.readAll().replace("\"schemaVersion\": 2", "\"schemaVersion\": 1");
+        manifest.resize(0);
+        manifest.write(json);
+        manifest.close();
+
+        QString safety;
+        QVERIFY2(library.restoreFrom(target, &safety, &error), qPrintable(error));
+        QCOMPARE(library.listNotes(NoteQuery::tagged(u"vintage"_s)).size(), 1);
+        QVERIFY(library.verify().isEmpty());
+        QDir(safety).removeRecursively();
+    }
+
     // Kill the writer with SIGKILL at random points; every save it
     // acknowledged must be present afterwards and the library consistent.
     void acknowledgedSavesSurviveKill()

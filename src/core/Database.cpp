@@ -164,13 +164,25 @@ int Database::userVersion()
 
 Transaction::Transaction(Database &db) : m_db(db)
 {
-    m_active = m_db.exec("BEGIN IMMEDIATE");
+    if (sqlite3_get_autocommit(m_db.handle()) == 0) {
+        static int counter = 0;
+        m_savepoint = "tx" + QByteArray::number(++counter);
+        m_active = m_db.exec(("SAVEPOINT " + m_savepoint).constData());
+    } else {
+        m_active = m_db.exec("BEGIN IMMEDIATE");
+    }
 }
 
 Transaction::~Transaction()
 {
-    if (m_active)
+    if (!m_active)
+        return;
+    if (m_savepoint.isEmpty()) {
         m_db.exec("ROLLBACK");
+    } else {
+        m_db.exec(("ROLLBACK TO " + m_savepoint).constData());
+        m_db.exec(("RELEASE " + m_savepoint).constData());
+    }
 }
 
 bool Transaction::commit()
@@ -178,6 +190,8 @@ bool Transaction::commit()
     if (!m_active)
         return false;
     m_active = false;
+    if (!m_savepoint.isEmpty())
+        return m_db.exec(("RELEASE " + m_savepoint).constData());
     if (m_db.exec("COMMIT"))
         return true;
     m_db.exec("ROLLBACK");

@@ -5,6 +5,7 @@
 #include "LibraryPaths.h"
 #include "RichDocument.h"
 
+#include <QJsonObject>
 #include <QList>
 #include <QMetaType>
 #include <QString>
@@ -18,6 +19,7 @@ struct NoteSummary {
     QString folderId; // empty: the top-level "Notes" folder
     QString title;
     QString snippet;  // for search results: the best match, marked with \x02..\x03
+    QString thumbnail; // blob hash of the first image, if any
     qint64 createdAt = 0; // ms since epoch
     qint64 updatedAt = 0;
     qint64 deletedAt = 0; // non-zero while in Recently Deleted
@@ -46,20 +48,68 @@ struct FolderInfo {
 
 enum class NoteSort { Edited, Created, Title };
 
+struct TagInfo {
+    QString name; // lowercased, without '#'
+    int noteCount = 0;
+};
+
+// What a Smart Folder matches. Every set criterion must hold.
+struct SmartCriteria {
+    QStringList tags;
+    bool matchAllTags = false; // otherwise any of the tags
+    bool hasChecklist = false;
+    bool hasAttachments = false;
+    bool pinnedOnly = false;
+    int editedWithinDays = 0;  // 0: any time
+    int createdWithinDays = 0;
+    QString folderId;          // empty: any folder
+
+    bool isEmpty() const;
+    QJsonObject toJson() const;
+    static SmartCriteria fromJson(const QJsonObject &json);
+    bool operator==(const SmartCriteria &) const = default;
+};
+
+struct SmartFolder {
+    QString id;
+    QString name;
+    SmartCriteria criteria;
+    int noteCount = 0;
+};
+
 // Which notes a list shows.
 struct NoteQuery {
     enum class Scope {
         All,      // every note not in Recently Deleted
         Folder,   // one folder; an empty folderId is the top-level "Notes"
         Trash,    // Recently Deleted
+        Tag,      // notes with `tag`
+        Smart,    // notes matching `criteria`
     };
     Scope scope = Scope::All;
     QString folderId;
     NoteSort sort = NoteSort::Edited;
+    QString tag;
+    SmartCriteria criteria;
 
-    static NoteQuery all(NoteSort sort = NoteSort::Edited) { return {Scope::All, {}, sort}; }
-    static NoteQuery folder(const QString &id, NoteSort sort = NoteSort::Edited) { return {Scope::Folder, id, sort}; }
-    static NoteQuery trash() { return {Scope::Trash, {}, NoteSort::Edited}; }
+    static NoteQuery all(NoteSort sort = NoteSort::Edited) { return {Scope::All, {}, sort, {}, {}}; }
+    static NoteQuery folder(const QString &id, NoteSort sort = NoteSort::Edited) { return {Scope::Folder, id, sort, {}, {}}; }
+    static NoteQuery trash() { return {Scope::Trash, {}, NoteSort::Edited, {}, {}}; }
+    static NoteQuery tagged(const QString &tag, NoteSort sort = NoteSort::Edited) { return {Scope::Tag, {}, sort, tag, {}}; }
+    static NoteQuery smart(const SmartCriteria &criteria, NoteSort sort = NoteSort::Edited) { return {Scope::Smart, {}, sort, {}, criteria}; }
+};
+
+// An image or file inside a note, for the attachment browser.
+struct AttachmentItem {
+    bool isImage = false;
+    QString blobHash;
+    QString attachmentId; // files only
+    QString fileName;     // files only
+    QString mimeType;     // files only
+    qint64 size = 0;
+    QString noteId;
+    QString noteTitle;
+    qint64 noteUpdatedAt = 0;
 };
 
 struct GarbageReport {
@@ -108,7 +158,7 @@ struct SaveResult {
 class NoteStore
 {
 public:
-    static constexpr int SchemaVersion = 1;
+    static constexpr int SchemaVersion = 2;
     // Keep at most one history snapshot per note per interval.
     static constexpr qint64 RevisionIntervalMs = 10 * 60 * 1000;
 
@@ -147,6 +197,20 @@ public:
     int trashCount();
     int noteCount();
 
+    // Tags come from #tags in note text and are kept up to date on save.
+    QList<TagInfo> listTags();
+
+    // Smart Folders
+    QList<SmartFolder> listSmartFolders();
+    std::optional<SmartFolder> createSmartFolder(const QString &name, const SmartCriteria &criteria,
+                                                 QString *error = nullptr);
+    bool updateSmartFolder(const QString &id, const QString &name, const SmartCriteria &criteria,
+                           QString *error = nullptr);
+    bool deleteSmartFolder(const QString &id, QString *error = nullptr);
+
+    // Every image and file in notes that aren't deleted, newest notes first.
+    QList<AttachmentItem> listAttachmentItems();
+
     // Folders
     QList<FolderInfo> listFolders();
     std::optional<FolderInfo> createFolder(const QString &name, const QString &parentId = {},
@@ -183,6 +247,10 @@ public:
 private:
     bool migrate(QString *error);
     bool folderExists(const QString &id);
+    // Rewrites what's derived from a note's body: image and attachment
+    // references, tags and the thumbnail.
+    bool writeDerived(const QString &noteId, const RichDocument &body);
+    int countMatching(const NoteQuery &query);
     QStringList folderAndDescendants(const QString &id);
     bool registerBlob(const BlobStore::Installed &blob);
 

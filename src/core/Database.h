@@ -70,7 +70,8 @@ private:
     sqlite3 *m_db = nullptr;
 };
 
-// BEGIN IMMEDIATE ... COMMIT, rolled back unless committed.
+// BEGIN IMMEDIATE ... COMMIT, rolled back unless committed. Inside another
+// transaction it becomes a savepoint, so helpers can use it freely.
 class Transaction
 {
 public:
@@ -82,6 +83,7 @@ public:
 private:
     Database &m_db;
     bool m_active = false;
+    QByteArray m_savepoint; // non-empty when nested
 };
 
 } // namespace onotes

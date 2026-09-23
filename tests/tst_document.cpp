@@ -245,6 +245,40 @@ private slots:
         QCOMPARE(report.warnings.size(), 2); // unsupported link, web image
     }
 
+    void findsTags_data()
+    {
+        QTest::addColumn<QString>("text");
+        QTest::addColumn<QStringList>("tags");
+        QTest::newRow("simple") << u"Plan the #launch and #Q3-review today"_s << QStringList{u"launch"_s, u"q3-review"_s};
+        QTest::newRow("start and punctuation") << u"#todo: call (#Dana) “#quoted”"_s
+                                               << QStringList{u"todo"_s, u"dana"_s, u"quoted"_s};
+        QTest::newRow("not tags") << u"issue #12, url.com/#anchor, a#b, ##, # space"_s << QStringList{};
+        QTest::newRow("nested and unicode") << u"#work/clients #café #2026-plan"_s
+                                            << QStringList{u"work/clients"_s, u"café"_s, u"2026-plan"_s};
+        QTest::newRow("trailing separators") << u"#draft- and #ideas/"_s << QStringList{u"draft"_s, u"ideas"_s};
+    }
+
+    void findsTags()
+    {
+        QFETCH(QString, text);
+        QFETCH(QStringList, tags);
+        QStringList found;
+        for (const TagMatch &m : findTags(text)) {
+            found << m.tag;
+            QCOMPARE(text.mid(m.start, m.length).toLower(), u'#' + m.tag);
+        }
+        QCOMPARE(found, tags);
+    }
+
+    void documentTagsSkipCodeAndLinks()
+    {
+        RichDocument doc;
+        doc.blocks << Block::paragraph({Span::plain(u"Ship #v2 "_s), Span::plain(u"#notatag"_s, Code),
+                                        Span::plain(u" see "_s), Span::plain(u"#alsonot"_s, 0, u"https://x.com/#alsonot"_s)});
+        doc.blocks << Block::listItem(ListKind::Check, 0, {Span::plain(u"#V2 again, #errands"_s)});
+        QCOMPARE(doc.tags(), (QStringList{u"v2"_s, u"errands"_s}));
+    }
+
     void rejectsInvalidDocuments_data()
     {
         QTest::addColumn<QByteArray>("json");

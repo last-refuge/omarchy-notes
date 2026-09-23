@@ -106,6 +106,11 @@ struct RichDocument {
 
     QStringList referencedBlobs() const;
     QStringList referencedAttachments() const;
+    // #tags written in the text (not in code or links), lowercased, unique,
+    // in order of first appearance.
+    QStringList tags() const;
+    // First image in the note, for thumbnails; empty if none.
+    QString firstImage() const;
 
     // Gives every block and table a unique, stable id, keeping existing ones.
     void assignMissingIds();
@@ -120,6 +125,17 @@ struct RichDocument {
 
 QString newId();
 bool isValidBlobHash(const QString &hash);
+
+// A #tag inside a run of text: `start`/`length` cover the whole "#tag".
+struct TagMatch {
+    qsizetype start = 0;
+    qsizetype length = 0;
+    QString tag; // lowercased, without '#'
+};
+// Tags start after whitespace or opening punctuation, begin with a letter,
+// number or underscore, contain at least one letter, and may continue with
+// letters, numbers, '_', '-' or '/'. "#1" and "url#anchor" are not tags.
+QList<TagMatch> findTags(const QString &text);
 
 } // namespace onotes
 

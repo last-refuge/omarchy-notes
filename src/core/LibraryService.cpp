@@ -120,6 +120,38 @@ int LibraryService::noteCount()
     return blocking([this] { return m_store->noteCount(); });
 }
 
+QList<TagInfo> LibraryService::listTags()
+{
+    return blocking([this] { return m_store->listTags(); });
+}
+
+QList<SmartFolder> LibraryService::listSmartFolders()
+{
+    return blocking([this] { return m_store->listSmartFolders(); });
+}
+
+std::optional<SmartFolder> LibraryService::createSmartFolder(const QString &name, const SmartCriteria &criteria,
+                                                             QString *error)
+{
+    return blocking([&] { return m_store->createSmartFolder(name, criteria, error); });
+}
+
+bool LibraryService::updateSmartFolder(const QString &id, const QString &name, const SmartCriteria &criteria,
+                                       QString *error)
+{
+    return blocking([&] { return m_store->updateSmartFolder(id, name, criteria, error); });
+}
+
+bool LibraryService::deleteSmartFolder(const QString &id, QString *error)
+{
+    return blocking([&] { return m_store->deleteSmartFolder(id, error); });
+}
+
+QList<AttachmentItem> LibraryService::listAttachmentItems()
+{
+    return blocking([this] { return m_store->listAttachmentItems(); });
+}
+
 QList<FolderInfo> LibraryService::listFolders()
 {
     return blocking([this] { return m_store->listFolders(); });

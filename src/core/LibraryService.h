@@ -46,6 +46,15 @@ public:
     int trashCount();
     int noteCount();
 
+    QList<TagInfo> listTags();
+    QList<SmartFolder> listSmartFolders();
+    std::optional<SmartFolder> createSmartFolder(const QString &name, const SmartCriteria &criteria,
+                                                 QString *error = nullptr);
+    bool updateSmartFolder(const QString &id, const QString &name, const SmartCriteria &criteria,
+                           QString *error = nullptr);
+    bool deleteSmartFolder(const QString &id, QString *error = nullptr);
+    QList<AttachmentItem> listAttachmentItems();
+
     QList<FolderInfo> listFolders();
     std::optional<FolderInfo> createFolder(const QString &name, const QString &parentId = {},
                                            QString *error = nullptr);

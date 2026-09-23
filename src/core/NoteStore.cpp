@@ -5,6 +5,8 @@
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QMimeDatabase>
 #include <QRegularExpression>
 #include <QSet>
@@ -98,6 +100,34 @@ CREATE TRIGGER notes_fts_update AFTER UPDATE OF title, plain_text ON notes BEGIN
 END;
 )sql";
 
+// v2: tags, Smart Folders, attachment references and note thumbnails.
+constexpr const char *kSchemaV2 = R"sql(
+ALTER TABLE notes ADD COLUMN thumbnail TEXT;
+
+CREATE TABLE note_tags (
+    note_id     TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+    tag         TEXT NOT NULL,
+    PRIMARY KEY (note_id, tag)
+) WITHOUT ROWID;
+CREATE INDEX note_tags_by_tag ON note_tags(tag);
+
+CREATE TABLE note_attachment_refs (
+    note_id       TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+    attachment_id TEXT NOT NULL,
+    PRIMARY KEY (note_id, attachment_id)
+) WITHOUT ROWID;
+CREATE INDEX note_attachment_refs_by_attachment ON note_attachment_refs(attachment_id);
+
+CREATE TABLE smart_folders (
+    id          TEXT PRIMARY KEY NOT NULL,
+    name        TEXT NOT NULL,
+    criteria    TEXT NOT NULL,
+    sort_key    INTEGER NOT NULL DEFAULT 0,
+    created_at  INTEGER NOT NULL,
+    updated_at  INTEGER NOT NULL
+);
+)sql";
+
 qint64 now()
 {
     return QDateTime::currentMSecsSinceEpoch();
@@ -171,6 +201,20 @@ bool NoteStore::migrate(QString *error)
         if (!m_db.exec(kSchemaV1))
             return setError(error, u"Could not create the library: %1"_s.arg(m_db.lastError()));
     }
+    if (version < 2) {
+        if (!m_db.exec(kSchemaV2))
+            return setError(error, u"Could not upgrade the library: %1"_s.arg(m_db.lastError()));
+        // Fill in tags, references and thumbnails for existing notes.
+        QList<QPair<QString, QString>> notes;
+        Statement all = m_db.prepare("SELECT id, body FROM notes");
+        while (all.next())
+            notes.append({all.text(0), all.text(1)});
+        for (const auto &[id, json] : notes) {
+            const auto body = RichDocument::fromJsonBytes(json.toUtf8());
+            if (body && !writeDerived(id, *body))
+                return setError(error, u"Could not upgrade the library: %1"_s.arg(m_db.lastError()));
+        }
+    }
     // Future migrations go here, each guarded by `version < N`.
     const QByteArray setVersion = "PRAGMA user_version=" + QByteArray::number(SchemaVersion);
     if (!m_db.exec(setVersion.constData()) || !tx.commit())
@@ -182,7 +226,7 @@ namespace {
 
 constexpr const char *kSummaryColumns =
     "n.id, n.folder_id, n.title, n.snippet, n.created_at, n.updated_at, n.deleted_at, "
-    "n.pinned, n.has_attachments, n.has_checklist";
+    "n.pinned, n.has_attachments, n.has_checklist, n.thumbnail";
 
 NoteSummary readSummary(const Statement &s)
 {
@@ -197,7 +241,88 @@ NoteSummary readSummary(const Statement &s)
     n.pinned = s.int64(7) != 0;
     n.hasAttachments = s.int64(8) != 0;
     n.hasChecklist = s.int64(9) != 0;
+    n.thumbnail = s.text(10);
     return n;
+}
+
+// A WHERE clause with its positional parameters.
+struct Filter {
+    QStringList conditions;
+    QVariantList params;
+
+    void add(const QString &condition, const QVariantList &values = {})
+    {
+        conditions << condition;
+        params << values;
+    }
+    QByteArray sql() const { return conditions.join(u" AND "_s).toUtf8(); }
+    void bindTo(Statement &s) const
+    {
+        for (int i = 0; i < params.size(); ++i) {
+            if (params[i].typeId() == QMetaType::QString)
+                s.bind(i + 1, params[i].toString());
+            else
+                s.bind(i + 1, params[i].toLongLong());
+        }
+    }
+};
+
+Filter filterFor(const NoteQuery &query, qint64 timestamp)
+{
+    Filter f;
+    switch (query.scope) {
+    case NoteQuery::Scope::All:
+        f.add(u"n.deleted_at IS NULL"_s);
+        break;
+    case NoteQuery::Scope::Folder:
+        f.add(u"n.deleted_at IS NULL"_s);
+        if (query.folderId.isEmpty())
+            f.add(u"n.folder_id IS NULL"_s);
+        else
+            f.add(u"n.folder_id = ?"_s, {query.folderId});
+        break;
+    case NoteQuery::Scope::Trash:
+        f.add(u"n.deleted_at IS NOT NULL"_s);
+        break;
+    case NoteQuery::Scope::Tag:
+        f.add(u"n.deleted_at IS NULL"_s);
+        f.add(u"n.id IN (SELECT note_id FROM note_tags WHERE tag = ?)"_s, {query.tag.toLower()});
+        break;
+    case NoteQuery::Scope::Smart: {
+        const SmartCriteria &c = query.criteria;
+        f.add(u"n.deleted_at IS NULL"_s);
+        if (!c.tags.isEmpty()) {
+            QStringList marks;
+            QVariantList tags;
+            for (const QString &tag : c.tags) {
+                marks << u"?"_s;
+                tags << tag.toLower();
+            }
+            if (c.matchAllTags) {
+                tags << qint64(c.tags.size());
+                f.add(u"(SELECT COUNT(DISTINCT t.tag) FROM note_tags t WHERE t.note_id = n.id AND t.tag IN (%1)) = ?"_s
+                          .arg(marks.join(u',')), tags);
+            } else {
+                f.add(u"n.id IN (SELECT note_id FROM note_tags WHERE tag IN (%1))"_s.arg(marks.join(u',')), tags);
+            }
+        }
+        if (c.hasChecklist)
+            f.add(u"n.has_checklist = 1"_s);
+        if (c.hasAttachments)
+            f.add(u"n.has_attachments = 1"_s);
+        if (c.pinnedOnly)
+            f.add(u"n.pinned = 1"_s);
+        constexpr qint64 day = 24 * 60 * 60 * 1000;
+        if (c.editedWithinDays > 0)
+            f.add(u"n.updated_at >= ?"_s, {timestamp - c.editedWithinDays * day});
+        if (c.createdWithinDays > 0)
+            f.add(u"n.created_at >= ?"_s, {timestamp - c.createdWithinDays * day});
+        if (!c.folderId.isEmpty())
+            f.add(u"n.folder_id = ?"_s, {c.folderId});
+        break;
+    }
+    }
+    return f;
 }
 
 // Turns what someone typed into an FTS5 query: every word must match, each
@@ -219,21 +344,10 @@ QString ftsQuery(const QString &text)
 
 QList<NoteSummary> NoteStore::listNotes(const NoteQuery &query)
 {
+    const Filter filter = filterFor(query, now());
     QByteArray sql = "SELECT ";
     sql += kSummaryColumns;
-    sql += " FROM notes n WHERE ";
-    switch (query.scope) {
-    case NoteQuery::Scope::All:
-        sql += "n.deleted_at IS NULL";
-        break;
-    case NoteQuery::Scope::Folder:
-        sql += query.folderId.isEmpty() ? "n.deleted_at IS NULL AND n.folder_id IS NULL"
-                                        : "n.deleted_at IS NULL AND n.folder_id = ?1";
-        break;
-    case NoteQuery::Scope::Trash:
-        sql += "n.deleted_at IS NOT NULL";
-        break;
-    }
+    sql += " FROM notes n WHERE " + filter.sql();
     if (query.scope == NoteQuery::Scope::Trash) {
         sql += " ORDER BY n.deleted_at DESC";
     } else {
@@ -244,14 +358,20 @@ QList<NoteSummary> NoteStore::listNotes(const NoteQuery &query)
         case NoteSort::Title: sql += "n.title = '', n.title COLLATE NOCASE, n.updated_at DESC"; break;
         }
     }
-
     Statement s = m_db.prepare(sql.constData());
-    if (query.scope == NoteQuery::Scope::Folder && !query.folderId.isEmpty())
-        s.bind(1, query.folderId);
+    filter.bindTo(s);
     QList<NoteSummary> out;
     while (s.next())
         out.append(readSummary(s));
     return out;
+}
+
+int NoteStore::countMatching(const NoteQuery &query)
+{
+    const Filter filter = filterFor(query, now());
+    Statement s = m_db.prepare(("SELECT COUNT(*) FROM notes n WHERE " + filter.sql()).constData());
+    filter.bindTo(s);
+    return s.next() ? int(s.int64(0)) : 0;
 }
 
 QList<NoteSummary> NoteStore::search(const QString &text, int limit)
@@ -333,7 +453,8 @@ std::optional<NoteRecord> NoteStore::createNote(const RichDocument &body, QStrin
         .bind(8, qint64(media))
         .bind(9, qint64(hasChecklist(r.body.blocks)))
         .bind(10, r.createdAt);
-    if (!s.exec()) {
+    Transaction tx(m_db);
+    if (!tx.isActive() || !s.exec() || !writeDerived(r.id, r.body) || !tx.commit()) {
         setError(error, m_db.lastError());
         return std::nullopt;
     }
@@ -387,24 +508,9 @@ SaveResult NoteStore::saveNote(const SaveRequest &request)
         return result;
     }
 
-    // Image references, for integrity checks and future garbage collection.
-    // References to blobs this library doesn't have (e.g. pasted from
-    // elsewhere) are skipped instead of failing the save.
-    Statement clearRefs = m_db.prepare("DELETE FROM note_blob_refs WHERE note_id = ?1");
-    clearRefs.bind(1, request.noteId);
-    if (!clearRefs.exec()) {
+    if (!writeDerived(request.noteId, body)) {
         result.error = m_db.lastError();
         return result;
-    }
-    for (const QString &hash : body.referencedBlobs()) {
-        Statement ref = m_db.prepare(
-            "INSERT OR IGNORE INTO note_blob_refs (note_id, blob_hash) "
-            "SELECT ?1, hash FROM blobs WHERE hash = ?2");
-        ref.bind(1, request.noteId).bind(2, hash);
-        if (!ref.exec()) {
-            result.error = m_db.lastError();
-            return result;
-        }
     }
 
     Statement lastSnapshot = m_db.prepare(
@@ -449,6 +555,206 @@ int NoteStore::revisionCount(const QString &noteId)
     Statement s = m_db.prepare("SELECT COUNT(*) FROM note_revisions WHERE note_id = ?1");
     s.bind(1, noteId);
     return s.next() ? int(s.int64(0)) : 0;
+}
+
+// ---------------------------------------------------------------- derived data
+
+bool NoteStore::writeDerived(const QString &noteId, const RichDocument &body)
+{
+    auto run = [&](const char *sql, const QVariantList &values) {
+        Statement s = m_db.prepare(sql);
+        for (int i = 0; i < values.size(); ++i)
+            s.bind(i + 1, values[i].toString());
+        return s.exec();
+    };
+    // References to data this library doesn't have (e.g. pasted from
+    // elsewhere) are skipped rather than failing the save.
+    if (!run("DELETE FROM note_blob_refs WHERE note_id = ?1", {noteId}))
+        return false;
+    for (const QString &hash : body.referencedBlobs()) {
+        if (!run("INSERT OR IGNORE INTO note_blob_refs (note_id, blob_hash) "
+                 "SELECT ?1, hash FROM blobs WHERE hash = ?2", {noteId, hash}))
+            return false;
+    }
+    if (!run("DELETE FROM note_attachment_refs WHERE note_id = ?1", {noteId}))
+        return false;
+    for (const QString &id : body.referencedAttachments()) {
+        if (!run("INSERT OR IGNORE INTO note_attachment_refs (note_id, attachment_id) "
+                 "SELECT ?1, id FROM attachments WHERE id = ?2", {noteId, id}))
+            return false;
+    }
+    if (!run("DELETE FROM note_tags WHERE note_id = ?1", {noteId}))
+        return false;
+    for (const QString &tag : body.tags()) {
+        if (!run("INSERT OR IGNORE INTO note_tags (note_id, tag) VALUES (?1, ?2)", {noteId, tag}))
+            return false;
+    }
+    return run("UPDATE notes SET thumbnail = (SELECT hash FROM blobs WHERE hash = ?2) WHERE id = ?1",
+               {noteId, body.firstImage()});
+}
+
+QList<TagInfo> NoteStore::listTags()
+{
+    Statement s = m_db.prepare(
+        "SELECT t.tag, COUNT(*) FROM note_tags t JOIN notes n ON n.id = t.note_id "
+        "WHERE n.deleted_at IS NULL GROUP BY t.tag ORDER BY t.tag");
+    QList<TagInfo> out;
+    while (s.next())
+        out.append({s.text(0), int(s.int64(1))});
+    return out;
+}
+
+QList<SmartFolder> NoteStore::listSmartFolders()
+{
+    QList<SmartFolder> out;
+    {
+        Statement s = m_db.prepare("SELECT id, name, criteria FROM smart_folders ORDER BY name COLLATE NOCASE");
+        while (s.next()) {
+            SmartFolder f;
+            f.id = s.text(0);
+            f.name = s.text(1);
+            f.criteria = SmartCriteria::fromJson(QJsonDocument::fromJson(s.text(2).toUtf8()).object());
+            out.append(f);
+        }
+    }
+    for (SmartFolder &f : out)
+        f.noteCount = countMatching(NoteQuery::smart(f.criteria));
+    return out;
+}
+
+namespace {
+
+bool checkSmartFolder(Database &db, const QString &name, const SmartCriteria &criteria, const QString &selfId,
+                      QString *error)
+{
+    if (name.isEmpty())
+        return setError(error, u"Give the Smart Folder a name."_s);
+    if (name.size() > 200)
+        return setError(error, u"That name is too long."_s);
+    if (criteria.isEmpty())
+        return setError(error, u"Choose at least one filter."_s);
+    Statement s = db.prepare("SELECT 1 FROM smart_folders WHERE name = ?1 COLLATE NOCASE AND id != ?2");
+    s.bind(1, name).bind(2, selfId);
+    if (s.next())
+        return setError(error, u"There's already a Smart Folder called “%1”."_s.arg(name));
+    return true;
+}
+
+} // namespace
+
+std::optional<SmartFolder> NoteStore::createSmartFolder(const QString &rawName, const SmartCriteria &criteria,
+                                                        QString *error)
+{
+    const QString name = rawName.simplified();
+    if (!checkSmartFolder(m_db, name, criteria, {}, error))
+        return std::nullopt;
+    SmartFolder folder{newId(), name, criteria, 0};
+    Statement s = m_db.prepare(
+        "INSERT INTO smart_folders (id, name, criteria, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?4)");
+    s.bind(1, folder.id)
+        .bind(2, name)
+        .bind(3, QString::fromUtf8(QJsonDocument(criteria.toJson()).toJson(QJsonDocument::Compact)))
+        .bind(4, now());
+    if (!s.exec()) {
+        setError(error, m_db.lastError());
+        return std::nullopt;
+    }
+    folder.noteCount = countMatching(NoteQuery::smart(criteria));
+    return folder;
+}
+
+bool NoteStore::updateSmartFolder(const QString &id, const QString &rawName, const SmartCriteria &criteria,
+                                  QString *error)
+{
+    const QString name = rawName.simplified();
+    if (!checkSmartFolder(m_db, name, criteria, id, error))
+        return false;
+    Statement s = m_db.prepare("UPDATE smart_folders SET name = ?2, criteria = ?3, updated_at = ?4 WHERE id = ?1");
+    s.bind(1, id)
+        .bind(2, name)
+        .bind(3, QString::fromUtf8(QJsonDocument(criteria.toJson()).toJson(QJsonDocument::Compact)))
+        .bind(4, now());
+    if (!s.exec())
+        return setError(error, m_db.lastError());
+    return m_db.changes() == 1 || setError(error, u"That Smart Folder no longer exists."_s);
+}
+
+bool NoteStore::deleteSmartFolder(const QString &id, QString *error)
+{
+    Statement s = m_db.prepare("DELETE FROM smart_folders WHERE id = ?1");
+    s.bind(1, id);
+    return s.exec() || setError(error, m_db.lastError());
+}
+
+QList<AttachmentItem> NoteStore::listAttachmentItems()
+{
+    Statement s = m_db.prepare(
+        "SELECT 1, r.blob_hash, NULL, NULL, NULL, b.size, n.id, n.title, n.updated_at "
+        "  FROM note_blob_refs r JOIN notes n ON n.id = r.note_id JOIN blobs b ON b.hash = r.blob_hash "
+        "  WHERE n.deleted_at IS NULL "
+        "UNION ALL "
+        "SELECT 0, a.blob_hash, a.id, a.file_name, a.mime_type, a.size, n.id, n.title, n.updated_at "
+        "  FROM note_attachment_refs r JOIN attachments a ON a.id = r.attachment_id "
+        "  JOIN notes n ON n.id = r.note_id WHERE n.deleted_at IS NULL "
+        "ORDER BY 9 DESC, 4");
+    QList<AttachmentItem> out;
+    while (s.next()) {
+        AttachmentItem item;
+        item.isImage = s.int64(0) != 0;
+        item.blobHash = s.text(1);
+        item.attachmentId = s.text(2);
+        item.fileName = s.text(3);
+        item.mimeType = s.text(4);
+        item.size = s.int64(5);
+        item.noteId = s.text(6);
+        item.noteTitle = s.text(7);
+        item.noteUpdatedAt = s.int64(8);
+        out.append(item);
+    }
+    return out;
+}
+
+bool SmartCriteria::isEmpty() const
+{
+    return tags.isEmpty() && !hasChecklist && !hasAttachments && !pinnedOnly && editedWithinDays <= 0
+        && createdWithinDays <= 0 && folderId.isEmpty();
+}
+
+QJsonObject SmartCriteria::toJson() const
+{
+    QJsonObject o;
+    if (!tags.isEmpty())
+        o[u"tags"] = QJsonArray::fromStringList(tags);
+    if (matchAllTags)
+        o[u"matchAllTags"] = true;
+    if (hasChecklist)
+        o[u"hasChecklist"] = true;
+    if (hasAttachments)
+        o[u"hasAttachments"] = true;
+    if (pinnedOnly)
+        o[u"pinnedOnly"] = true;
+    if (editedWithinDays > 0)
+        o[u"editedWithinDays"] = editedWithinDays;
+    if (createdWithinDays > 0)
+        o[u"createdWithinDays"] = createdWithinDays;
+    if (!folderId.isEmpty())
+        o[u"folderId"] = folderId;
+    return o;
+}
+
+SmartCriteria SmartCriteria::fromJson(const QJsonObject &o)
+{
+    SmartCriteria c;
+    for (const QJsonValue &v : o[u"tags"].toArray())
+        c.tags << v.toString().toLower();
+    c.matchAllTags = o[u"matchAllTags"].toBool();
+    c.hasChecklist = o[u"hasChecklist"].toBool();
+    c.hasAttachments = o[u"hasAttachments"].toBool();
+    c.pinnedOnly = o[u"pinnedOnly"].toBool();
+    c.editedWithinDays = o[u"editedWithinDays"].toInt();
+    c.createdWithinDays = o[u"createdWithinDays"].toInt();
+    c.folderId = o[u"folderId"].toString();
+    return c;
 }
 
 // ---------------------------------------------------------------- notes
@@ -513,11 +819,8 @@ std::optional<NoteRecord> NoteStore::duplicateNote(const QString &noteId, QStrin
             return std::nullopt;
         }
     }
-    Statement refs = m_db.prepare(
-        "INSERT OR IGNORE INTO note_blob_refs (note_id, blob_hash) "
-        "SELECT ?2, blob_hash FROM note_blob_refs WHERE note_id = ?1");
-    refs.bind(1, noteId).bind(2, copy->id);
-    if (!refs.exec() || !tx.commit()) {
+    // Attachment references were written before these records existed.
+    if (!writeDerived(copy->id, copy->body) || !tx.commit()) {
         setError(error, m_db.lastError());
         return std::nullopt;
     }

@@ -6,6 +6,8 @@
 #include <QSet>
 #include <QUuid>
 
+#include <algorithm>
+
 using namespace Qt::StringLiterals;
 
 namespace onotes {
@@ -442,6 +444,30 @@ QStringList RichDocument::referencedAttachments() const
     return out;
 }
 
+QStringList RichDocument::tags() const
+{
+    QStringList out;
+    forEachSpan(blocks, [&](const Span &s) {
+        if (s.kind != Span::Kind::Text || (s.marks & Code) || !s.href.isEmpty())
+            return;
+        for (const TagMatch &m : findTags(s.text)) {
+            if (!out.contains(m.tag))
+                out.append(m.tag);
+        }
+    });
+    return out;
+}
+
+QString RichDocument::firstImage() const
+{
+    QString first;
+    forEachSpan(blocks, [&](const Span &s) {
+        if (first.isEmpty() && s.kind == Span::Kind::Image)
+            first = s.ref;
+    });
+    return first;
+}
+
 void RichDocument::assignMissingIds()
 {
     QSet<QString> seen;
@@ -490,6 +516,26 @@ std::optional<RichDocument> RichDocument::fromJsonBytes(const QByteArray &bytes,
 QString newId()
 {
     return QUuid::createUuid().toString(QUuid::WithoutBraces);
+}
+
+QList<TagMatch> findTags(const QString &text)
+{
+    static const QRegularExpression re(
+        u"(?:^|(?<=[\\s(\\[{\"'\u201c\u2018]))#([\\p{L}\\p{N}_][\\p{L}\\p{N}_/\\-]*)"_s);
+    QList<TagMatch> out;
+    auto it = re.globalMatch(text);
+    while (it.hasNext()) {
+        const QRegularExpressionMatch m = it.next();
+        QString tag = m.captured(1);
+        // Trailing separators aren't part of the tag ("#todo-" -> "todo").
+        while (tag.endsWith(u'-') || tag.endsWith(u'/'))
+            tag.chop(1);
+        const bool hasLetter = std::any_of(tag.cbegin(), tag.cend(), [](QChar c) { return c.isLetter(); });
+        if (!hasLetter || tag.size() > 64)
+            continue;
+        out.append({m.capturedStart(0), tag.size() + 1, tag.toLower()});
+    }
+    return out;
 }
 
 bool isValidBlobHash(const QString &hash)
