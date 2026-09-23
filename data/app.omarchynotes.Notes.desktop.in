@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Notes
+Name=Omarchy Notes
 GenericName=Notes
 Comment=Rich notes with checklists, tables and attachments
 Exec=@ONOTES_BIN@

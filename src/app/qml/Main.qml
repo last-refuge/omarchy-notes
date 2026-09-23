@@ -17,7 +17,7 @@ ApplicationWindow {
     minimumWidth: 360
     minimumHeight: 400
     visible: true
-    title: qsTr("Notes")
+    title: qsTr("Omarchy Notes")
     color: Theme.canvas
 
     palette {

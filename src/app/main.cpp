@@ -21,7 +21,7 @@ int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
     QGuiApplication::setApplicationName(u"omarchy-notes"_s);
-    QGuiApplication::setApplicationDisplayName(u"Notes"_s);
+    QGuiApplication::setApplicationDisplayName(u"Omarchy Notes"_s);
     QGuiApplication::setApplicationVersion(QStringLiteral(ONOTES_VERSION));
     QGuiApplication::setDesktopFileName(QStringLiteral(ONOTES_APP_ID));
 
@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
     QDir().mkpath(paths.root);
     QLockFile lock(paths.root + u"/.lock"_s);
     if (!lock.tryLock(200)) {
-        std::fprintf(stderr, "Notes is already running for %s\n", qPrintable(paths.root));
+        std::fprintf(stderr, "Omarchy Notes is already running for %s\n", qPrintable(paths.root));
         return 1;
     }
 
