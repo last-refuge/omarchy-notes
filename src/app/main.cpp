@@ -1,4 +1,5 @@
 #include "AppLibrary.h"
+#include "BlobImageProvider.h"
 #include "LibraryService.h"
 #include "SampleLibrary.h"
 #include "ThemeController.h"
@@ -74,6 +75,7 @@ int main(int argc, char *argv[])
 
     QQuickStyle::setStyle(u"Basic"_s);
     QQmlApplicationEngine engine;
+    engine.addImageProvider(u"blob"_s, new BlobImageProvider(&service));
     engine.setInitialProperties({{u"initialNoteId"_s, initialNote}});
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      [] { QCoreApplication::exit(1); }, Qt::QueuedConnection);

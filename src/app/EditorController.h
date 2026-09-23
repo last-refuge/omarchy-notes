@@ -55,6 +55,11 @@ class EditorController : public QObject
     Q_PROPERTY(bool inHeading READ inHeading NOTIFY formatChanged)
     Q_PROPERTY(bool hasPendingFormat READ hasPendingFormat NOTIFY formatChanged)
 
+    // Find in note. Matches are highlighted; findIndex is 1-based (0: none).
+    Q_PROPERTY(QString findText READ findText WRITE setFindText NOTIFY findChanged)
+    Q_PROPERTY(int findCount READ findCount NOTIFY findChanged)
+    Q_PROPERTY(int findIndex READ findIndex NOTIFY findChanged)
+
 public:
     enum SaveState { Saved, Edited, Saving, Failed, Conflict };
     Q_ENUM(SaveState)
@@ -122,6 +127,11 @@ public:
     bool inHeading() const { return m_blockStyle > 0; }
     bool hasPendingFormat() const { return m_pendingPosition >= 0 && m_pendingPosition == m_cursorPosition; }
 
+    QString findText() const { return m_findText; }
+    void setFindText(const QString &text);
+    int findCount() const { return int(m_matchStarts.size()); }
+    int findIndex() const { return m_findCurrent + 1; }
+
     onotes::DocumentStyle style() const;
     bool isDirty() const { return m_generation != m_savedGeneration; }
 
@@ -157,6 +167,11 @@ public:
     Q_INVOKABLE void toggleCheckAtCursor();
     Q_INVOKABLE bool activateObjectAt(int position);
     Q_INVOKABLE void openLink(const QString &href);
+    // The #tag at a document position, if any (for Ctrl+click).
+    Q_INVOKABLE QString tagAt(int position) const;
+
+    Q_INVOKABLE void findNext();
+    Q_INVOKABLE void findPrevious();
 
     // Insertions
     Q_INVOKABLE void insertTable(int rows, int columns);
@@ -184,6 +199,7 @@ signals:
     void savedChanged();
     void saveStateChanged();
     void formatChanged();
+    void findChanged();
 
     // Requests for the view, which owns the visible cursor.
     void cursorRequested(int position);
@@ -205,6 +221,14 @@ private:
     void ensureResources();
     void updateFormatState();
 
+    // Presentation-only formats on the text layout (tag colour, find
+    // highlights): never part of the document, its undo history or saves.
+    void decorate(int from, int to);
+    void decorateAll();
+    void scheduleDecorate(int from, int to);
+    void recountMatches();
+    void selectMatch(int index);
+
     QTextCursor textCursor() const;
     QList<QTextBlock> selectedBlocks() const;
     void applyBlockStyle(QTextBlock block, int level);
@@ -215,7 +239,6 @@ private:
     QTextCharFormat baseFormatFor(const QTextBlock &block) const;
     void insertRich(const onotes::RichDocument &doc, QTextCursor &cursor);
     void insertImage(QTextCursor &cursor, const QString &hash, QSize logicalSize);
-    void openAttachment(const QString &id);
     QImage renderAttachmentChip(const QString &attachmentId) const;
     QImage renderMissingImage(QSize logicalSize) const;
 
@@ -255,6 +278,14 @@ private:
     QString m_saveError;
 
     QSet<QString> m_loadedResources;
+
+    bool m_decorating = false;
+    QTimer m_decorateTimer;
+    int m_decorateFrom = -1;
+    int m_decorateTo = -1;
+    QString m_findText;
+    QList<int> m_matchStarts;
+    int m_findCurrent = -1;
 
     // Marks to set/clear on the next text typed at m_pendingPosition.
     int m_pendingPosition = -1;

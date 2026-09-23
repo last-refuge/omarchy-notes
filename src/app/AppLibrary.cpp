@@ -1,11 +1,17 @@
 #include "AppLibrary.h"
 
 #include "LibraryBackup.h"
+#include "LibraryPaths.h"
+#include "NoteExchange.h"
 #include "RichDocument.h"
 
 #include <QDateTime>
 #include <QDesktopServices>
 #include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QJsonObject>
+#include <QMimeDatabase>
 #include <QLocale>
 #include <QQmlEngine>
 #include <QStandardPaths>
@@ -41,6 +47,15 @@ QString styledSnippet(const QString &snippet)
     return out;
 }
 
+QString safeFileName(const QString &name)
+{
+    QString out = QFileInfo(name).fileName();
+    out.replace(u'/', u'_');
+    if (out.isEmpty() || out == u"." || out == u"..")
+        out = u"attachment"_s;
+    return out;
+}
+
 QVariantMap result(bool ok, const QString &error = {})
 {
     return {{u"ok"_s, ok}, {u"error"_s, error}};
@@ -72,6 +87,7 @@ QVariant NotesModel::data(const QModelIndex &index, int role) const
     case HasAttachmentsRole: return n.hasAttachments;
     case HasChecklistRole: return n.hasChecklist;
     case FolderNameRole: return n.folderId.isEmpty() ? QString() : m_folderNames.value(n.folderId);
+    case ThumbnailRole: return n.thumbnail;
     case SectionRole:
         if (m_search || m_trash || !hasPinned())
             return QString();
@@ -92,6 +108,7 @@ QHash<int, QByteArray> NotesModel::roleNames() const
         {HasChecklistRole, "hasChecklist"},
         {FolderNameRole, "folderName"},
         {SectionRole, "section"},
+        {ThumbnailRole, "thumbnail"},
     };
 }
 
@@ -183,6 +200,7 @@ QVariant FoldersModel::data(const QModelIndex &index, int role) const
     case CountRole: return r.count;
     case FolderIdRole: return r.folderId;
     case ParentIdRole: return r.parentId;
+    case SectionRole: return r.section;
     }
     return {};
 }
@@ -197,10 +215,12 @@ QHash<int, QByteArray> FoldersModel::roleNames() const
         {CountRole, "count"},
         {FolderIdRole, "folderId"},
         {ParentIdRole, "parentId"},
+        {SectionRole, "section"},
     };
 }
 
-void FoldersModel::reset(const QList<FolderInfo> &folders, int noteCount, int trashCount)
+void FoldersModel::reset(const QList<FolderInfo> &folders, int noteCount, int trashCount, int attachmentCount,
+                         const QList<SmartFolder> &smartFolders, const QList<TagInfo> &tags)
 {
     QHash<QString, QList<FolderInfo>> children;
     int filed = 0;
@@ -210,17 +230,22 @@ void FoldersModel::reset(const QList<FolderInfo> &folders, int noteCount, int tr
     }
 
     QList<Row> rows;
-    rows.append({u"all"_s, tr("All Notes"), u"all"_s, 0, noteCount, {}, {}});
-    rows.append({u"notes"_s, tr("Notes"), u"notes"_s, 0, noteCount - filed, {}, {}});
+    rows.append({u"all"_s, tr("All Notes"), u"all"_s, 0, noteCount, {}, {}, {}});
+    rows.append({u"notes"_s, tr("Notes"), u"notes"_s, 0, noteCount - filed, {}, {}, {}});
     // Depth-first, keeping the store's alphabetical order among siblings.
     std::function<void(const QString &, int)> walk = [&](const QString &parent, int depth) {
         for (const FolderInfo &f : children.value(parent)) {
-            rows.append({f.id, f.name, u"folder"_s, depth, f.noteCount, f.id, f.parentId});
+            rows.append({f.id, f.name, u"folder"_s, depth, f.noteCount, f.id, f.parentId, {}});
             walk(f.id, depth + 1);
         }
     };
     walk({}, 0);
-    rows.append({u"trash"_s, tr("Recently Deleted"), u"trash"_s, 0, trashCount, {}, {}});
+    rows.append({u"attachments"_s, tr("Attachments"), u"attachments"_s, 0, attachmentCount, {}, {}, {}});
+    rows.append({u"trash"_s, tr("Recently Deleted"), u"trash"_s, 0, trashCount, {}, {}, {}});
+    for (const SmartFolder &f : smartFolders)
+        rows.append({u"smart:"_s + f.id, f.name, u"smart"_s, 0, f.noteCount, f.id, {}, tr("Smart Folders")});
+    for (const TagInfo &t : tags)
+        rows.append({u"tag:"_s + t.name, u"#"_s + t.name, u"tag"_s, 0, t.noteCount, {}, {}, tr("Tags")});
 
     beginResetModel();
     m_rows = rows;
@@ -242,6 +267,78 @@ int FoldersModel::indexOfKey(const QString &key) const
     return -1;
 }
 
+// ---------------------------------------------------------------- AttachmentsModel
+
+int AttachmentsModel::rowCount(const QModelIndex &parent) const
+{
+    return parent.isValid() ? 0 : int(m_visible.size());
+}
+
+QVariant AttachmentsModel::data(const QModelIndex &index, int role) const
+{
+    if (!index.isValid() || index.row() >= m_visible.size())
+        return {};
+    const AttachmentItem &item = m_visible.at(index.row());
+    switch (role) {
+    case IsImageRole: return item.isImage;
+    case BlobHashRole: return item.blobHash;
+    case AttachmentIdRole: return item.attachmentId;
+    case FileNameRole: return item.isImage ? tr("Image") : item.fileName;
+    case DetailRole: {
+        const QString size = QLocale().formattedDataSize(item.size);
+        if (item.isImage)
+            return size;
+        const QString kind = QMimeDatabase().mimeTypeForName(item.mimeType).comment();
+        return kind.isEmpty() ? size : kind + u" · "_s + size;
+    }
+    case ExtensionRole: return QFileInfo(item.fileName).suffix().toUpper().left(4);
+    case NoteIdRole: return item.noteId;
+    case NoteTitleRole: return item.noteTitle.isEmpty() ? tr("New Note") : item.noteTitle;
+    }
+    return {};
+}
+
+QHash<int, QByteArray> AttachmentsModel::roleNames() const
+{
+    return {
+        {IsImageRole, "isImage"},
+        {BlobHashRole, "blobHash"},
+        {AttachmentIdRole, "attachmentId"},
+        {FileNameRole, "fileName"},
+        {DetailRole, "detail"},
+        {ExtensionRole, "extension"},
+        {NoteIdRole, "noteId"},
+        {NoteTitleRole, "noteTitle"},
+    };
+}
+
+void AttachmentsModel::setFilter(int filter)
+{
+    if (filter == m_filter)
+        return;
+    m_filter = filter;
+    emit filterChanged();
+    applyFilter();
+}
+
+void AttachmentsModel::reset(const QList<AttachmentItem> &items)
+{
+    m_items = items;
+    applyFilter();
+}
+
+void AttachmentsModel::applyFilter()
+{
+    beginResetModel();
+    m_visible.clear();
+    for (const AttachmentItem &item : m_items) {
+        if (m_filter == All || (m_filter == Images) == item.isImage)
+            m_visible.append(item);
+    }
+    endResetModel();
+    emit countChanged();
+}
+
 // ---------------------------------------------------------------- AppLibrary
 
 AppLibrary::AppLibrary(LibraryService *service, const QString &settingsFile, QObject *parent)
@@ -254,10 +351,19 @@ AppLibrary::AppLibrary(LibraryService *service, const QString &settingsFile, QOb
     m_settings = std::make_unique<QSettings>(file, QSettings::IniFormat);
     m_sort = static_cast<NoteSort>(std::clamp(m_settings->value(u"list/sort"_s, 0).toInt(), 0, 2));
     m_key = m_settings->value(u"list/view"_s, u"all"_s).toString();
+    m_gallery = m_settings->value(u"list/gallery"_s, false).toBool();
 
     m_searchDebounce.setSingleShot(true);
     m_searchDebounce.setInterval(120);
     connect(&m_searchDebounce, &QTimer::timeout, this, &AppLibrary::runSearch);
+    m_sidebarRefresh.setSingleShot(true);
+    m_sidebarRefresh.setInterval(800);
+    connect(&m_sidebarRefresh, &QTimer::timeout, this, [this] {
+        reloadFolders();
+        // Membership of tag and Smart Folder views can change with an edit.
+        if (!searching() && (m_key.startsWith(u"tag:") || m_key.startsWith(u"smart:")))
+            reloadNotes();
+    });
     connect(m_service, &LibraryService::searchFinished, this, &AppLibrary::onSearchFinished);
     connect(m_service, &LibraryService::notesChanged, this, &AppLibrary::refresh);
 
@@ -284,6 +390,15 @@ QString AppLibrary::viewTitle() const
     if (searching())
         return tr("Search");
     return m_folders.nameOf(m_key);
+}
+
+void AppLibrary::setGalleryMode(bool gallery)
+{
+    if (gallery == m_gallery)
+        return;
+    m_gallery = gallery;
+    m_settings->setValue(u"list/gallery"_s, gallery);
+    emit galleryModeChanged();
 }
 
 QString AppLibrary::lastNoteId() const
@@ -368,7 +483,16 @@ void AppLibrary::refresh()
 void AppLibrary::reloadFolders()
 {
     m_trashCount = m_service->trashCount();
-    m_folders.reset(m_service->listFolders(), m_service->noteCount(), m_trashCount);
+    m_smartFolders = m_service->listSmartFolders();
+    const QList<TagInfo> tags = m_service->listTags();
+    m_tags.clear();
+    for (const TagInfo &t : tags)
+        m_tags << t.name;
+    const QList<AttachmentItem> items = m_service->listAttachmentItems();
+    m_folders.reset(m_service->listFolders(), m_service->noteCount(), m_trashCount, int(items.size()),
+                    m_smartFolders, tags);
+    if (m_key == u"attachments")
+        m_attachments.reset(items);
     emit countsChanged();
 }
 
@@ -387,9 +511,21 @@ void AppLibrary::reloadNotes()
     if (searching())
         return;
     NoteQuery query;
-    if (m_key == u"trash")
+    if (m_key == u"trash") {
         query = NoteQuery::trash();
-    else if (m_key == u"all")
+    } else if (m_key == u"attachments") {
+        m_attachments.reset(m_service->listAttachmentItems());
+        m_notes.reset({}, false, false, {});
+        return;
+    } else if (m_key.startsWith(u"tag:")) {
+        query = NoteQuery::tagged(m_key.mid(4), m_sort);
+    } else if (m_key.startsWith(u"smart:")) {
+        query = NoteQuery::all(m_sort);
+        for (const SmartFolder &f : m_smartFolders) {
+            if (f.id == m_key.mid(6))
+                query = NoteQuery::smart(f.criteria, m_sort);
+        }
+    } else if (m_key == u"all")
         query = NoteQuery::all(m_sort);
     else if (m_key == u"notes")
         query = NoteQuery::folder({}, m_sort);
@@ -415,6 +551,7 @@ void AppLibrary::noteSaved(const QString &noteId, const RichDocument &body, qint
 {
     const bool moveToTop = m_sort == NoteSort::Edited && !searching() && m_key != u"trash";
     m_notes.applySaved(noteId, body, updatedAt, moveToTop);
+    m_sidebarRefresh.start();
 }
 
 bool AppLibrary::report(bool ok, const QString &error)
@@ -426,17 +563,21 @@ bool AppLibrary::report(bool ok, const QString &error)
 
 QString AppLibrary::createNote()
 {
-    QString folderId;
-    if (m_key != u"all" && m_key != u"notes" && m_key != u"trash")
-        folderId = m_key;
+    const bool special = m_key == u"all" || m_key == u"notes" || m_key == u"trash" || m_key == u"attachments"
+        || m_key.startsWith(u"tag:") || m_key.startsWith(u"smart:");
+    const QString folderId = special ? QString() : m_key;
+    RichDocument body{{Block::paragraph()}};
+    // A note started from a tag carries the tag, so it shows up there.
+    if (m_key.startsWith(u"tag:") && !searching())
+        body.blocks.append(Block::paragraph({Span::plain(u"#"_s + m_key.mid(4))}));
     QString error;
-    const auto note = m_service->createNote(RichDocument{{Block::paragraph()}}, &error, folderId);
+    const auto note = m_service->createNote(body, &error, folderId);
     if (!note) {
         emit errorOccurred(tr("Couldn't create a note: %1").arg(error));
         return {};
     }
     // A new note should be visible in the list it was created from.
-    if (searching() || m_key == u"trash") {
+    if (searching() || m_key == u"trash" || m_key == u"attachments" || m_key.startsWith(u"smart:")) {
         m_searchText.clear();
         emit searchTextChanged();
         m_key = u"all"_s;
@@ -572,6 +713,147 @@ QVariantList AppLibrary::folderChoices() const
         if (row.kind == u"folder")
             out.append(QVariantMap{{u"id"_s, row.folderId}, {u"name"_s, row.name}, {u"depth"_s, row.depth}});
     }
+    return out;
+}
+
+QVariantMap AppLibrary::createSmartFolder(const QString &name, const QVariantMap &criteria)
+{
+    QString error;
+    const auto folder = m_service->createSmartFolder(
+        name, SmartCriteria::fromJson(QJsonObject::fromVariantMap(criteria)), &error);
+    if (!folder)
+        return result(false, error);
+    refresh();
+    QVariantMap out = result(true);
+    out.insert(u"id"_s, u"smart:"_s + folder->id);
+    return out;
+}
+
+QVariantMap AppLibrary::updateSmartFolder(const QString &id, const QString &name, const QVariantMap &criteria)
+{
+    QString error;
+    if (!m_service->updateSmartFolder(id, name, SmartCriteria::fromJson(QJsonObject::fromVariantMap(criteria)), &error))
+        return result(false, error);
+    refresh();
+    emit viewChanged();
+    return result(true);
+}
+
+bool AppLibrary::deleteSmartFolder(const QString &id)
+{
+    QString error;
+    if (!report(m_service->deleteSmartFolder(id, &error), error))
+        return false;
+    refresh();
+    return true;
+}
+
+QVariantMap AppLibrary::smartFolder(const QString &id) const
+{
+    for (const SmartFolder &f : m_smartFolders) {
+        if (f.id == id) {
+            QVariantMap out = f.criteria.toJson().toVariantMap();
+            out.insert(u"name"_s, f.name);
+            return out;
+        }
+    }
+    return {};
+}
+
+bool AppLibrary::openAttachment(const QString &attachmentId)
+{
+    const auto info = m_service->attachment(attachmentId);
+    const QString source = info ? m_service->blobPath(info->blobHash) : QString();
+    if (!info || !QFileInfo::exists(source)) {
+        emit errorOccurred(tr("This attachment's data is missing from the library."));
+        return false;
+    }
+    // External apps need a real file name; give them a read-only copy.
+    const QString dir = cacheDirectory() + u"/open/"_s + attachmentId;
+    QDir().mkpath(dir);
+    const QString target = dir + u'/' + safeFileName(info->fileName);
+    if (!QFileInfo::exists(target)) {
+        if (!QFile::copy(source, target)) {
+            emit errorOccurred(tr("Couldn't prepare the attachment for opening."));
+            return false;
+        }
+        QFile::setPermissions(target, QFileDevice::ReadOwner | QFileDevice::ReadUser);
+    }
+    if (!QDesktopServices::openUrl(QUrl::fromLocalFile(target))) {
+        emit errorOccurred(tr("No application is set up to open %1.").arg(info->fileName));
+        return false;
+    }
+    return true;
+}
+
+bool AppLibrary::openImage(const QString &blobHash)
+{
+    const QString source = m_service->blobPath(blobHash);
+    if (source.isEmpty() || !QFileInfo::exists(source)) {
+        emit errorOccurred(tr("This image's data is missing from the library."));
+        return false;
+    }
+    // Hand images to the desktop viewer through a named copy.
+    const QString dir = cacheDirectory() + u"/open/"_s + blobHash.left(16);
+    QDir().mkpath(dir);
+    const QString suffix = QMimeDatabase().mimeTypeForFile(source).preferredSuffix();
+    const QString target = dir + u"/image."_s + (suffix.isEmpty() ? u"png"_s : suffix);
+    if (!QFileInfo::exists(target))
+        QFile::copy(source, target);
+    return QDesktopServices::openUrl(QUrl::fromLocalFile(target));
+}
+
+QVariantMap AppLibrary::importFiles(const QList<QUrl> &files)
+{
+    QStringList paths;
+    for (const QUrl &url : files)
+        paths << url.toLocalFile();
+    const bool special = m_key == u"all" || m_key == u"notes" || m_key == u"trash" || m_key == u"attachments"
+        || m_key.startsWith(u"tag:") || m_key.startsWith(u"smart:") || searching();
+    const ImportReport report = onotes::importFiles(*m_service, paths, special ? QString() : m_key);
+    if (special) {
+        m_searchText.clear();
+        emit searchTextChanged();
+        m_key = u"all"_s;
+        emit viewChanged();
+    }
+    refresh();
+    QVariantMap out = result(!report.createdIds.isEmpty(), report.warnings.join(u'\n'));
+    out.insert(u"count"_s, report.createdIds.size());
+    out.insert(u"first"_s, report.createdIds.value(0));
+    out.insert(u"warnings"_s, report.warnings);
+    return out;
+}
+
+QString AppLibrary::exportFileName(const QString &noteId, const QString &format) const
+{
+    const auto note = m_service->loadNote(noteId);
+    const QString base = fileNameForTitle(note ? note->body.title() : QString());
+    const QString suffix = format == u"html" ? u".html"_s : format == u"pdf" ? u".pdf"_s : u".md"_s;
+    return base + suffix;
+}
+
+QVariantMap AppLibrary::exportNote(const QString &noteId, const QString &format, const QUrl &file)
+{
+    const ExportFormat f = format == u"html" ? ExportFormat::Html
+        : format == u"pdf"                   ? ExportFormat::Pdf
+                                             : ExportFormat::Markdown;
+    QString error;
+    if (!onotes::exportNote(*m_service, noteId, f, file.toLocalFile(), &error))
+        return result(false, error);
+    QVariantMap out = result(true);
+    out.insert(u"path"_s, file.toLocalFile());
+    return out;
+}
+
+QVariantMap AppLibrary::exportAll(const QUrl &folder)
+{
+    QString error;
+    const auto root = exportLibraryAsMarkdown(*m_service, folder.toLocalFile(), &error);
+    if (!root)
+        return result(false, error);
+    QVariantMap out = result(true);
+    out.insert(u"path"_s, *root);
     return out;
 }
 

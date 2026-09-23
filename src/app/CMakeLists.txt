@@ -6,6 +6,7 @@ qt_add_qml_module(notes_app_lib
     OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/qml/OmarchyNotes
     SOURCES
         AppLibrary.cpp AppLibrary.h
+        BlobImageProvider.cpp BlobImageProvider.h
         EditorController.cpp EditorController.h
         ThemeController.cpp ThemeController.h
     QML_FILES
@@ -19,6 +20,9 @@ qt_add_qml_module(notes_app_lib
         qml/FolderNameDialog.qml
         qml/ConfirmDialog.qml
         qml/MoveNoteDialog.qml
+        qml/SmartFolderDialog.qml
+        qml/NoteMenu.qml
+        qml/AttachmentsView.qml
     RESOURCES
         icons/compose.svg
         icons/bullets.svg
@@ -41,6 +45,11 @@ qt_add_qml_module(notes_app_lib
         icons/more.svg
         icons/recover.svg
         icons/close.svg
+        icons/smart-folder.svg
+        icons/tag.svg
+        icons/gallery.svg
+        icons/list.svg
+        icons/share.svg
 )
 
 target_include_directories(notes_app_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

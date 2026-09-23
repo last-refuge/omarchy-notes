@@ -16,6 +16,10 @@ ApplicationWindow {
     readonly property bool sidebarInline: wide && !sidebarCollapsed
     property bool showingEditor: true
     readonly property var editor: editorPane.editor
+    // Gallery and attachments use the whole centre; opening a note from
+    // them shows the editor full width with a back button.
+    readonly property bool wideContent: Library.inAttachments || noteList.gallery
+    readonly property bool singlePane: narrow || wideContent
 
     width: 1240
     height: 780
@@ -67,9 +71,9 @@ ApplicationWindow {
         Library.showKey(key)
         if (sidebarDrawer.opened)
             sidebarDrawer.close()
-        if (Library.notes.indexOf(editor.noteId) < 0)
+        if (!Library.inAttachments && !noteList.gallery && Library.notes.indexOf(editor.noteId) < 0)
             openFirstNote()
-        if (narrow)
+        if (singlePane)
             showingEditor = false
     }
 
@@ -166,7 +170,10 @@ ApplicationWindow {
             openNote(first)
         else if (Library.notes.count === 0 && Library.currentKey !== "trash")
             newNote() // an empty library opens straight into a note
-        editorPane.focusEditor()
+        if (wideContent)
+            showingEditor = false // reopen on the gallery or attachments
+        else
+            editorPane.focusEditor()
     }
 
     onClosing: close => {
@@ -180,6 +187,17 @@ ApplicationWindow {
         target: Library
         function onErrorOccurred(message) { toast.show(message) }
         function onLibraryReplaced() { window.openFirstNote() }
+        function onGalleryModeChanged() { window.showingEditor = !window.singlePane }
+    }
+
+    function deleteSmartFolder(id, name) {
+        confirm.ask(qsTr("Delete \u201c%1\u201d?").arg(name),
+                    qsTr("Only the Smart Folder is removed. The notes it shows stay where they are."),
+                    qsTr("Delete Smart Folder"), true, () => {
+                        Library.deleteSmartFolder(id)
+                        if (Library.currentKey === "all")
+                            window.openFirstNote()
+                    })
     }
 
     // ------------------------------------------------------------ layout
@@ -201,6 +219,11 @@ ApplicationWindow {
             onEmptyTrashRequested: window.emptyTrash()
             onBackupRequested: backupFolderDialog.open()
             onRestoreRequested: restoreFolderDialog.open()
+            onNewSmartFolderRequested: smartDialog.openForCreate()
+            onEditSmartFolderRequested: id => smartDialog.openForEdit(id)
+            onDeleteSmartFolderRequested: (id, name) => window.deleteSmartFolder(id, name)
+            onImportRequested: importDialog.open()
+            onExportAllRequested: exportAllDialog.open()
         }
         Rectangle {
             visible: window.sidebarInline
@@ -212,9 +235,9 @@ ApplicationWindow {
             id: noteList
             objectName: "noteList"
             Layout.fillHeight: true
-            Layout.fillWidth: window.narrow
-            Layout.preferredWidth: window.narrow ? window.width : 300
-            visible: !window.narrow || !window.showingEditor
+            Layout.fillWidth: window.singlePane
+            Layout.preferredWidth: window.singlePane ? window.width : 300
+            visible: !Library.inAttachments && (!window.singlePane || !window.showingEditor)
             currentNoteId: window.editor.noteId
             showSidebarButton: !window.sidebarInline
             onNoteChosen: noteId => window.openNote(noteId)
@@ -223,18 +246,28 @@ ApplicationWindow {
             onActionRequested: (action, noteId) => window.handleAction(action, noteId)
             onEmptyTrashRequested: window.emptyTrash()
         }
+        AttachmentsView {
+            id: attachmentsView
+            objectName: "attachmentsView"
+            Layout.fillHeight: true
+            Layout.fillWidth: true
+            visible: Library.inAttachments && !window.showingEditor
+            showSidebarButton: !window.sidebarInline
+            onNoteChosen: noteId => window.openNote(noteId)
+            onSidebarToggled: window.wide ? (window.sidebarCollapsed = false) : sidebarDrawer.open()
+        }
         Rectangle {
             Layout.fillHeight: true
             Layout.preferredWidth: 1
             color: Theme.divider
-            visible: !window.narrow
+            visible: !window.singlePane
         }
         EditorPane {
             id: editorPane
             Layout.fillWidth: true
             Layout.fillHeight: true
-            visible: !window.narrow || window.showingEditor
-            narrow: window.narrow
+            visible: !window.singlePane || window.showingEditor
+            narrow: window.singlePane
             onBackRequested: window.showingEditor = false
             onOpenNoteRequested: noteId => window.openNote(noteId)
             onNewNoteRequested: window.newNote()
@@ -242,6 +275,7 @@ ApplicationWindow {
             onRecoverRequested: window.recoverNote(window.editor.noteId)
             onDeleteForeverRequested: window.deleteForever(window.editor.noteId)
             onNotice: message => toast.show(message)
+            onTagRequested: tag => window.showView("tag:" + tag)
         }
     }
 
@@ -262,6 +296,11 @@ ApplicationWindow {
             onEmptyTrashRequested: { sidebarDrawer.close(); window.emptyTrash() }
             onBackupRequested: { sidebarDrawer.close(); backupFolderDialog.open() }
             onRestoreRequested: { sidebarDrawer.close(); restoreFolderDialog.open() }
+            onNewSmartFolderRequested: { sidebarDrawer.close(); smartDialog.openForCreate() }
+            onEditSmartFolderRequested: id => { sidebarDrawer.close(); smartDialog.openForEdit(id) }
+            onDeleteSmartFolderRequested: (id, name) => { sidebarDrawer.close(); window.deleteSmartFolder(id, name) }
+            onImportRequested: { sidebarDrawer.close(); importDialog.open() }
+            onExportAllRequested: { sidebarDrawer.close(); exportAllDialog.open() }
         }
     }
 
@@ -280,6 +319,37 @@ ApplicationWindow {
         id: folderDialog
         objectName: "folderDialog"
         onCreated: folderId => window.showView(folderId)
+    }
+    SmartFolderDialog {
+        id: smartDialog
+        objectName: "smartDialog"
+        onCreated: key => window.showView(key)
+    }
+    FileDialog {
+        id: importDialog
+        title: qsTr("Import Notes")
+        fileMode: FileDialog.OpenFiles
+        nameFilters: [qsTr("Markdown and text (*.md *.markdown *.txt)"), qsTr("All files (*)")]
+        onAccepted: {
+            const result = Library.importFiles(selectedFiles)
+            if (result.count > 0) {
+                window.openNote(result.first)
+                toast.show(result.warnings.length
+                           ? qsTr("Imported %n note(s). %1", "", result.count).arg(result.warnings.join(" "))
+                           : qsTr("Imported %n note(s).", "", result.count))
+            } else {
+                toast.show(result.error || qsTr("Nothing was imported."))
+            }
+        }
+    }
+    FolderDialog {
+        id: exportAllDialog
+        title: qsTr("Choose Where to Export Your Notes")
+        onAccepted: {
+            window.editor.flush()
+            const result = Library.exportAll(selectedFolder)
+            toast.show(result.ok ? qsTr("Exported to %1").arg(result.path) : result.error)
+        }
     }
     MoveNoteDialog {
         id: moveDialog
@@ -334,7 +404,9 @@ ApplicationWindow {
     Shortcut {
         sequence: "Ctrl+Shift+F"
         onActivated: {
-            if (window.narrow)
+            if (Library.inAttachments)
+                window.showView("all")
+            if (window.singlePane)
                 window.showingEditor = false
             noteList.focusSearch()
         }

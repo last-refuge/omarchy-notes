@@ -15,6 +15,11 @@ Rectangle {
     signal emptyTrashRequested()
     signal backupRequested()
     signal restoreRequested()
+    signal newSmartFolderRequested()
+    signal editSmartFolderRequested(string smartId)
+    signal deleteSmartFolderRequested(string smartId, string name)
+    signal importRequested()
+    signal exportAllRequested()
 
     function focusList() { list.forceActiveFocus() }
 
@@ -51,6 +56,23 @@ Rectangle {
             Accessible.name: qsTr("Folders")
             ScrollBar.vertical: ScrollBar {}
 
+            section.property: "section"
+            section.delegate: Label {
+                required property string section
+                width: ListView.view.width
+                visible: section.length > 0
+                height: visible ? 34 : 0
+                leftPadding: 18
+                verticalAlignment: Text.AlignBottom
+                bottomPadding: 5
+                text: section
+                color: Theme.secondaryText
+                font.pixelSize: 12
+                font.weight: Font.DemiBold
+                font.letterSpacing: 0.4
+                Accessible.role: Accessible.Heading
+            }
+
             currentIndex: Library.folders.indexOfKey(Library.currentKey)
             Connections {
                 target: Library
@@ -76,7 +98,7 @@ Rectangle {
                 readonly property bool selected: key === Library.currentKey && !Library.searching
 
                 function openMenu() {
-                    if (kind === "folder" || kind === "trash" || kind === "notes")
+                    if (kind !== "tag" && kind !== "attachments")
                         contextMenu.popup(row, 24, row.height)
                 }
 
@@ -104,7 +126,8 @@ Rectangle {
                     spacing: 9
                     IconImage {
                         source: "qrc:/qt/qml/OmarchyNotes/icons/"
-                                + ({all: "all-notes", notes: "note", folder: "folder", trash: "trash"})[row.kind] + ".svg"
+                                + ({all: "all-notes", notes: "note", folder: "folder", trash: "trash",
+                                    attachments: "attach", smart: "smart-folder", tag: "tag"})[row.kind] + ".svg"
                         sourceSize: Qt.size(16, 16)
                         color: row.selected ? Theme.selectionText : Theme.secondaryText
                     }
@@ -130,8 +153,20 @@ Rectangle {
                 Menu {
                     id: contextMenu
                     MenuItem {
+                        text: qsTr("Edit Smart Folder…")
+                        visible: row.kind === "smart"
+                        height: visible ? implicitHeight : 0
+                        onTriggered: root.editSmartFolderRequested(row.folderId)
+                    }
+                    MenuItem {
+                        text: qsTr("Delete Smart Folder…")
+                        visible: row.kind === "smart"
+                        height: visible ? implicitHeight : 0
+                        onTriggered: root.deleteSmartFolderRequested(row.folderId, row.name)
+                    }
+                    MenuItem {
                         text: row.kind === "folder" ? qsTr("New Folder Inside") : qsTr("New Folder")
-                        visible: row.kind !== "trash"
+                        visible: row.kind === "folder" || row.kind === "notes" || row.kind === "all"
                         height: visible ? implicitHeight : 0
                         onTriggered: root.newFolderRequested(row.kind === "folder" ? row.folderId : "")
                     }
@@ -181,6 +216,11 @@ Rectangle {
                 onClicked: libraryMenu.popup(libraryButton, 0, -libraryMenu.implicitHeight)
                 Menu {
                     id: libraryMenu
+                    MenuItem { text: qsTr("New Smart Folder…"); onTriggered: root.newSmartFolderRequested() }
+                    MenuSeparator {}
+                    MenuItem { text: qsTr("Import Markdown or Text…"); onTriggered: root.importRequested() }
+                    MenuItem { text: qsTr("Export All Notes as Markdown…"); onTriggered: root.exportAllRequested() }
+                    MenuSeparator {}
                     MenuItem { text: qsTr("Back Up Library…"); onTriggered: root.backupRequested() }
                     MenuItem { text: qsTr("Restore from Backup…"); onTriggered: root.restoreRequested() }
                     MenuSeparator {}

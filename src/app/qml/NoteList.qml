@@ -9,6 +9,8 @@ Rectangle {
 
     property string currentNoteId
     property bool showSidebarButton: false
+    // Cards instead of rows; the list then takes the editor's space.
+    readonly property bool gallery: Library.galleryMode && !Library.inTrash
     signal noteChosen(string noteId)
     signal newNoteRequested()
     signal sidebarToggled()
@@ -20,7 +22,7 @@ Rectangle {
         search.forceActiveFocus()
         search.selectAll()
     }
-    function focusList() { list.forceActiveFocus() }
+    function focusList() { (gallery ? grid : list).forceActiveFocus() }
 
     color: Theme.sidebar
 
@@ -54,6 +56,12 @@ Rectangle {
                 text: list.count
                 color: Theme.secondaryText
                 Accessible.name: qsTr("%n notes", "", list.count)
+            }
+            ToolIcon {
+                iconName: Library.galleryMode ? "list" : "gallery"
+                text: Library.galleryMode ? qsTr("View as list") : qsTr("View as gallery")
+                visible: !Library.inTrash
+                onClicked: Library.galleryMode = !Library.galleryMode
             }
             ToolIcon {
                 id: sortButton
@@ -152,6 +160,7 @@ Rectangle {
         ListView {
             id: list
             objectName: "noteListView"
+            visible: !root.gallery
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
@@ -307,44 +316,11 @@ Rectangle {
                     onTapped: row.openMenu()
                 }
 
-                Menu {
+                NoteMenu {
                     id: contextMenu
-                    MenuItem {
-                        text: row.pinned ? qsTr("Unpin Note") : qsTr("Pin Note")
-                        visible: !Library.inTrash
-                        height: visible ? implicitHeight : 0
-                        onTriggered: root.actionRequested(row.pinned ? "unpin" : "pin", row.noteId)
-                    }
-                    MenuItem {
-                        text: qsTr("Move to Folder…")
-                        visible: !Library.inTrash
-                        height: visible ? implicitHeight : 0
-                        onTriggered: root.actionRequested("move", row.noteId)
-                    }
-                    MenuItem {
-                        text: qsTr("Duplicate")
-                        visible: !Library.inTrash
-                        height: visible ? implicitHeight : 0
-                        onTriggered: root.actionRequested("duplicate", row.noteId)
-                    }
-                    MenuItem {
-                        text: qsTr("Delete")
-                        visible: !Library.inTrash
-                        height: visible ? implicitHeight : 0
-                        onTriggered: root.actionRequested("trash", row.noteId)
-                    }
-                    MenuItem {
-                        text: qsTr("Recover")
-                        visible: Library.inTrash
-                        height: visible ? implicitHeight : 0
-                        onTriggered: root.actionRequested("recover", row.noteId)
-                    }
-                    MenuItem {
-                        text: qsTr("Delete Permanently…")
-                        visible: Library.inTrash
-                        height: visible ? implicitHeight : 0
-                        onTriggered: root.actionRequested("deleteForever", row.noteId)
-                    }
+                    noteId: row.noteId
+                    pinned: row.pinned
+                    onAction: (action, noteId) => root.actionRequested(action, noteId)
                 }
             }
 
@@ -374,6 +350,165 @@ Rectangle {
                         : Library.inTrash ? qsTr("Notes you delete stay here for 30 days.")
                         : qsTr("Press Ctrl+N to start one.")
                 }
+            }
+
+        }
+        GridView {
+            id: grid
+            objectName: "noteGrid"
+            visible: root.gallery
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.leftMargin: 10
+            clip: true
+            model: Library.notes
+            keyNavigationEnabled: true
+            activeFocusOnTab: true
+            boundsBehavior: Flickable.StopAtBounds
+            readonly property int columns: Math.max(1, Math.floor(width / 230))
+            cellWidth: Math.floor(width / columns)
+            cellHeight: 236
+            currentIndex: Library.notes.indexOf(root.currentNoteId)
+            Accessible.role: Accessible.List
+            Accessible.name: Library.viewTitle
+            ScrollBar.vertical: ScrollBar {}
+            Keys.onReturnPressed: if (currentItem) root.noteChosen(currentItem.noteId)
+            Keys.onDeletePressed: if (currentItem) root.actionRequested("trash", currentItem.noteId)
+            Keys.onMenuPressed: if (currentItem) currentItem.openMenu()
+
+            delegate: Item {
+                id: card
+
+                required property int index
+                required property string noteId
+                required property string title
+                required property string snippet
+                required property string date
+                required property bool pinned
+                required property string thumbnail
+                readonly property bool selected: noteId === root.currentNoteId
+
+                function openMenu() { cardMenu.popup(card, 24, 40) }
+
+                width: GridView.view.cellWidth
+                height: GridView.view.cellHeight
+                Accessible.role: Accessible.ListItem
+                Accessible.name: title + ", " + date
+                Accessible.selected: selected
+
+                Rectangle {
+                    id: frame
+                    anchors.fill: parent
+                    anchors.margins: 7
+                    radius: 10
+                    color: Theme.canvas
+                    border.width: card.selected || (card.GridView.isCurrentItem && card.GridView.view.activeFocus) ? 2 : 1
+                    border.color: card.selected || card.GridView.isCurrentItem && card.GridView.view.activeFocus
+                                  ? Theme.focus : (hover.hovered ? Theme.tableBorder : Theme.divider)
+                    clip: true
+
+                    Item {
+                        id: preview
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: 1
+                        height: 134
+                        Image {
+                            anchors.fill: parent
+                            visible: card.thumbnail.length > 0
+                            source: card.thumbnail ? "image://blob/" + card.thumbnail : ""
+                            sourceSize: Qt.size(460, 268)
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                        }
+                        // Text notes preview their opening lines.
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 12
+                            visible: card.thumbnail.length === 0
+                            spacing: 4
+                            Label {
+                                width: parent.width
+                                text: card.title
+                                wrapMode: Text.Wrap
+                                maximumLineCount: 2
+                                elide: Text.ElideRight
+                                font.pixelSize: 13
+                                font.weight: Font.DemiBold
+                                color: Theme.text
+                            }
+                            Label {
+                                width: parent.width
+                                text: card.snippet
+                                textFormat: Text.StyledText
+                                wrapMode: Text.Wrap
+                                maximumLineCount: 4
+                                elide: Text.ElideRight
+                                font.pixelSize: 12
+                                color: Theme.secondaryText
+                            }
+                        }
+                        Rectangle {
+                            anchors.bottom: parent.bottom
+                            width: parent.width
+                            height: 1
+                            color: Theme.divider
+                        }
+                    }
+                    ColumnLayout {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: preview.bottom
+                        anchors.margins: 10
+                        spacing: 2
+                        RowLayout {
+                            Label {
+                                Layout.fillWidth: true
+                                text: card.title
+                                elide: Text.ElideRight
+                                font.weight: Font.DemiBold
+                                color: Theme.text
+                            }
+                            IconImage {
+                                visible: card.pinned
+                                source: "qrc:/qt/qml/OmarchyNotes/icons/pin.svg"
+                                sourceSize: Qt.size(13, 13)
+                                color: Theme.secondaryText
+                            }
+                        }
+                        Label {
+                            text: card.date
+                            font.pixelSize: 12
+                            color: Theme.secondaryText
+                        }
+                    }
+                }
+                HoverHandler { id: hover }
+                TapHandler {
+                    onTapped: {
+                        card.GridView.view.currentIndex = card.index
+                        root.noteChosen(card.noteId)
+                    }
+                }
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    onTapped: card.openMenu()
+                }
+                NoteMenu {
+                    id: cardMenu
+                    noteId: card.noteId
+                    pinned: card.pinned
+                    onAction: (action, noteId) => root.actionRequested(action, noteId)
+                }
+            }
+
+            Label {
+                anchors.centerIn: parent
+                visible: grid.count === 0
+                text: Library.searching ? qsTr("No notes match \u201c%1\u201d").arg(Library.searchText.trim())
+                                        : qsTr("No notes here yet")
+                color: Theme.secondaryText
             }
         }
     }

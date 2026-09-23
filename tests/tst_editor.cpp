@@ -3,6 +3,7 @@
 // for visual review of rendering (tables, checkboxes, images, themes).
 
 #include "AppLibrary.h"
+#include "BlobImageProvider.h"
 #include "DocumentConverter.h"
 #include "EditorController.h"
 #include "LibraryService.h"
@@ -188,6 +189,7 @@ private slots:
         AppLibrary::setInstance(m_library.get());
 
         m_engine = std::make_unique<QQmlApplicationEngine>();
+        m_engine->addImageProvider(u"blob"_s, new BlobImageProvider(m_service.get()));
         m_engine->setInitialProperties({{u"initialNoteId"_s, m_mixedId}});
         m_engine->loadFromModule("OmarchyNotes", "Main");
         QVERIFY(!m_engine->rootObjects().isEmpty());
@@ -616,6 +618,137 @@ private slots:
         QCOMPARE(m_library->currentKey(), u"all"_s); // the view moved off the gone folder
         QVERIFY(m_service->loadNote(inside)->deletedAt > 0);
         QVERIFY(m_editor->noteId() != inside || m_editor->readOnly());
+    }
+
+    void tagsAreHighlightedAndListed()
+    {
+        resetView();
+        open(paragraphs({u"Planning"_s}));
+        setCursor(8);
+        type(u" #roadmap"_s);
+        QVERIFY(m_editor->flush());
+        QTRY_VERIFY(m_library->folders()->indexOfKey(u"tag:roadmap"_s) >= 0); // after typing pauses
+        QTRY_VERIFY(!doc()->findBlockByNumber(0).layout()->formats().isEmpty()); // coloured
+
+        // Reopening a tagged note must not count the colouring as an edit.
+        const QString id = m_editor->noteId();
+        open(paragraphs({u"Elsewhere"_s}));
+        m_editor->openNote(id);
+        QTest::qWait(50);
+        QCOMPARE(m_editor->saveState(), EditorController::Saved);
+
+        call("showView", u"tag:roadmap"_s);
+        QCOMPARE(m_library->viewTitle(), u"#roadmap"_s);
+        QCOMPARE(m_library->notes()->count(), 1);
+        call("newNote"); // a note started from a tag carries it
+        QVERIFY(m_editor->flush());
+        QVERIFY(m_service->loadNote(m_editor->noteId())->body.tags().contains(u"roadmap"_s));
+        screenshot(u"tags"_s);
+    }
+
+    void findInNote()
+    {
+        resetView();
+        open(paragraphs({u"alpha beta ALPHA gamma alpha"_s}));
+        setCursor(0);
+        m_editor->setFindText(u"alpha"_s);
+        QCOMPARE(m_editor->findCount(), 3);
+        QCOMPARE(m_editor->findIndex(), 1);
+        QCOMPARE(m_text->property("selectedText").toString(), u"alpha"_s);
+        m_editor->findNext();
+        QCOMPARE(m_editor->findIndex(), 2);
+        QCOMPARE(m_text->property("selectionStart").toInt(), 11);
+        m_editor->findPrevious();
+        m_editor->findPrevious();
+        QCOMPARE(m_editor->findIndex(), 3); // wraps around
+        QCOMPARE(m_editor->saveState(), EditorController::Saved); // finding isn't editing
+
+        setCursor(doc()->characterCount() - 1);
+        type(u" alpha"_s);
+        QTRY_COMPARE(m_editor->findCount(), 4); // follows edits
+        m_editor->setFindText({});
+        QCOMPARE(m_editor->findCount(), 0);
+        QVERIFY(m_editor->flush());
+    }
+
+    void smartFolderShowsMatchingNotes()
+    {
+        resetView();
+        RichDocument trip;
+        trip.blocks = {Block::heading(1, {Span::plain(u"Trip"_s)}),
+                       Block::listItem(ListKind::Check, 0, {Span::plain(u"Passport #travel"_s)})};
+        trip.assignMissingIds();
+        const QString tripId = open(trip);
+        open(paragraphs({u"Hotel ideas #travel"_s}));
+        QVariantMap criteria{{u"tags"_s, QStringList{u"travel"_s}}, {u"hasChecklist"_s, true}};
+        const QVariantMap made = m_library->createSmartFolder(u"Travel checklists"_s, criteria);
+        QVERIFY2(made.value(u"ok"_s).toBool(), qPrintable(made.value(u"error"_s).toString()));
+        call("showView", made.value(u"id"_s));
+        QCOMPARE(m_library->viewTitle(), u"Travel checklists"_s);
+        QCOMPARE(m_library->notes()->count(), 1);
+        QCOMPARE(m_library->notes()->idAt(0), tripId);
+        QVERIFY(!m_library->createSmartFolder(u"Empty"_s, {}).value(u"ok"_s).toBool());
+        screenshot(u"smart-folder"_s);
+    }
+
+    void galleryView()
+    {
+        resetView();
+        m_library->setGalleryMode(true);
+        QQuickItem *grid = item("noteGrid");
+        QTRY_VERIFY(grid->isVisible());
+        QVERIFY(!m_pane->isVisible()); // the gallery takes the editor's space
+        QTest::qWait(300); // let thumbnails decode
+        screenshot(u"gallery"_s);
+
+        call("openNote", m_mixedId);
+        QVERIFY(m_pane->isVisible());
+        QVERIFY(!grid->isVisible());
+        m_library->setGalleryMode(false);
+        QVERIFY(m_pane->isVisible());
+        QVERIFY(item("noteListView")->isVisible());
+    }
+
+    void attachmentBrowser()
+    {
+        resetView();
+        call("showView", u"attachments"_s);
+        QVERIFY(m_library->inAttachments());
+        QTRY_VERIFY(item("attachmentsView")->isVisible());
+        QVERIFY(m_library->attachments()->count() >= 2);
+        m_library->attachments()->setFilter(AttachmentsModel::Files);
+        const int files = m_library->attachments()->count();
+        m_library->attachments()->setFilter(AttachmentsModel::Images);
+        QVERIFY(files >= 1 && m_library->attachments()->count() >= 1);
+        m_library->attachments()->setFilter(AttachmentsModel::All);
+        QTest::qWait(300);
+        screenshot(u"attachments"_s);
+
+        const QString noteId = m_library->attachments()->index(0).data(AttachmentsModel::NoteIdRole).toString();
+        call("openNote", noteId);
+        QCOMPARE(m_editor->noteId(), noteId);
+        QVERIFY(m_pane->isVisible());
+        resetView();
+    }
+
+    void importAndExportFromTheApp()
+    {
+        resetView();
+        QTemporaryDir files;
+        QFile md(files.filePath(u"From Obsidian.md"_s));
+        QVERIFY(md.open(QIODevice::WriteOnly));
+        md.write("# From Obsidian\n\n- [ ] Try the importer #imported\n");
+        md.close();
+        const QVariantMap imported = m_library->importFiles({QUrl::fromLocalFile(md.fileName())});
+        QCOMPARE(imported.value(u"count"_s).toInt(), 1);
+        const QString id = imported.value(u"first"_s).toString();
+        QVERIFY(m_library->notes()->indexOf(id) >= 0);
+        QCOMPARE(m_library->exportFileName(id, u"pdf"_s), u"From Obsidian.pdf"_s);
+        const QVariantMap exported = m_library->exportNote(id, u"md"_s, QUrl::fromLocalFile(files.filePath(u"out.md"_s)));
+        QVERIFY2(exported.value(u"ok"_s).toBool(), qPrintable(exported.value(u"error"_s).toString()));
+        QFile out(files.filePath(u"out.md"_s));
+        QVERIFY(out.open(QIODevice::ReadOnly));
+        QVERIFY(out.readAll().contains("- [ ] Try the importer #imported"));
     }
 
     void largeNoteResponsiveness()

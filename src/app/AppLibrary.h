@@ -34,6 +34,7 @@ public:
         HasChecklistRole,
         FolderNameRole,
         SectionRole,
+        ThumbnailRole,
     };
 
     using QAbstractListModel::QAbstractListModel;
@@ -82,16 +83,20 @@ public:
         CountRole,
         FolderIdRole,
         ParentIdRole,
+        SectionRole,
     };
 
     struct Row {
-        QString key; // "all", "notes", "trash", or a folder id
+        // "all", "notes", "attachments", "trash", a folder id,
+        // "smart:<id>" or "tag:<name>"
+        QString key;
         QString name;
-        QString kind; // "all", "notes", "folder", "trash"
+        QString kind; // "all", "notes", "folder", "attachments", "trash", "smart", "tag"
         int depth = 0;
         int count = 0;
-        QString folderId;
+        QString folderId; // folder or Smart Folder id
         QString parentId;
+        QString section; // "" for the library, then "Smart Folders", "Tags"
     };
 
     using QAbstractListModel::QAbstractListModel;
@@ -100,13 +105,61 @@ public:
     QVariant data(const QModelIndex &index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
 
-    void reset(const QList<onotes::FolderInfo> &folders, int noteCount, int trashCount);
+    void reset(const QList<onotes::FolderInfo> &folders, int noteCount, int trashCount, int attachmentCount,
+               const QList<onotes::SmartFolder> &smartFolders, const QList<onotes::TagInfo> &tags);
     const QList<Row> &rows() const { return m_rows; }
     QString nameOf(const QString &key) const;
     Q_INVOKABLE int indexOfKey(const QString &key) const;
 
 private:
     QList<Row> m_rows;
+};
+
+// Every image and file across notes, for the attachment browser.
+class AttachmentsModel : public QAbstractListModel
+{
+    Q_OBJECT
+    QML_ANONYMOUS
+
+    Q_PROPERTY(int count READ count NOTIFY countChanged)
+    Q_PROPERTY(int filter READ filter WRITE setFilter NOTIFY filterChanged)
+
+public:
+    enum Filter { All, Images, Files };
+    Q_ENUM(Filter)
+
+    enum Role {
+        IsImageRole = Qt::UserRole + 1,
+        BlobHashRole,
+        AttachmentIdRole,
+        FileNameRole,
+        DetailRole,
+        ExtensionRole,
+        NoteIdRole,
+        NoteTitleRole,
+    };
+
+    using QAbstractListModel::QAbstractListModel;
+
+    int rowCount(const QModelIndex &parent = {}) const override;
+    QVariant data(const QModelIndex &index, int role) const override;
+    QHash<int, QByteArray> roleNames() const override;
+
+    int count() const { return int(m_visible.size()); }
+    int filter() const { return m_filter; }
+    void setFilter(int filter);
+    void reset(const QList<onotes::AttachmentItem> &items);
+
+signals:
+    void countChanged();
+    void filterChanged();
+
+private:
+    void applyFilter();
+
+    QList<onotes::AttachmentItem> m_items;
+    QList<onotes::AttachmentItem> m_visible;
+    int m_filter = All;
 };
 
 // QML-facing wrapper around the LibraryService: `Library` in QML. It owns
@@ -120,6 +173,10 @@ class AppLibrary : public QObject
 
     Q_PROPERTY(NotesModel *notes READ notes CONSTANT)
     Q_PROPERTY(FoldersModel *folders READ folders CONSTANT)
+    Q_PROPERTY(AttachmentsModel *attachments READ attachments CONSTANT)
+    Q_PROPERTY(bool galleryMode READ galleryMode WRITE setGalleryMode NOTIFY galleryModeChanged)
+    Q_PROPERTY(bool inAttachments READ inAttachments NOTIFY viewChanged)
+    Q_PROPERTY(QStringList allTags READ allTags NOTIFY countsChanged)
     Q_PROPERTY(QString currentKey READ currentKey NOTIFY viewChanged)
     Q_PROPERTY(QString viewTitle READ viewTitle NOTIFY viewChanged)
     Q_PROPERTY(bool inTrash READ inTrash NOTIFY viewChanged)
@@ -146,6 +203,11 @@ public:
     onotes::LibraryService *service() const { return m_service; }
     NotesModel *notes() { return &m_notes; }
     FoldersModel *folders() { return &m_folders; }
+    AttachmentsModel *attachments() { return &m_attachments; }
+    bool galleryMode() const { return m_gallery; }
+    void setGalleryMode(bool gallery);
+    bool inAttachments() const { return m_key == u"attachments" && m_searchText.isEmpty(); }
+    QStringList allTags() const { return m_tags; }
     QString currentKey() const { return m_key; }
     QString viewTitle() const;
     bool inTrash() const { return m_key == u"trash" && m_searchText.isEmpty(); }
@@ -188,6 +250,22 @@ public:
     // Destinations for "Move to": [{id, name, depth}], "Notes" first (id "").
     Q_INVOKABLE QVariantList folderChoices() const;
 
+    // Smart Folders. Criteria maps use SmartCriteria's JSON keys.
+    Q_INVOKABLE QVariantMap createSmartFolder(const QString &name, const QVariantMap &criteria);
+    Q_INVOKABLE QVariantMap updateSmartFolder(const QString &id, const QString &name, const QVariantMap &criteria);
+    Q_INVOKABLE bool deleteSmartFolder(const QString &id);
+    Q_INVOKABLE QVariantMap smartFolder(const QString &id) const;
+
+    // Opening files with the desktop's default apps.
+    Q_INVOKABLE bool openAttachment(const QString &attachmentId);
+    Q_INVOKABLE bool openImage(const QString &blobHash);
+
+    // Import and export. Results are maps with ok/error plus details.
+    Q_INVOKABLE QVariantMap importFiles(const QList<QUrl> &files);
+    Q_INVOKABLE QString exportFileName(const QString &noteId, const QString &format) const;
+    Q_INVOKABLE QVariantMap exportNote(const QString &noteId, const QString &format, const QUrl &file);
+    Q_INVOKABLE QVariantMap exportAll(const QUrl &folder);
+
     // Backup. Results are maps with ok/error plus details.
     Q_INVOKABLE QString defaultBackupName() const;
     Q_INVOKABLE QVariantMap backupTo(const QUrl &parentFolder, const QString &name);
@@ -201,6 +279,7 @@ signals:
     void viewChanged();
     void searchTextChanged();
     void sortOrderChanged();
+    void galleryModeChanged();
     void countsChanged();
     void lastNoteIdChanged();
     void simulateSaveFailureChanged();
@@ -222,9 +301,16 @@ private:
     std::unique_ptr<QSettings> m_settings;
     NotesModel m_notes;
     FoldersModel m_folders;
+    AttachmentsModel m_attachments;
+    QStringList m_tags;
+    QList<onotes::SmartFolder> m_smartFolders;
+    bool m_gallery = false;
     QString m_key = QStringLiteral("all");
     QString m_searchText;
     QTimer m_searchDebounce;
+    // Saves can change tags, Smart Folder matches and attachments; the
+    // sidebar catches up shortly after typing pauses.
+    QTimer m_sidebarRefresh;
     quint64 m_searchTicket = 0;
     onotes::NoteSort m_sort = onotes::NoteSort::Edited;
     int m_trashCount = 0;

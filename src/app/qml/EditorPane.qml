@@ -3,6 +3,7 @@ import QtQuick.Controls.Basic
 import QtQuick.Dialogs
 import QtQuick.Layouts
 import QtQuick.Window
+import QtCore
 import OmarchyNotes
 
 Rectangle {
@@ -19,8 +20,33 @@ Rectangle {
     signal recoverRequested()
     signal deleteForeverRequested()
     signal notice(string message)
+    signal tagRequested(string tag)
+
+    function openFind() {
+        findBar.visible = true
+        findField.forceActiveFocus()
+        findField.selectAll()
+        if (findField.text)
+            editor.findText = findField.text
+    }
+    function closeFind() {
+        findBar.visible = false
+        editor.findText = ""
+        focusEditor()
+    }
 
     function focusEditor() { textArea.forceActiveFocus() }
+
+    function exportAs(format) {
+        noteExportDialog.format = format
+        noteExportDialog.nameFilters = [format === "pdf" ? qsTr("PDF (*.pdf)")
+                                       : format === "html" ? qsTr("Web page (*.html)")
+                                       : qsTr("Markdown (*.md)")]
+        noteExportDialog.defaultSuffix = format
+        noteExportDialog.selectedFile = noteExportDialog.currentFolder + "/"
+            + encodeURIComponent(Library.exportFileName(editor.noteId, format))
+        noteExportDialog.open()
+    }
 
     function toggleMark(mark) {
         editor.toggleMark(mark)
@@ -189,6 +215,18 @@ Rectangle {
                     text: qsTr("Delete note")
                     onClicked: root.deleteRequested()
                 }
+                ToolIcon {
+                    id: exportButton
+                    iconName: "share"
+                    text: qsTr("Export note")
+                    onClicked: exportMenu.popup(exportButton, 0, exportButton.height)
+                    Menu {
+                        id: exportMenu
+                        MenuItem { text: qsTr("Export as Markdown…"); onTriggered: root.exportAs("md") }
+                        MenuItem { text: qsTr("Export as HTML…"); onTriggered: root.exportAs("html") }
+                        MenuItem { text: qsTr("Export as PDF…"); onTriggered: root.exportAs("pdf") }
+                    }
+                }
             }
         }
 
@@ -196,6 +234,62 @@ Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 1
             color: Theme.divider
+        }
+
+        // Find in note.
+        Rectangle {
+            id: findBar
+            objectName: "findBar"
+            visible: false
+            Layout.fillWidth: true
+            Layout.preferredHeight: 44
+            color: Theme.raised
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 8
+                spacing: 6
+                TextField {
+                    id: findField
+                    objectName: "findField"
+                    Layout.fillWidth: true
+                    Layout.maximumWidth: 360
+                    placeholderText: qsTr("Find in note")
+                    placeholderTextColor: Theme.secondaryText
+                    color: Theme.text
+                    selectionColor: Theme.selection
+                    selectedTextColor: Theme.selectionText
+                    Accessible.name: qsTr("Find in note")
+                    onTextEdited: editor.findText = text
+                    Keys.onReturnPressed: event => {
+                        if (event.modifiers & Qt.ShiftModifier)
+                            editor.findPrevious()
+                        else
+                            editor.findNext()
+                    }
+                    Keys.onEscapePressed: root.closeFind()
+                    background: Rectangle {
+                        radius: 6
+                        color: Theme.canvas
+                        border.width: findField.activeFocus ? 2 : 1
+                        border.color: findField.text && editor.findCount === 0 ? Theme.error
+                                     : findField.activeFocus ? Theme.focus : Theme.divider
+                    }
+                }
+                Label {
+                    text: !findField.text ? ""
+                        : editor.findCount === 0 ? qsTr("No matches")
+                        : qsTr("%1 of %2").arg(editor.findIndex).arg(editor.findCount)
+                    color: editor.findCount === 0 && findField.text ? Theme.error : Theme.secondaryText
+                    font.pixelSize: 12
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: text
+                }
+                ToolIcon { text: "\u2191"; Accessible.name: qsTr("Previous match"); enabled: editor.findCount > 0; onClicked: editor.findPrevious() }
+                ToolIcon { text: "\u2193"; Accessible.name: qsTr("Next match"); enabled: editor.findCount > 0; onClicked: editor.findNext() }
+                Item { Layout.fillWidth: true }
+                ToolIcon { text: qsTr("Done"); onClicked: root.closeFind() }
+            }
         }
 
         // Notes in Recently Deleted open read-only.
@@ -296,13 +390,19 @@ Rectangle {
                         editor.activateObjectAt(textArea.positionAt(p.x, p.y))
                     }
                 }
-                // Ctrl+click follows links.
+                // Ctrl+click follows links and opens #tags.
                 TapHandler {
                     acceptedModifiers: Qt.ControlModifier
                     onTapped: eventPoint => {
-                        const link = textArea.linkAt(eventPoint.position.x, eventPoint.position.y)
-                        if (link)
+                        const p = eventPoint.position
+                        const link = textArea.linkAt(p.x, p.y)
+                        if (link) {
                             editor.openLink(link)
+                            return
+                        }
+                        const tag = editor.tagAt(textArea.positionAt(p.x, p.y))
+                        if (tag)
+                            root.tagRequested(tag)
                     }
                 }
                 HoverHandler {
@@ -407,6 +507,18 @@ Rectangle {
         onAccepted: { editor.attachFile(selectedFile); root.focusEditor() }
     }
     FileDialog {
+        id: noteExportDialog
+        property string format: "md"
+        title: qsTr("Export Note")
+        fileMode: FileDialog.SaveFile
+        currentFolder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
+        onAccepted: {
+            editor.flush()
+            const result = Library.exportNote(editor.noteId, format, selectedFile)
+            root.notice(result.ok ? qsTr("Exported to %1").arg(result.path) : result.error)
+        }
+    }
+    FileDialog {
         id: exportDialog
         title: qsTr("Export Note")
         fileMode: FileDialog.SaveFile
@@ -435,4 +547,7 @@ Rectangle {
     Shortcut { sequence: "Ctrl+Alt+T"; enabled: textArea.activeFocus; onActivated: editor.insertTable(2, 2) }
     Shortcut { sequence: "Ctrl+Shift+A"; enabled: toolbar.editable; onActivated: attachDialog.open() }
     Shortcut { sequence: "Ctrl+L"; enabled: toolbar.editable; onActivated: linkPicker.open() }
+    Shortcut { sequences: [StandardKey.Find]; enabled: editor.hasNote; onActivated: root.openFind() }
+    Shortcut { sequences: [StandardKey.FindNext]; enabled: findBar.visible; onActivated: editor.findNext() }
+    Shortcut { sequences: [StandardKey.FindPrevious]; enabled: findBar.visible; onActivated: editor.findPrevious() }
 }

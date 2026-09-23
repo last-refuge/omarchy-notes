@@ -105,15 +105,6 @@ void forEachFragment(QTextDocument *doc, int start, int end, Fn fn)
     }
 }
 
-QString safeFileName(const QString &name)
-{
-    QString out = QFileInfo(name).fileName();
-    out.replace(u'/', u'_');
-    if (out.isEmpty() || out == u"." || out == u"..")
-        out = u"attachment"_s;
-    return out;
-}
-
 } // namespace
 
 EditorController::EditorController(QObject *parent) : QObject(parent)
@@ -127,6 +118,16 @@ EditorController::EditorController(QObject *parent) : QObject(parent)
     connect(&m_capTimer, &QTimer::timeout, this, &EditorController::saveNow);
     m_retryTimer.setSingleShot(true);
     connect(&m_retryTimer, &QTimer::timeout, this, &EditorController::saveNow);
+    // Decorations follow edits on the next turn of the event loop, after
+    // the text edit has finished its own update.
+    m_decorateTimer.setSingleShot(true);
+    m_decorateTimer.setInterval(0);
+    connect(&m_decorateTimer, &QTimer::timeout, this, [this] {
+        if (!m_findText.isEmpty())
+            recountMatches();
+        decorate(m_decorateFrom, m_decorateTo);
+        m_decorateFrom = m_decorateTo = -1;
+    });
 
     if (ThemeController *theme = ThemeController::instance())
         connect(theme, &ThemeController::changed, this, &EditorController::reloadPresentation);
@@ -347,6 +348,9 @@ void EditorController::loadBody(const RichDocument &body)
     ensureResources();
     m_loading = false;
     m_savedGeneration = m_generation;
+    if (!m_findText.isEmpty())
+        recountMatches();
+    decorateAll();
     updateFormatState();
 }
 
@@ -368,6 +372,8 @@ void EditorController::reloadPresentation()
 
 void EditorController::onContentsChange(int position, int removed, int added)
 {
+    if (m_decorating)
+        return; // our own re-layout, not an edit
     if (m_loading || m_noteId.isEmpty() || readOnly() || (removed == 0 && added == 0))
         return;
     if (m_applyingPending)
@@ -377,6 +383,7 @@ void EditorController::onContentsChange(int position, int removed, int added)
     ++m_generation;
     if (m_saveState == Saved)
         setSaveState(Edited);
+    scheduleDecorate(position, position + std::max(added, 1));
     // Save once typing pauses, and at the latest when the cap expires.
     m_idleTimer.start();
     if (!m_capTimer.isActive())
@@ -1099,47 +1106,12 @@ bool EditorController::activateObjectAt(int position)
         if (!cf.isImageFormat())
             continue;
         const QString name = cf.toImageFormat().name();
-        if (const QString id = DocumentConverter::attachmentIdFromResource(name); !id.isEmpty()) {
-            openAttachment(id);
-            return true;
-        }
-        if (const QString hash = DocumentConverter::blobHashFromResource(name); !hash.isEmpty()) {
-            // Hand images to the desktop viewer through a named copy.
-            const QString dir = cacheDirectory() + u"/open/"_s + hash.left(16);
-            QDir().mkpath(dir);
-            const QString suffix = QMimeDatabase().mimeTypeForFile(m_library->service()->blobPath(hash))
-                                       .preferredSuffix();
-            const QString target = dir + u"/image."_s + (suffix.isEmpty() ? u"png"_s : suffix);
-            if (!QFileInfo::exists(target))
-                QFile::copy(m_library->service()->blobPath(hash), target);
-            QDesktopServices::openUrl(QUrl::fromLocalFile(target));
-            return true;
-        }
+        if (const QString id = DocumentConverter::attachmentIdFromResource(name); !id.isEmpty())
+            return m_library->openAttachment(id);
+        if (const QString hash = DocumentConverter::blobHashFromResource(name); !hash.isEmpty())
+            return m_library->openImage(hash);
     }
     return false;
-}
-
-void EditorController::openAttachment(const QString &id)
-{
-    const auto info = m_library->service()->attachment(id);
-    const QString source = info ? m_library->service()->blobPath(info->blobHash) : QString();
-    if (!info || !QFileInfo::exists(source)) {
-        emit notice(tr("This attachment's data is missing from the library."));
-        return;
-    }
-    // External apps need a real file name; give them a read-only copy.
-    const QString dir = cacheDirectory() + u"/open/"_s + id;
-    QDir().mkpath(dir);
-    const QString target = dir + u'/' + safeFileName(info->fileName);
-    if (!QFileInfo::exists(target)) {
-        if (!QFile::copy(source, target)) {
-            emit notice(tr("Couldn't prepare the attachment for opening."));
-            return;
-        }
-        QFile::setPermissions(target, QFileDevice::ReadOwner | QFileDevice::ReadUser);
-    }
-    if (!QDesktopServices::openUrl(QUrl::fromLocalFile(target)))
-        emit notice(tr("No application is set up to open %1.").arg(info->fileName));
 }
 
 void EditorController::openLink(const QString &href)
@@ -1281,6 +1253,147 @@ void EditorController::insertNoteLink(const QString &noteId)
     cursor.insertText(u" "_s, base);
     cursor.endEditBlock();
     emit cursorRequested(cursor.position());
+}
+
+// ---------------------------------------------------------------- decorations and find
+
+void EditorController::scheduleDecorate(int from, int to)
+{
+    m_decorateFrom = m_decorateFrom < 0 ? from : std::min(m_decorateFrom, from);
+    m_decorateTo = std::max(m_decorateTo, to);
+    m_decorateTimer.start();
+}
+
+void EditorController::decorateAll()
+{
+    if (m_doc)
+        decorate(0, m_doc->characterCount());
+}
+
+void EditorController::decorate(int from, int to)
+{
+    if (!m_doc || from < 0)
+        return;
+    ThemeController *theme = ThemeController::instance();
+    QTextCharFormat tagFormat;
+    tagFormat.setForeground(theme ? theme->accent() : QColor(0x2f, 0x6f, 0xd0));
+    QTextCharFormat matchFormat;
+    QColor highlight = theme ? theme->highlight() : QColor(255, 204, 0, 110);
+    matchFormat.setBackground(highlight);
+    QTextCharFormat currentFormat;
+    QColor current = theme ? theme->accent() : QColor(0x2f, 0x6f, 0xd0);
+    current.setAlphaF(0.45f);
+    currentFormat.setBackground(current);
+    const int currentStart = m_findCurrent >= 0 ? m_matchStarts.value(m_findCurrent, -1) : -1;
+
+    to = std::min(to, m_doc->characterCount());
+    for (QTextBlock block = m_doc->findBlock(from); block.isValid() && block.position() <= to;
+         block = block.next()) {
+        QList<QTextLayout::FormatRange> ranges;
+        const QString text = block.text();
+        for (const TagMatch &m : findTags(text)) {
+            // Tags aren't tags inside code or links (see RichDocument::tags).
+            QTextCursor at(block);
+            at.setPosition(block.position() + int(m.start) + 1);
+            const QTextCharFormat cf = at.charFormat();
+            if (cf.isAnchor() || cf.boolProperty(TextProperty::Code))
+                continue;
+            ranges.append({int(m.start), int(m.length), tagFormat});
+        }
+        if (!m_findText.isEmpty()) {
+            for (qsizetype i = text.indexOf(m_findText, 0, Qt::CaseInsensitive); i >= 0;
+                 i = text.indexOf(m_findText, i + m_findText.size(), Qt::CaseInsensitive)) {
+                const bool isCurrent = block.position() + int(i) == currentStart;
+                ranges.append({int(i), int(m_findText.size()), isCurrent ? currentFormat : matchFormat});
+            }
+        }
+        if (ranges.isEmpty() && block.layout()->formats().isEmpty())
+            continue;
+        block.layout()->setFormats(ranges);
+        m_decorating = true;
+        m_doc->markContentsDirty(block.position(), block.length());
+        m_decorating = false;
+    }
+}
+
+void EditorController::setFindText(const QString &text)
+{
+    if (text == m_findText)
+        return;
+    m_findText = text;
+    recountMatches();
+    // Jump to the first match from the cursor, like typing into a find bar.
+    m_findCurrent = -1;
+    for (int i = 0; i < m_matchStarts.size(); ++i) {
+        if (m_matchStarts[i] >= m_cursorPosition - int(text.size())) {
+            m_findCurrent = i;
+            break;
+        }
+    }
+    if (m_findCurrent < 0 && !m_matchStarts.isEmpty())
+        m_findCurrent = 0;
+    decorateAll();
+    if (m_findCurrent >= 0)
+        selectMatch(m_findCurrent);
+    emit findChanged();
+}
+
+void EditorController::recountMatches()
+{
+    const int previous = m_findCurrent >= 0 ? m_matchStarts.value(m_findCurrent, -1) : -1;
+    m_matchStarts.clear();
+    if (m_doc && !m_findText.isEmpty()) {
+        for (QTextBlock block = m_doc->begin(); block.isValid(); block = block.next()) {
+            const QString text = block.text();
+            for (qsizetype i = text.indexOf(m_findText, 0, Qt::CaseInsensitive); i >= 0;
+                 i = text.indexOf(m_findText, i + m_findText.size(), Qt::CaseInsensitive))
+                m_matchStarts.append(block.position() + int(i));
+        }
+    }
+    // Keep the current match if it still exists.
+    m_findCurrent = previous >= 0 ? int(m_matchStarts.indexOf(previous)) : -1;
+    if (m_findCurrent < 0 && !m_matchStarts.isEmpty() && previous >= 0)
+        m_findCurrent = 0;
+    emit findChanged();
+}
+
+void EditorController::selectMatch(int index)
+{
+    if (index < 0 || index >= m_matchStarts.size())
+        return;
+    const int old = m_findCurrent >= 0 ? m_matchStarts.value(m_findCurrent, -1) : -1;
+    m_findCurrent = index;
+    const int start = m_matchStarts[index];
+    if (old >= 0)
+        decorate(old, old + 1);
+    decorate(start, start + 1);
+    emit selectionRequested(start, start + int(m_findText.size()));
+    emit findChanged();
+}
+
+void EditorController::findNext()
+{
+    if (!m_matchStarts.isEmpty())
+        selectMatch((m_findCurrent + 1) % int(m_matchStarts.size()));
+}
+
+void EditorController::findPrevious()
+{
+    if (!m_matchStarts.isEmpty())
+        selectMatch((m_findCurrent - 1 + int(m_matchStarts.size())) % int(m_matchStarts.size()));
+}
+
+QString EditorController::tagAt(int position) const
+{
+    if (!m_doc)
+        return {};
+    const QTextBlock block = m_doc->findBlock(position);
+    const int offset = position - block.position();
+    for (const TagMatch &m : findTags(block.text())) {
+        if (offset >= m.start && offset <= m.start + m.length)
+            return m.tag;
+    }
+    return {};
 }
 
 // ---------------------------------------------------------------- clipboard
