@@ -54,6 +54,9 @@ jobs:
           runuser -u builder -- git config --global --add safe.directory "$GITHUB_WORKSPACE"
           runuser -u builder -- python3 packaging/prepare-release.py --ref HEAD --output build-aur-ci
       - name: Build in a clean Arch chroot
-        run: runuser -u builder -- bash -c 'cd build-aur-ci/aur && extra-x86_64-build'
+        run: |
+          # systemd-nspawn needs a machine ID, which the container image lacks.
+          systemd-machine-id-setup
+          runuser -u builder -- bash -c 'cd build-aur-ci/aur && extra-x86_64-build'
       - name: Validate package contents and dependencies
         run: ./tests/check-arch-package.sh build-aur-ci/aur
