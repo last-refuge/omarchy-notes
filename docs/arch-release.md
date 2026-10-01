@@ -37,6 +37,9 @@ mirror. It synchronizes the entire container to the selected snapshot, including
 downgrades, before installing tools or dependencies. Initial validation targets
 x86_64. Add aarch64 to the recipe only after validating it against its target dependencies.
 
+See [the recorded package validation](omarchy-validation.md) for tested dependency
+versions, results, and remaining upstream checks.
+
 `tests/test-package-lifecycle.sh` runs **inside a disposable container as root**,
 with an unprivileged `builder` account. It installs the checksum-verified 1.0.0-1
 release, creates notes and attachments through the installed app, upgrades to the
