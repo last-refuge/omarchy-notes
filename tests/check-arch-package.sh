@@ -30,4 +30,6 @@ if readelf -d "$work_dir/usr/bin/omarchy-notes" | grep -Eq '\((RPATH|RUNPATH)\)'
   exit 1
 fi
 grep -q '^Exec=/usr/bin/omarchy-notes$' "$work_dir/usr/share/applications/org.omarchy.Notes.desktop"
+desktop-file-validate "$work_dir/usr/share/applications/org.omarchy.Notes.desktop"
+appstreamcli validate --no-net "$work_dir/usr/share/metainfo/org.omarchy.Notes.metainfo.xml"
 echo 'Arch package validation: ok'

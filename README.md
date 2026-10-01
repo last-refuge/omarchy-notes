@@ -24,7 +24,7 @@ Rich notes with checklists, tables, images and attachments. They live on your ma
 The idea is simple: Apple Notes' easy note-taking, on Linux. Open it, start typing, and trust it's saved. It's a real desktop app built with Qt, not a web page in a wrapper. It works offline with no account, and it follows whatever Omarchy theme you're using, even when you switch themes while it's open.
 
 > [!TIP]
-> **New here?** Visit the [project page](https://last-refuge.github.io/omarchy-notes/) for a quick tour, or jump straight to [installing](#-install).
+> **New here?** Visit the [project page](https://lastrefuge.ai/projects/omarchy-notes) for a quick tour, or jump straight to [installing](#-install).
 
 ## ✨ What you can do today
 
@@ -51,16 +51,30 @@ The idea is simple: Apple Notes' easy note-taking, on Linux. Open it, start typi
 
 ## 🚀 Install
 
-**From the latest release** (on Omarchy or any Arch system):
+**From GitHub Releases** (Omarchy or Arch Linux, x86_64):
 
 ```bash
 sudo pacman -U https://github.com/last-refuge/omarchy-notes/releases/download/v1.0.0/omarchy-notes-1.0.0-1-x86_64.pkg.tar.zst
 ```
 
 > [!NOTE]
-> **Coming soon to the AUR.** The AUR has paused new account sign-ups while it deals with a wave of automated registrations. Omarchy Notes will be published there as soon as registration reopens, and then `yay -S omarchy-notes` will work too. Until then, the package above is the same one the AUR recipe builds.
+> **Omarchy package repository:** inclusion is being prepared. Once the package is published to your channel, you'll be able to find it under **Install → Package** or run `omarchy pkg add omarchy-notes`. Until then, use the release package above. Repository inclusion will also provide updates through `omarchy update`.
 
 Then press <kbd>Super</kbd> + <kbd>Space</kbd> and search for **Omarchy Notes**.
+
+### Updates and removal
+
+For the direct GitHub package, check [GitHub Releases](https://github.com/last-refuge/omarchy-notes/releases/latest) for a newer version and install its package with `sudo pacman -U /path/to/package.pkg.tar.zst`. Direct downloads need manual updates until the package is available in a configured repository.
+
+To verify a download, get the package and `SHA256SUMS` from the **same release**, then check its entry before installing:
+
+```bash
+grep -E '  (\./)?omarchy-notes-1\.0\.0-1-x86_64\.pkg\.tar\.zst$' SHA256SUMS | sha256sum --check
+```
+
+That example checks the current 1.0.0 package; use the corresponding filename for later releases. Checksums detect a damaged download; they are not a package signature.
+
+Remove the package through **Remove → Package** or `omarchy pkg drop omarchy-notes`. On other Arch systems, use `sudo pacman -Rns omarchy-notes`. Your library in `~/.local/share/omarchy-notes/` stays in place, including attachments, so reinstalling restores access to your notes.
 
 ### Building from source
 
@@ -81,6 +95,8 @@ cmake --install build-release
 ```
 
 That puts `omarchy-notes` in `~/.local/bin` and adds it to your app launcher.
+
+Repository packaging currently targets x86_64. Builds on aarch64 are not yet validated. Optional Quick Note setup below targets Omarchy's Lua-based Hyprland configuration.
 
 > [!TIP]
 > If it doesn't show up in the launcher right away, run `omarchy restart shell` so the launcher picks up the new app.
@@ -185,7 +201,7 @@ The editor tests drive the real app off-screen and save screenshots to `build/sc
 | [`src/core`](src/core) | The engine: the note format, saving to SQLite, attachment storage and theme colours. There's no UI code in here. |
 | [`src/app`](src/app) | The app itself: the editor logic and the Qt Quick (QML) interface. |
 | [`tests`](tests) | Round-trip, storage (including a "kill it mid-save" durability test), theme contrast, end-to-end editor and launch tests, plus packaging checks. |
-| [`packaging`](packaging) | Desktop entry, icon, AppStream metadata, man page and the AUR recipe template. |
+| [`packaging`](packaging) | Desktop entry, icon, AppStream metadata, man page, Arch source recipe, and Omarchy release-watch metadata. |
 
 Found a bug or have an idea? [Open an issue](https://github.com/last-refuge/omarchy-notes/issues). It's early days, so feedback shapes where this goes.
 

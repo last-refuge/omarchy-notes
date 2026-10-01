@@ -1,17 +1,15 @@
 # Maintainer: Jason Alexander <jason@greatspark.com>
-# Generated with packaging/prepare-release.py; submit the generated copy to AUR.
+# Generated with packaging/prepare-release.py for the Omarchy package repository.
 pkgname=omarchy-notes
 pkgver=1.0.0
-pkgrel=1
+pkgrel=2
 pkgdesc='Fast, native notes for Omarchy, inspired by Apple Notes'
-arch=('x86_64' 'aarch64')
+arch=('x86_64')
 url='https://lastrefuge.ai/projects/omarchy-notes'
 license=('MIT')
-depends=('glibc' 'hicolor-icon-theme' 'libgcc' 'libstdc++' 'qt6-base' 'qt6-declarative' 'qt6-svg' 'sqlite')
+depends=('glibc' 'hicolor-icon-theme' 'libgcc' 'libstdc++' 'qt6-base>=6.8' 'qt6-declarative>=6.8' 'qt6-svg' 'qt6-wayland' 'sqlite' 'xdg-utils')
 makedepends=('cmake' 'ninja' 'pkgconf')
-optdepends=('qt6-wayland: native Wayland support'
-            'qt6-imageformats: WebP, TIFF and other image formats in notes'
-            'xdg-utils: open attachments in their default applications')
+optdepends=('qt6-imageformats: WebP, TIFF and other image formats in notes')
 source=("https://github.com/last-refuge/omarchy-notes/releases/download/v${pkgver}/${pkgname}-${pkgver}.tar.gz")
 b2sums=('@SOURCE_B2SUM@')
 

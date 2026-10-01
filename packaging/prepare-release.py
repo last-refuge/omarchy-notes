@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare immutable source and AUR artifacts from a committed revision. No publishing."""
+"""Prepare immutable source and Omarchy packaging artifacts. No publishing."""
 
 import argparse
 import gzip
@@ -64,14 +64,16 @@ def prepare(repo, ref, output):
         source_archive = artifacts / f"{source_name}.tar.gz"
         archive(source_archive, work, [source_name], epoch)
         checksum = hashlib.blake2b(source_archive.read_bytes()).hexdigest()
-        aur = artifacts / "aur"
-        aur.mkdir()
-        (aur / "PKGBUILD").write_text(template.replace("@SOURCE_B2SUM@", checksum))
-        srcinfo = subprocess.check_output(["makepkg", "--printsrcinfo"], cwd=aur)
-        (aur / ".SRCINFO").write_bytes(srcinfo)
-        archive(artifacts / f"{source_name}-aur.tar.gz", artifacts, ["aur"], epoch)
+        arch = artifacts / "arch"
+        arch.mkdir()
+        (arch / "PKGBUILD").write_text(template.replace("@SOURCE_B2SUM@", checksum))
+        srcinfo = subprocess.check_output(["makepkg", "--printsrcinfo"], cwd=arch)
+        (arch / ".SRCINFO").write_bytes(srcinfo)
+        (arch / ".omarchy").mkdir()
+        shutil.copyfile(source / "packaging/omarchy/package.json", arch / ".omarchy/package.json")
+        archive(artifacts / f"{source_name}-arch.tar.gz", artifacts, ["arch"], epoch)
         # makepkg uses this exact archive locally before it is published at the source URL.
-        shutil.copyfile(source_archive, aur / source_archive.name)
+        shutil.copyfile(source_archive, arch / source_archive.name)
         (artifacts / "SOURCE_REVISION").write_text(revision + "\n")
         with (artifacts / "SHA256SUMS").open("w") as sums:
             for path in sorted(artifacts.iterdir()):

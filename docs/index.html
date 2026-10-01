@@ -218,7 +218,7 @@
         </div>
         <a class="secondary" href="#install">Other ways to install</a>
       </div>
-      <p class="soon">Coming soon to the AUR, once it reopens new account sign-ups.</p>
+      <p class="soon">Install the x86_64 release now. Inclusion in Omarchy's package repository is being prepared.</p>
       <div class="shot">
         <img src="images/screenshot-dark.png" width="1240" height="780"
              alt="Omarchy Notes in the Kanagawa theme: a folder sidebar with tags, a note list, and a meeting note with headings, round checkboxes and a table">
@@ -283,15 +283,20 @@
       </div>
       <div class="install">
         <div class="step">
-          <h3>From the latest release</h3>
-          <p>On Omarchy or any Arch system, install the package from <a href="https://github.com/last-refuge/omarchy-notes/releases/latest">GitHub Releases</a>:</p>
+          <h3>From GitHub Releases</h3>
+          <p>On Omarchy or Arch Linux (x86_64), install the package from <a href="https://github.com/last-refuge/omarchy-notes/releases/latest">GitHub Releases</a>:</p>
           <div class="command"><span class="prompt">$</span><code id="install-cmd-2">sudo pacman -U https://github.com/last-refuge/omarchy-notes/releases/download/v1.0.0/omarchy-notes-1.0.0-1-x86_64.pkg.tar.zst</code><button class="copy" type="button" data-copy="install-cmd-2">Copy</button></div>
-          <p class="note"><b>Coming soon to the AUR.</b> The AUR has paused new account sign-ups while it deals with a wave of automated registrations. Omarchy Notes will be published there as soon as registration reopens, and then <code>yay -S omarchy-notes</code> will work too.</p>
+          <p class="note"><b>Omarchy package repository:</b> inclusion is being prepared. Once published to your channel, find it under <b>Install → Package</b> or run <code>omarchy pkg add omarchy-notes</code>. Until then, use the release download above.</p>
         </div>
         <div class="step">
           <h3>Then open it</h3>
           <p>Press <kbd>Super</kbd> <kbd>Space</kbd> and search for <b>Omarchy Notes</b>. Optional: put Quick Note on <kbd>Super</kbd> <kbd>Alt</kbd> <kbd>N</kbd>. This checks your existing key bindings first and never overwrites one:</p>
           <div class="command"><span class="prompt">$</span><code id="hypr-cmd">omarchy-notes --setup-hyprland</code><button class="copy" type="button" data-copy="hypr-cmd">Copy</button></div>
+        </div>
+        <div class="step">
+          <h3>Update or remove it</h3>
+          <p>Direct release downloads need manual updates: install the newer package from <a href="https://github.com/last-refuge/omarchy-notes/releases/latest">GitHub Releases</a> with <code>sudo pacman -U /path/to/package.pkg.tar.zst</code>. Download <code>SHA256SUMS</code> from the same release to verify the package; the <a href="https://github.com/last-refuge/omarchy-notes#updates-and-removal">README explains the check</a>.</p>
+          <p>Remove it through <b>Remove → Package</b> or <code>omarchy pkg drop omarchy-notes</code>. Your notes and attachments stay in <code>~/.local/share/omarchy-notes/</code>.</p>
         </div>
         <div class="step">
           <h3>Or build it yourself</h3>

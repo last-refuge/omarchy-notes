@@ -38,23 +38,44 @@ jobs:
   arch-package:
     runs-on: ubuntu-latest
     container: archlinux:latest
-    timeout-minutes: 30
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        channel: [stable, edge]
     steps:
+      - name: Select Omarchy dependency snapshot
+        env:
+          CHANNEL: ${{ matrix.channel }}
+        run: |
+          if [[ "$CHANNEL" == stable ]]; then
+            mirror=stable-mirror.omarchy.org
+          else
+            mirror=mirror.omarchy.org
+          fi
+          printf 'Server = https://%s/$repo/os/$arch\n' "$mirror" > /etc/pacman.d/mirrorlist
+          # The container image may be newer than stable. Downgrade as well as
+          # upgrade to keep every dependency on the selected snapshot.
+          pacman -Syyuu --noconfirm
       - name: Install packaging tools
-        run: pacman -Syu --noconfirm base-devel git namcap python sudo
+        run: pacman -S --noconfirm base-devel git namcap python sudo appstream desktop-file-utils ttf-dejavu
       - uses: actions/checkout@v4
-      - name: Prepare source and AUR files
+      - name: Prepare source and Omarchy packaging files
         run: |
           useradd --create-home builder
           echo 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
           chmod 440 /etc/sudoers.d/builder
           chown -R builder:builder "$GITHUB_WORKSPACE"
           runuser -u builder -- git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          runuser -u builder -- python3 packaging/prepare-release.py --ref HEAD --output build-aur-ci
+          runuser -u builder -- python3 packaging/prepare-release.py --ref HEAD --output build-arch-ci
       # A systemd-nspawn chroot (extra-x86_64-build) can't run inside the
       # job container; the container itself is fresh, and --syncdeps installs
       # only the dependencies the PKGBUILD declares.
-      - name: Build the package from the AUR files
-        run: runuser -u builder -- bash -c 'cd build-aur-ci/aur && makepkg --syncdeps --noconfirm --cleanbuild'
+      - name: Build the source package
+        run: runuser -u builder -- bash -c 'cd build-arch-ci/arch && makepkg --syncdeps --noconfirm --cleanbuild'
       - name: Validate package contents and dependencies
-        run: ./tests/check-arch-package.sh build-aur-ci/aur
+        run: ./tests/check-arch-package.sh build-arch-ci/arch
+      - name: Verify installed package lifecycle
+        run: ./tests/test-package-lifecycle.sh build-arch-ci/arch
+      - name: Record tested dependency versions
+        run: pacman -Q glibc qt6-base qt6-declarative qt6-wayland sqlite

@@ -32,9 +32,10 @@ jobs:
       - name: Prepare and validate release artifacts
         run: |
           runuser -u builder -- python3 packaging/prepare-release.py --ref "$GITHUB_REF_NAME" --output dist
-          runuser -u builder -- bash -c 'cd dist/aur && makepkg --noconfirm --cleanbuild'
-          ./tests/check-arch-package.sh dist/aur
-          cp dist/aur/omarchy-notes-*.pkg.tar.zst dist/
+          runuser -u builder -- bash -c 'cd dist/arch && makepkg --syncdeps --noconfirm --cleanbuild'
+          ./tests/check-arch-package.sh dist/arch
+          ./tests/test-package-lifecycle.sh dist/arch
+          cp dist/arch/omarchy-notes-*.pkg.tar.zst dist/
           cd dist
           sha256sum ./*.tar.gz ./*.pkg.tar.zst SOURCE_REVISION > SHA256SUMS
       - name: Write release notes from the changelog

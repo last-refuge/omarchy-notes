@@ -5,6 +5,16 @@ All notable changes to Omarchy Notes are documented here. The project uses
 
 ## [Unreleased]
 
+### Changed
+
+- Prepare source packaging and release-watch metadata for the Omarchy package
+  repository, with stable and edge dependency validation and installed-package
+  upgrade, removal, and reinstall checks.
+- Require the Wayland platform plugin and attachment-opening tools in the Arch
+  package. Initial repository packaging targets x86_64; aarch64 validation is pending.
+- Document release-download updates and data-preserving removal while repository
+  inclusion is pending.
+
 ## [1.0.0] - 2026-09-23
 
 ### Added
