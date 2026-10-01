@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "all-caps-body",
+        "value": "*",
+        "files": [
+          "docs/index.html"
+        ],
+        "createdAt": "2026-10-01T15:06:50.480Z",
+        "reason": "Agent: text-transform uppercase is confined to .eyebrow section labels and a short product descriptor; body paragraphs remain sentence case."
+      }
+    ]
+  }
+}
