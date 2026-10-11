@@ -51,7 +51,72 @@ The idea is simple: Apple Notes' easy note-taking, on Linux. Open it, start typi
 
 ## 🚀 Install
 
-**From the latest release** (on Omarchy or any Arch system):
+On **Omarchy or Arch Linux**, run the installer as your normal user:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/last-refuge/omarchy-notes/master/install.sh | bash
+```
+
+It finds the latest published release, checks the package checksum and identity,
+and installs it through pacman with clear progress. It asks for administrator
+access for package changes and offers optional Quick Note setup on compatible
+Omarchy installations.
+
+Then press <kbd>Super</kbd> + <kbd>Space</kbd> and search for **Omarchy Notes**.
+
+### Preview the installation or inspect the script
+
+Download the script to read it and preview what it will do:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/last-refuge/omarchy-notes/master/install.sh -o install.sh
+less install.sh
+bash install.sh --dry-run
+bash install.sh
+```
+
+If you've already cloned this repository, run `bash install.sh` from its root.
+
+### Installer options
+
+Choose a release, build it from source, or explicitly enable Quick Note:
+
+```bash
+bash install.sh --version v1.0.0
+bash install.sh --source
+bash install.sh --quick-note
+```
+
+| Option | What it does |
+|---|---|
+| `--version TAG` | Install a specific published release, such as `v1.0.0` |
+| `--source` | Build the selected release with makepkg, then install the package through pacman |
+| `--dry-run` | Inspect the release and show the plan without installing or changing configuration |
+| `--quick-note` | Set up the Quick Note key and floating window rule on compatible Omarchy installations |
+| `--no-quick-note` | Skip Quick Note setup |
+| `--yes` | Accept package installation without confirmation; unattended runs need noninteractive sudo access |
+| `--help` | Show installer help |
+
+`--yes` alone never enables Quick Note. Use `NO_COLOR=1 bash install.sh` for plain
+output. Failures leave a log at the printed path. Binary downloads never switch
+to a source build automatically; choose `--source` when you want to build.
+
+Run the installer again to update. Your notes and running window are preserved;
+close and reopen Notes normally after updating. To remove the app while keeping
+your notes:
+
+```bash
+sudo pacman -R omarchy-notes
+```
+
+> [!NOTE]
+> The installer is currently distributed from this repository. Future releases
+> will also include it as a downloadable asset; v1.0.0 has no installer asset.
+> The script can install the existing v1.0.0 package.
+
+### Direct package installation
+
+You can also install the **v1.0.0 x86_64 package** directly:
 
 ```bash
 sudo pacman -U https://github.com/last-refuge/omarchy-notes/releases/download/v1.0.0/omarchy-notes-1.0.0-1-x86_64.pkg.tar.zst
@@ -60,14 +125,16 @@ sudo pacman -U https://github.com/last-refuge/omarchy-notes/releases/download/v1
 > [!NOTE]
 > **Coming soon to the AUR.** The AUR has paused new account sign-ups while it deals with a wave of automated registrations. Omarchy Notes will be published there as soon as registration reopens, and then `yay -S omarchy-notes` will work too. Until then, the package above is the same one the AUR recipe builds.
 
-Then press <kbd>Super</kbd> + <kbd>Space</kbd> and search for **Omarchy Notes**.
-
 ### Building from source
+
+For a release package on Arch, use `bash install.sh --source`. To build a user-local
+copy yourself, follow the steps below. Other Linux systems need equivalent build
+tools, Qt 6.8 or newer, and SQLite.
 
 **1. Install the build tools:**
 
 ```bash
-sudo pacman -S --needed qt6-base qt6-declarative qt6-wayland qt6-svg sqlite cmake ninja gcc
+sudo pacman -S --needed qt6-base qt6-declarative qt6-wayland qt6-svg sqlite cmake ninja gcc pkgconf
 ```
 
 **2. Build and install it for your user:**

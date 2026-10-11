@@ -5,6 +5,25 @@ on:
   pull_request:
 
 jobs:
+  installer:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    timeout-minutes: 5
+    steps:
+      - name: Install installer test tools
+        run: pacman -Syu --noconfirm bash curl python shellcheck sudo util-linux
+      - uses: actions/checkout@v4
+      - name: Create unprivileged test user
+        run: |
+          useradd --create-home builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+      - name: Check installer syntax and lint
+        run: |
+          bash -n install.sh tests/test-installer.sh tests/test-installer-package.sh
+          shellcheck install.sh tests/test-installer.sh tests/test-installer-package.sh
+      - name: Test installer without network or system changes
+        run: runuser -u builder -- ./tests/test-installer.sh
+
   build-and-test:
     runs-on: ubuntu-latest
     container: archlinux:latest
@@ -41,7 +60,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Install packaging tools
-        run: pacman -Syu --noconfirm base-devel git namcap python sudo
+        run: pacman -Syu --noconfirm base-devel curl git namcap python ripgrep sudo util-linux
       - uses: actions/checkout@v4
       - name: Prepare source and AUR files
         run: |
@@ -58,3 +77,5 @@ jobs:
         run: runuser -u builder -- bash -c 'cd build-aur-ci/aur && makepkg --syncdeps --noconfirm --cleanbuild'
       - name: Validate package contents and dependencies
         run: ./tests/check-arch-package.sh build-aur-ci/aur
+      - name: Install and verify through the installer in the disposable container
+        run: runuser -u builder -- ./tests/test-installer-package.sh build-aur-ci/aur

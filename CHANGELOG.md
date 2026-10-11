@@ -5,6 +5,11 @@ All notable changes to Omarchy Notes are documented here. The project uses
 
 ## [Unreleased]
 
+### Added
+
+- Command-line installer with formatted progress, verified Arch release
+  packages, explicit source builds, dry runs, and opt-in Quick Note setup.
+
 ## [1.0.0] - 2026-09-23
 
 ### Added

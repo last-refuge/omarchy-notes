@@ -289,6 +289,15 @@
           <p class="note"><b>Coming soon to the AUR.</b> The AUR has paused new account sign-ups while it deals with a wave of automated registrations. Omarchy Notes will be published there as soon as registration reopens, and then <code>yay -S omarchy-notes</code> will work too.</p>
         </div>
         <div class="step">
+          <h3>Install with guided progress</h3>
+          <p>The checkout installer checks release checksums, shows progress, and offers optional Quick Note setup. Download and inspect it, then run it as your normal user:</p>
+<pre class="block">curl -fsSL https://raw.githubusercontent.com/last-refuge/omarchy-notes/master/install.sh -o install.sh
+less install.sh
+bash install.sh --dry-run
+bash install.sh</pre>
+          <p class="note">Run it again to update. Use <code>--version v1.0.0</code> to choose a release or <code>--source</code> to build with makepkg. <code>--yes</code> accepts package installation; Quick Note requires <code>--quick-note</code> for unattended runs. Your notes are kept. The v1.0.0 release has no installer asset yet.</p>
+        </div>
+        <div class="step">
           <h3>Then open it</h3>
           <p>Press <kbd>Super</kbd> <kbd>Space</kbd> and search for <b>Omarchy Notes</b>. Optional: put Quick Note on <kbd>Super</kbd> <kbd>Alt</kbd> <kbd>N</kbd>. This checks your existing key bindings first and never overwrites one:</p>
           <div class="command"><span class="prompt">$</span><code id="hypr-cmd">omarchy-notes --setup-hyprland</code><button class="copy" type="button" data-copy="hypr-cmd">Copy</button></div>
