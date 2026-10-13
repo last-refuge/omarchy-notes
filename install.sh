@@ -12,18 +12,17 @@ Omarchy Notes installer. A place for your thoughts.
 Installs a verified release package on Omarchy or Arch Linux.
 Run again to update. Your notes and running application are kept.
 
-  --version TAG       select a published release (for example v1.0.0)
-  --edition qt|rust    choose the edition (default: qt; Rust is separate)
-  --source            build the selected release with makepkg as your user
+  --version TAG       select a published Rust release (for example rust-v1.0.0)
+  --source            build the selected Rust release with makepkg as your user
   --yes, -y           accept package installation without confirmation
   --dry-run           inspect the release and show the plan without installing
-  --quick-note        opt in to the Quick Note key and floating window rule
+  --quick-note        show manual Quick Note setup instructions
   --no-quick-note     skip Quick Note setup
   --help, -h          show this help
 
 Without a terminal, installation requires --yes and noninteractive sudo access.
 --yes alone never enables Quick Note. NO_COLOR disables color and animation.
-Other Linux systems: see the README for building with CMake into ~/.local.
+Other Linux systems: see the README for building with Cargo.
 USAGE
 }
 
@@ -197,18 +196,18 @@ build_source() {
 }
 
 finish() {
-  local binary='' preview_alias='' package_name path count=0 alias_count=0 output shadow config data
+  local binary='' preview_alias='' package_name path count=0 alias_count=0 output shadow data
   pacman -Ql "$PACKAGE_NAME" </dev/null >"$WORK/installed-files" 2>>"$LOG" || die 'Installed package file list is unavailable.'
   while read -r package_name path; do
     if [[ $package_name == "$PACKAGE_NAME" && $path == /*/bin/"$EXECUTABLE" ]]; then
       binary=$path; count=$((count + 1))
     fi
-    if [[ $EDITION == rust && $package_name == "$PACKAGE_NAME" && $path == /*/bin/omarchy-notes-preview ]]; then
+    if [[ $package_name == "$PACKAGE_NAME" && $path == /*/bin/omarchy-notes-preview ]]; then
       preview_alias=$path; alias_count=$((alias_count + 1))
     fi
   done <"$WORK/installed-files"
   (( count == 1 )) && [[ -x $binary ]] || die 'The installed application executable is missing or ambiguous.'
-  output=$(env -u QT_QPA_PLATFORMTHEME QT_QPA_PLATFORM=offscreen "$binary" --version </dev/null 2>>"$LOG") ||
+  output=$("$binary" --version </dev/null 2>>"$LOG") ||
     die 'Package installed, but application verification failed. See the log before launching it.'
   [[ $output == "$EXECUTABLE $VERSION" ]] || die "Installed application reports an unexpected version: $output."
   ok "Application verified $BULLET $output"
@@ -217,40 +216,18 @@ finish() {
     warn "An older or separate copy at $shadow takes precedence on PATH."
     note "Use $binary for the package version; move the older copy aside when ready."
   fi
-  if [[ $EDITION == rust ]]; then
-    (( alias_count == 1 )) && [[ -x $preview_alias ]] || die 'The package-owned preview compatibility launcher is missing or ambiguous.'
-    output=$("$preview_alias" --version </dev/null 2>>"$LOG") || die 'The preview compatibility launcher could not execute Rust.'
-    [[ $output == "$EXECUTABLE $VERSION" ]] || die "The preview compatibility launcher reports an unexpected version: $output."
-    shadow=$(command -v omarchy-notes-preview || true)
-    if [[ -n $shadow && $(readlink -f -- "$shadow") != "$(readlink -f -- "$preview_alias")" ]]; then
-      warn "An older preview at $shadow takes precedence on PATH; move that specific copy aside when ready."
-    fi
+  (( alias_count == 1 )) && [[ -x $preview_alias ]] || die 'The package-owned preview compatibility launcher is missing or ambiguous.'
+  output=$("$preview_alias" --version </dev/null 2>>"$LOG") || die 'The preview compatibility launcher could not execute Rust.'
+  [[ $output == "$EXECUTABLE $VERSION" ]] || die "The preview compatibility launcher reports an unexpected version: $output."
+  shadow=$(command -v omarchy-notes-preview || true)
+  if [[ -n $shadow && $(readlink -f -- "$shadow") != "$(readlink -f -- "$preview_alias")" ]]; then
+    warn "An older preview at $shadow takes precedence on PATH; move that specific copy aside when ready."
   fi
-  config=${XDG_CONFIG_HOME:-$HOME/.config}
-  if [[ $EDITION == rust ]]; then
-    if [[ $QUICK == yes ]]; then
-      note 'Rust Quick Note is available in the desktop launcher or with omarchy-notes-rust --quick-note.'
-      note 'Automatic Rust compositor setup is not implemented; use the distinct-key instructions in docs/rust-release.md. No bindings were changed.'
-    fi
-  elif (( IS_OMARCHY )) && [[ -f $config/hypr/bindings.lua && -f $config/hypr/hyprland.lua ]]; then
-    if [[ $QUICK == ask ]] && (( HAVE_TTY && ! YES )); then
-      if confirm 'Set up Quick Note with Super + Alt + N?' y/N; then QUICK=yes; fi
-    fi
-    if [[ $QUICK == yes ]]; then
-      if env -u QT_QPA_PLATFORMTHEME QT_QPA_PLATFORM=offscreen "$binary" --setup-hyprland </dev/null >"$WORK/quick-note" 2>>"$LOG"; then
-        ok 'Quick Note setup complete'
-      else
-        warn 'Notes is installed. Quick Note setup needs attention (the key may already be taken).'
-        RETAIN_LOG=1
-        note "Setup log: $LOG"
-      fi
-      tee -a "$LOG" <"$WORK/quick-note"
-    fi
-  elif [[ $QUICK == yes ]]; then
-    warn 'Notes is installed. Quick Note setup requires compatible Omarchy Lua configuration.'
+  if [[ $QUICK == yes ]]; then
+    note 'Rust Quick Note is available in the desktop launcher or with omarchy-notes-rust --quick-note.'
+    note 'Automatic Rust compositor setup is not implemented; use the distinct-key instructions in docs/rust-release.md. No bindings were changed.'
   fi
-  if [[ $EDITION == rust ]]; then data=${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-notes-gpui
-  else data=${OMARCHY_NOTES_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-notes}; fi
+  data=${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-notes-gpui
   [[ $data == /* ]] || data=$PWD/$data
   printf '\n  %sReady to write%s\n' "$BOLD" "$RESET"
   if (( IS_OMARCHY )); then printf '     Super + Space, then type "%s"\n' "$DISPLAY_NAME"; fi
@@ -265,7 +242,7 @@ finish() {
 
 main() {
   presentation
-  YES=0; DRY=0; SOURCE=0; QUICK=ask; TAG=''; EDITION=qt; WORK=''; LOG=''; ACTIVE_PID=''; RETAIN_LOG=0
+  YES=0; DRY=0; SOURCE=0; QUICK=no; TAG=''; WORK=''; LOG=''; ACTIVE_PID=''; RETAIN_LOG=0
   local quick_option='' option
   while (( $# )); do
     option=$1
@@ -274,8 +251,6 @@ main() {
       --yes|-y) YES=1 ;;
       --dry-run) DRY=1 ;;
       --source) SOURCE=1 ;;
-      --edition) shift; (( $# )) || die '--edition requires qt or rust.'; EDITION=$1 ;;
-      --edition=*) EDITION=${option#*=} ;;
       --version) shift; (( $# )) && [[ -n $1 ]] || die '--version requires a release tag.'; TAG=$1 ;;
       --version=*) TAG=${option#*=}; [[ -n $TAG ]] || die '--version requires a release tag.' ;;
       --quick-note|--no-quick-note)
@@ -286,12 +261,8 @@ main() {
     esac
     shift
   done
-  case "$EDITION" in
-    qt) PACKAGE_NAME=omarchy-notes; EXECUTABLE=omarchy-notes; TAG_PREFIX=v; DISPLAY_NAME='Omarchy Notes' ;;
-    rust) PACKAGE_NAME=omarchy-notes-rust; EXECUTABLE=omarchy-notes-rust; TAG_PREFIX=rust-v; DISPLAY_NAME='Omarchy Notes (Rust)' ;;
-    *) die '--edition must be qt or rust.' ;;
-  esac
-  [[ -z $TAG || $TAG =~ ^${TAG_PREFIX}[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "--version must be a stable release tag for $EDITION such as ${TAG_PREFIX}1.0.0."
+  PACKAGE_NAME=omarchy-notes-rust; EXECUTABLE=omarchy-notes-rust; TAG_PREFIX=rust-v; DISPLAY_NAME='Omarchy Notes (Rust)'
+  [[ -z $TAG || $TAG =~ ^${TAG_PREFIX}[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "--version must be a stable Rust release tag such as ${TAG_PREFIX}1.0.0."
   HAVE_TTY=0
   if ( : </dev/tty ) 2>/dev/null; then HAVE_TTY=1; fi
   if (( ! DRY )); then
@@ -301,10 +272,9 @@ main() {
   [[ $(uname -s) == Linux ]] || die 'This installer supports Linux. See the README for build instructions.'
   IS_OMARCHY=0
   if [[ -d /usr/share/omarchy ]] || command -v omarchy >/dev/null 2>&1; then IS_OMARCHY=1; fi
-  [[ -f /etc/arch-release ]] || die 'This installer supports Omarchy and Arch Linux. See the README for a CMake build.'
+  [[ -f /etc/arch-release ]] || die 'This installer supports Omarchy and Arch Linux. See the README for a Cargo build.'
   ARCH=$(uname -m)
-  [[ $ARCH == x86_64 || $ARCH == aarch64 ]] || die "Unsupported architecture: $ARCH. See the README for building with CMake."
-  [[ $EDITION != rust || $ARCH == x86_64 ]] || die 'The Rust edition currently supports x86_64 only.'
+  [[ $ARCH == x86_64 ]] || die "Unsupported architecture: $ARCH. Rust currently supports x86_64 only."
   local tool
   for tool in curl sha256sum pacman setsid mktemp awk sed tail readlink python3; do
     command -v "$tool" >/dev/null || die "Missing prerequisite: $tool. Install it and try again."
@@ -353,11 +323,8 @@ PY
     die "Could not download checksums for $TAG. Check that the release exists and the network is available."
   read_manifest
   PACMAN_FLAGS=(); (( ! YES )) || PACMAN_FLAGS+=(--noconfirm)
-  BUILD_DEPS=(base-devel cmake ninja pkgconf qt6-base qt6-declarative qt6-svg sqlite)
-  if [[ $EDITION == rust ]]; then
-    BUILD_DEPS=(base-devel rustup clang cmake pkgconf git vulkan-headers python glib2 cairo pango libxcb
-      libxkbcommon libxkbcommon-x11 wayland vulkan-icd-loader hicolor-icon-theme noto-fonts-cjk noto-fonts-emoji xdg-desktop-portal xdg-utils)
-  fi
+  BUILD_DEPS=(base-devel rustup clang cmake pkgconf git vulkan-headers python glib2 cairo pango libxcb
+    libxkbcommon libxkbcommon-x11 wayland vulkan-icd-loader hicolor-icon-theme noto-fonts-cjk noto-fonts-emoji xdg-desktop-portal xdg-utils)
   local recipe='' recipe_hash='' source='' source_hash='' installed=''
   if (( SOURCE )); then
     select_asset "^${PACKAGE_NAME}-${version_pattern}-aur\\.tar\\.gz$" 'AUR recipe'
@@ -382,10 +349,8 @@ PY
       note "Would download and verify $ASSET, and check its package identity."
     fi
     if (( SOURCE )) || [[ $installed != "$PACKAGE_NAME $PACKAGE_VERSION" ]]; then note 'Would run sudo pacman -U <verified-package>.'; fi
-    note 'Would verify the package-owned executable with off-screen --version.'
-    if [[ $QUICK == yes && $EDITION == rust ]]; then note 'Would show the Rust desktop Quick Note action and manual distinct-key setup instructions.'
-    elif [[ $QUICK == yes ]]; then note 'Would set up Quick Note on compatible Omarchy configuration.'
-    elif [[ $EDITION == qt && $QUICK == ask ]] && (( IS_OMARCHY && ! YES )); then note 'Would offer optional Quick Note setup in an interactive terminal.'; fi
+    note 'Would verify the package-owned executable with --version.'
+    if [[ $QUICK == yes ]]; then note 'Would show the Rust desktop Quick Note action and manual distinct-key setup instructions.'; fi
     printf '\n'; return 0
   fi
   if (( SOURCE )) || [[ $installed != "$PACKAGE_NAME $PACKAGE_VERSION" ]]; then

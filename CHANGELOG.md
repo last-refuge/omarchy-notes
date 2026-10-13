@@ -5,6 +5,16 @@ All notable changes to Omarchy Notes are documented here. The project uses
 
 ## [Unreleased]
 
+### Changed
+
+- Rust/GPUI is now the only app implementation and installer target. Existing
+  Rust executable names and data directories remain unchanged.
+
+### Removed
+
+- Retired Qt/C++/QML app, CMake build, Qt packages and live Qt test probes.
+  Frozen legacy library fixtures remain for Rust migration regression tests.
+
 ### Added
 
 - Command-line installer with formatted progress, verified Arch release

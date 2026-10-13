@@ -24,7 +24,7 @@ import time
 import unittest
 
 INSTALLER = Path(sys.argv.pop(1)).resolve()
-PACKAGE = "omarchy-notes-1.0.0-1-x86_64.pkg.tar.zst"
+PACKAGE = "omarchy-notes-rust-1.0.0-1-x86_64.pkg.tar.zst"
 REPO = "https://github.com/last-refuge/omarchy-notes"
 RELEASES_API = "https://api.github.com/repos/last-refuge/omarchy-notes/releases?per_page=100"
 
@@ -32,7 +32,7 @@ SHIM = r'''#!/usr/bin/env python3
 import json, os, pathlib, subprocess, sys, time
 root = pathlib.Path(os.environ["MOCK_ROOT"])
 cfg = json.loads((root / "config.json").read_text())
-package = cfg.get("package", "omarchy-notes")
+package = cfg.get("package", "omarchy-notes-rust")
 version = cfg.get("version", "1.0.0")
 name = pathlib.Path(sys.argv[0]).name
 args = sys.argv[1:]
@@ -54,7 +54,7 @@ elif name == "curl":
     if cfg.get("fail_asset") == asset or (url.startswith("https://api.github.com/") and cfg.get("fail_asset") == "latest"):
         fail("curl: simulated HTTP 404 / network failure", 22)
     if url.startswith("https://api.github.com/"):
-        tag = cfg.get("latest_url", "https://github.com/last-refuge/omarchy-notes/releases/tag/v1.0.0").rsplit("/",1)[-1]
+        tag = cfg.get("latest_url", "https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.0.0").rsplit("/",1)[-1]
         data = json.dumps(cfg.get("releases", [{"tag_name":tag,"published_at":"2026-10-13T00:00:00Z","draft":False,"prerelease":False}])).encode()
         pathlib.Path(args[args.index("--output") + 1]).write_bytes(data)
     else:
@@ -95,16 +95,10 @@ elif name == "makepkg":
     destination = pathlib.Path(os.environ["PKGDEST"])
     (destination / f"{package}-{version}-1-x86_64.pkg.tar.zst").write_bytes(b"built package")
     (destination / f"{package}-debug-{version}-1-x86_64.pkg.tar.zst").write_bytes(b"debug")
-elif name in ("omarchy-notes", "omarchy-notes-rust"):
+elif name == "omarchy-notes-rust":
     if args == ["--version"]:
-        if name == "omarchy-notes" and os.environ.get("QT_QPA_PLATFORM") != "offscreen": fail("not off-screen")
-        if cfg.get("fail_verify"): fail("simulated Qt failure")
+        if cfg.get("fail_verify"): fail("simulated application failure")
         print(cfg.get("app_version", name + " " + version))
-    elif args == ["--setup-hyprland"]:
-        if cfg.get("quick_conflict"):
-            print("Super + Alt + N is already bound, so nothing was changed.")
-            sys.exit(1)
-        print("Added Quick Note; backups saved.")
     else: fail("unexpected app arguments")
 elif name == "omarchy":
     fail("installer must not run omarchy commands")
@@ -124,7 +118,6 @@ class InstallerTests(unittest.TestCase):
         shim.chmod(0o755)
         for name in ("curl", "sudo", "pacman", "uname", "makepkg", "omarchy"):
             (self.root / "bin" / name).symlink_to(shim)
-        (self.root / "system/bin/omarchy-notes").symlink_to(shim)
         (self.root / "system/bin/omarchy-notes-rust").symlink_to(shim)
         alias = self.root / "system/bin/omarchy-notes-preview"
         alias.write_text('#!/bin/sh\nexec "' + str(self.root / "system/bin/omarchy-notes-rust") + '" "$@"\n')
@@ -134,9 +127,9 @@ class InstallerTests(unittest.TestCase):
         (self.root / "config/hypr/hyprland.lua").write_text("-- sentinel rule\n")
         (self.root / "data/omarchy-notes/library.sqlite3").write_bytes(b"untouched notes")
         (self.root / "assets" / PACKAGE).write_bytes(b"release package")
-        (self.root / "assets" / PACKAGE.replace("omarchy-notes-", "omarchy-notes-debug-")).write_bytes(b"debug")
-        self.archive("omarchy-notes-1.0.0-aur.tar.gz", {"aur/PKGBUILD": "pkgname=omarchy-notes\n", "aur/.SRCINFO": "pkgname = omarchy-notes\n"})
-        self.archive("omarchy-notes-1.0.0.tar.gz", {"omarchy-notes-1.0.0/CMakeLists.txt": "source"})
+        (self.root / "assets" / PACKAGE.replace("omarchy-notes-rust-", "omarchy-notes-rust-debug-")).write_bytes(b"debug")
+        self.archive("omarchy-notes-rust-1.0.0-aur.tar.gz", {"aur/PKGBUILD": "pkgname=omarchy-notes-rust\n", "aur/.SRCINFO": "pkgname = omarchy-notes-rust\n"})
+        self.archive("omarchy-notes-rust-1.0.0.tar.gz", {"omarchy-notes-rust-1.0.0/Cargo.toml": "source"})
         self.manifest()
         self.env = dict(os.environ, MOCK_ROOT=str(self.root), HOME=str(self.root / "home"),
                         XDG_CONFIG_HOME=str(self.root / "config"), XDG_DATA_HOME=str(self.root / "data"),
@@ -192,25 +185,25 @@ class InstallerTests(unittest.TestCase):
         self.assert_success(result)
         self.assertIn("Application verified", result.stdout)
         self.assertIn("pacman transaction visible", result.stdout)
-        self.assertIn(str(self.root / "data/omarchy-notes"), result.stdout)
+        self.assertIn(str(self.root / "data/omarchy-notes-gpui"), result.stdout)
         self.assertEqual(len(self.mutations()), 1)
         self.assertIn("--noconfirm", self.mutations()[0])
-        self.assertEqual(self.calls("omarchy-notes"), [["--version"]])
+        self.assertEqual(self.calls("omarchy-notes-rust"), [["--version"], ["--version"]])
         self.assertEqual((self.root / "data/omarchy-notes/library.sqlite3").read_bytes(), b"untouched notes")
         self.assertEqual((self.root / "config/hypr/bindings.lua").read_text(), "-- sentinel binding\n")
         self.assertEqual(list((self.root / "tmp").iterdir()), [])
         self.assertNotIn("\x1b", result.stdout)
         urls = [args[-1] for args in self.calls("curl")]
         self.assertEqual(urls.count(RELEASES_API), 1)
-        self.assertTrue(all("/download/v1.0.0/" in url for url in urls[1:]))
+        self.assertTrue(all("/download/rust-v1.0.0/" in url for url in urls[1:]))
         self.assertFalse(any("debug" in url for url in urls))
 
     def test_upgrade_and_already_installed(self):
-        (self.root / "installed").write_text("0.9.0-1")
-        self.assert_success(self.run_installer("--yes", "--version", "v1.0.0"))
+        (self.root / "installed-rust").write_text("0.9.0-1")
+        self.assert_success(self.run_installer("--yes", "--version", "rust-v1.0.0"))
         self.assertEqual(len(self.mutations()), 1)
         (self.root / "calls.jsonl").unlink()
-        result = self.run_installer("--yes", "--version=v1.0.0")
+        result = self.run_installer("--yes", "--version=rust-v1.0.0")
         self.assert_success(result)
         self.assertIn("already installed", result.stdout)
         self.assertEqual(self.mutations(), [])
@@ -221,7 +214,7 @@ class InstallerTests(unittest.TestCase):
             self.assert_success(self.run_installer(*args))
         self.assertEqual(self.mutations(), [])
         self.assertEqual(self.calls("sudo"), [])
-        self.assertEqual(self.calls("omarchy-notes"), [])
+        self.assertEqual(self.calls("omarchy-notes-rust"), [])
         self.assertEqual(self.calls("makepkg"), [])
         self.assertEqual(list((self.root / "tmp").iterdir()), [])
 
@@ -229,7 +222,7 @@ class InstallerTests(unittest.TestCase):
         for args, message in (((), "No interactive terminal"),
                               (("--version",), "requires a release tag"),
                               (("--version=", "--yes"), "requires a release tag"),
-                              (("--version", "../bad", "--yes"), "stable release tag"),
+                              (("--version", "../bad", "--yes"), "stable Rust release tag"),
                               (("--quick-note", "--no-quick-note"), "Choose either"),
                               (("--wat",), "Unknown option")):
             self.assert_failure(self.run_installer(*args), message)
@@ -240,7 +233,7 @@ class InstallerTests(unittest.TestCase):
         self.config["arch"] = "riscv64"
         self.assert_failure(self.run_installer("--yes"), "Unsupported architecture")
         self.config["arch"] = "aarch64"
-        self.assert_failure(self.run_installer("--yes"), "No aarch64 application package")
+        self.assert_failure(self.run_installer("--yes"), "x86_64 only")
         self.config["os"] = "Darwin"
         self.assert_failure(self.run_installer("--yes"), "supports Linux")
         self.assertEqual(self.mutations(), [])
@@ -253,7 +246,7 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(self.calls("makepkg"), [])
 
     def test_unsupported_release_redirect(self):
-        self.config["latest_url"] = REPO + "/releases/tag/v1.1.0-beta"
+        self.config["latest_url"] = REPO + "/releases/tag/rust-v1.1.0-beta"
         self.assert_failure(self.run_installer("--yes"), "No supported published release")
         self.assertEqual(self.mutations(), [])
 
@@ -292,43 +285,47 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(self.calls("sudo")[0][0], "-n")
         self.config = {"deny_pacman": True}
         self.assert_failure(self.run_installer("--yes"), "pacman could not install")
-        self.assertFalse((self.root / "installed").exists())
+        self.assertFalse((self.root / "installed-rust").exists())
 
     def test_post_install_verification_failure(self):
         self.config["fail_verify"] = True
         self.assert_failure(self.run_installer("--yes"), "application verification failed")
-        self.assertTrue((self.root / "installed").exists())
-        self.assertEqual(self.calls("omarchy-notes"), [["--version"]])
+        self.assertTrue((self.root / "installed-rust").exists())
+        self.assertEqual(self.calls("omarchy-notes-rust"), [["--version"]])
 
-    def test_quick_note_explicit_opt_in_and_conflict(self):
-        self.config["quick_conflict"] = True
+    def test_missing_preview_alias_is_refused(self):
+        (self.root / "system/bin/omarchy-notes-preview").unlink()
+        self.assert_failure(self.run_installer("--yes"), "compatibility launcher is missing")
+
+    def test_wrong_executable_version_is_refused(self):
+        self.config["app_version"] = "omarchy-notes 1.0.0"
+        self.assert_failure(self.run_installer("--yes"), "unexpected version")
+
+    def test_quick_note_explicit_opt_in_is_manual(self):
         result = self.run_installer("--yes", "--quick-note")
         self.assert_success(result)
-        self.assertIn("Quick Note setup needs attention", result.stdout)
-        self.assertIn("already bound", result.stdout)
-        self.assertEqual(self.calls("omarchy-notes"), [["--version"], ["--setup-hyprland"]])
-        logs = list((self.root / "tmp").glob("*.log"))
-        self.assertEqual(len(logs), 1)
-        self.assertIn("already bound", logs[0].read_text())
+        self.assertIn("No bindings were changed", result.stdout)
+        self.assertEqual(self.calls("omarchy-notes-rust"), [["--version"], ["--version"]])
+        self.assertEqual((self.root / "config/hypr/bindings.lua").read_text(), "-- sentinel binding\n")
 
     def test_quick_note_skipped_and_incompatible(self):
         self.assert_success(self.run_installer("--yes", "--no-quick-note"))
         (self.root / "config/hypr/bindings.lua").unlink()
         result = self.run_installer("--yes", "--quick-note")
         self.assert_success(result)
-        self.assertIn("requires compatible", result.stdout)
-        self.assertFalse(any("--setup-hyprland" in args for args in self.calls("omarchy-notes")))
+        self.assertIn("No bindings were changed", result.stdout)
+        self.assertFalse(any("--setup-hyprland" in args for args in self.calls("omarchy-notes-rust")))
 
     def test_shadow_copy_and_data_override(self):
         # Different real path, rather than a symlink to the package-owned shim.
-        (self.root / "bin/omarchy-notes").write_text("#!/bin/sh\nexit 99\n")
-        (self.root / "bin/omarchy-notes").chmod(0o755)
-        self.env["OMARCHY_NOTES_DATA_DIR"] = str(self.root / "custom-library")
+        (self.root / "bin/omarchy-notes-rust").write_text("#!/bin/sh\nexit 99\n")
+        (self.root / "bin/omarchy-notes-rust").chmod(0o755)
+        self.env["XDG_DATA_HOME"] = str(self.root / "custom-library")
         result = self.run_installer("--yes")
         self.assert_success(result)
         self.assertIn("takes precedence on PATH", result.stdout)
         self.assertIn(str(self.root / "custom-library"), result.stdout)
-        self.assertTrue((self.root / "bin/omarchy-notes").exists())
+        self.assertTrue((self.root / "bin/omarchy-notes-rust").exists())
 
     def test_source_build(self):
         result = self.run_installer("--yes", "--source")
@@ -351,10 +348,10 @@ class InstallerTests(unittest.TestCase):
             {"tag_name":"rust-v8.0.0", "published_at":"2026-10-15T00:00:00Z", "draft":True},
         ]
 
-    def test_rust_edition_coexists_and_latest_selection_is_edition_filtered(self):
+    def test_legacy_data_preserved_and_latest_selection_is_rust_only(self):
         self.rust_release()
         (self.root / "installed").write_text("1.0.0-1")
-        result = self.run_installer("--yes", "--edition", "rust", "--quick-note")
+        result = self.run_installer("--yes", "--quick-note")
         self.assert_success(result)
         self.assertIn("rust-v0.1.0 selected", result.stdout)
         self.assertIn(str(self.root / "data/omarchy-notes-gpui"), result.stdout)
@@ -365,33 +362,28 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual((self.root / "data/omarchy-notes/library.sqlite3").read_bytes(), b"untouched notes")
         self.assertEqual((self.root / "config/hypr/bindings.lua").read_text(), "-- sentinel binding\n")
         self.assertTrue(all("/download/rust-v0.1.0/" in url[-1] for url in self.calls("curl")[1:]))
-        # The Qt default still selects its own release despite a newer Rust one.
-        self.config.pop("package"); self.config.pop("version")
-        result = self.run_installer("--yes", "--no-quick-note")
-        self.assert_success(result)
-        self.assertIn("Release v1.0.0 selected", result.stdout)
 
-    def test_cross_edition_tags_packages_and_architectures_are_refused(self):
+    def test_legacy_tags_options_packages_and_architectures_are_refused(self):
         self.rust_release()
-        self.assert_failure(self.run_installer("--yes", "--edition=rust", "--version=v1.0.0"), "stable release tag for rust")
-        self.assert_failure(self.run_installer("--yes", "--version=rust-v0.1.0"), "stable release tag for qt")
-        self.assert_failure(self.run_installer("--yes", "--edition=other"), "must be qt or rust")
+        self.assert_failure(self.run_installer("--yes", "--version=v1.0.0"), "stable Rust release tag")
+        for edition in ("qt", "rust", "other"):
+            self.assert_failure(self.run_installer("--yes", f"--edition={edition}"), "Unknown option")
         self.config["identity"] = "omarchy-notes 0.1.0-1"
-        self.assert_failure(self.run_installer("--yes", "--edition=rust"), "Unexpected package identity")
+        self.assert_failure(self.run_installer("--yes"), "Unexpected package identity")
         self.config["arch"] = "aarch64"
-        self.assert_failure(self.run_installer("--yes", "--edition=rust"), "x86_64 only")
+        self.assert_failure(self.run_installer("--yes"), "x86_64 only")
         self.assertEqual(self.mutations(), [])
 
-    def test_rust_source_route_selects_separate_recipe_and_dependencies(self):
+    def test_source_route_selects_rust_recipe_and_dependencies(self):
         self.rust_release()
-        self.assert_success(self.run_installer("--yes", "--source", "--edition=rust"))
+        self.assert_success(self.run_installer("--yes", "--source"))
         deps = next(args for args in self.mutations() if args[0] == "-S")
         self.assertIn("rustup", deps)
         self.assertNotIn("qt6-base", deps)
         self.assertEqual(self.calls("omarchy-notes-rust"), [["--version"], ["--version"]])
 
     def test_source_failures(self):
-        self.config["corrupt_asset"] = "omarchy-notes-1.0.0-aur.tar.gz"
+        self.config["corrupt_asset"] = "omarchy-notes-rust-1.0.0-aur.tar.gz"
         self.assert_failure(self.run_installer("--yes", "--source"), "Checksum failed")
         self.assertEqual(self.mutations(), [])
         self.config = {"fail_build": True}
@@ -399,7 +391,7 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual([args[0] for args in self.mutations()], ["-S"])
 
     def test_unexpected_recipe_path(self):
-        self.archive("omarchy-notes-1.0.0-aur.tar.gz", {"../escaped": "bad"})
+        self.archive("omarchy-notes-rust-1.0.0-aur.tar.gz", {"../escaped": "bad"})
         self.manifest()
         self.assert_failure(self.run_installer("--yes", "--source"), "Unexpected path")
         self.assertEqual(self.mutations(), [])
@@ -461,11 +453,11 @@ class InstallerTests(unittest.TestCase):
         return os.waitstatus_to_exitcode(status), output.decode(errors="replace")
 
     def test_interactive_prompts_and_narrow_terminal(self):
-        code, output = self.run_pty([], (("[Y/n]", "y"), ("[y/N]", "n")))
+        code, output = self.run_pty([], (("[Y/n]", "y"),))
         self.assertEqual(code, 0, output)
         self.assertIn("\x1b[38;2;126;156;216m", output)
         self.assertIn("\x1b[?25h", output)
-        self.assertFalse(any("--setup-hyprland" in args for args in self.calls("omarchy-notes")))
+        self.assertFalse(any("--setup-hyprland" in args for args in self.calls("omarchy-notes-rust")))
         self.assertNotIn("--noconfirm", self.mutations()[0])
         self.assertNotEqual(self.calls("sudo")[0][0], "-n")
         code, output = self.run_pty(["--yes"], columns=40)

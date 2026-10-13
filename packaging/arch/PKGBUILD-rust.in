@@ -1,5 +1,5 @@
 # Maintainer: Jason Alexander <jason@greatspark.com>
-# Generated from an immutable revision. Rust remains separate from the Qt package.
+# Generated from an immutable revision. Preserve the Rust executable identity.
 pkgname=omarchy-notes-rust
 pkgver=@RUST_VERSION@
 pkgrel=1

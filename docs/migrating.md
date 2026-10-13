@@ -1,43 +1,66 @@
 # Moving your notes into Omarchy Notes
 
-Omarchy Notes imports Markdown (`.md`) and plain-text (`.txt`) files, one at a time or as whole
-folders. Folders become folders, checklists stay checklists, tables stay tables, and images a
-note points to are copied into your library. Anything that can't come across (for example
-images hosted on the web) is listed after the import, never silently dropped.
+The current app is Rust-only. Qt is retired; compatibility with its library and
+backup formats exists for legacy migration, not as a supported installation route.
 
-Both options are in the **⋯** menu at the bottom of the folder list:
+## Markdown and text imports
 
-- **Import Markdown or Text…** for individual files
-- **Import a Folder of Notes…** for a whole exported library
+Open **Settings → Your notes and files → Import, export & backups** and choose
+Markdown/text files or a folder. Sources are never edited. Review counts and
+warnings before **Accept & import**. Folder structure and links between imported
+notes receive new identities; supported local assets are copied.
 
-## From Apple Notes
+Imports are bounded to 1,000 text files and 64 MiB of text and unique asset bytes.
+Symbolic links are refused, and local resources must be within the selected folder
+or file's parent. Missing/remote assets and unsupported formatting are reported
+before copying. Quotation content requires an explicit format upgrade with a
+verified backup. See [data ownership](rust-data-ownership.md) for exact boundaries.
 
-Apple Notes can't export to Markdown by itself, so use an exporter on your Mac first:
+### From Apple Notes
 
-1. Install **Exporter** (free) from the Mac App Store.
-2. Export all folders as **Markdown**. Exporter writes one folder per Notes folder, with
-   images alongside.
-3. Copy the exported folder to your Omarchy machine.
-4. In Omarchy Notes choose **Import a Folder of Notes…** and pick it.
+Use a Markdown exporter on your Mac, then copy its exported folders and assets to
+your Omarchy machine and import the folder. Exporter output varies: review warnings
+and check important notes after import. Unlock protected notes before export;
+drawings or scans need an exporter that includes their image files.
 
-Locked (password-protected) notes can't be exported by any tool; unlock them in Apple Notes
-first. Drawings and scanned documents come across as images.
+### From Obsidian, Logseq, Bear, Joplin and others
 
-## From Obsidian, Logseq, Bear or any Markdown folder
+Export to Markdown or select a copy of the Markdown folder. For Joplin, use
+**File → Export all → MD – Markdown**. Application-specific metadata and wiki links
+may not transfer as functional structures. Tags and Smart Folder interfaces are
+not implemented in Rust; do not expect `#tags` to create browsable tag filters.
+Review the supported formatting and asset warnings rather than assuming parity
+with the source app.
 
-Choose **Import a Folder of Notes…** and pick your vault or export folder. Front matter at the
-top of files is skipped, `#tags` in the text become tags, and GitHub-style task lists
-(`- [ ]`) become checklists. Wiki links (`[[Note]]`) come across as plain text.
+## From the retired Qt app
 
-## From Joplin, Standard Notes and others
+The former default library is `~/.local/share/omarchy-notes/`; the Rust profile
+remains `~/.local/share/omarchy-notes-gpui/`. Corresponding XDG overrides apply.
+Rust does not automatically open, rename or upgrade the former library, and does
+not import Qt's `settings.ini` as Rust preferences.
 
-Export to Markdown from the app (Joplin: **File → Export all → MD – Markdown**), then import the
-folder.
+1. Close any legacy app using the library and preserve a consistent copy plus a
+   verified backup. Never experiment on the only original.
+2. Open the copied compatible library with **Open Library** in Settings, or
+   `omarchy-notes-rust --data-dir /path/to/copied-library`. For a format-1 backup,
+   use **Inspect Backup**, then restore into a new directory.
+3. Check notes and assets. Existing tags/Smart Folder metadata, merged tables and
+   revisions are preserved, but their deferred interfaces do not become available.
+4. Enabling quotations explicitly upgrades to schema 3 and creates a verified
+   pre-upgrade backup. Legacy Qt cannot read the upgraded library. A legacy rollback
+   uses that backup and excludes later Rust edits; preserve the newer library and
+   back it up or export before any rollback.
+
+Only Rust owners provide the durable Rust capture/launch protocol. A legacy owner
+must close before Rust can acquire the same library. Legacy media clipboard data
+requires referenced assets already in the receiving library; cross-library rich
+media exchange with Qt is not supported.
 
 ## Leaving again
 
-You're never locked in. Use **Export All Notes as Markdown…** in the same menu to get a folder
-of Markdown files that mirrors your folders. Images and attachments are included, and links
-between notes become relative links. To move to another machine running Omarchy Notes, use
-**Back Up Library…** and **Restore from Backup…** instead: that keeps everything exactly as it
-is, including pins, Smart Folders and history.
+Use Settings to export a note as Markdown/HTML, or a library as Markdown with
+assets. PDF is a separate snapshot export and does not include attached file bytes.
+Portable formats cannot preserve every application attribute or revision history.
+For an exact move to another Rust installation, **Back Up Library**, inspect the
+backup, and restore into a new library. The source backup and current notebook
+remain intact. Backups are unencrypted; store them somewhere trusted.

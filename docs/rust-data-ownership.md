@@ -1,5 +1,8 @@
 # Rust notes: import, export and backups
 
+Omarchy Notes is Rust-only. Qt is retired; references to it below describe legacy
+migration compatibility, not current support.
+
 Open **Settings → Your notes and files → Import, export & backups**. These
 routes are implemented in the release branch; final native/package acceptance
 is still pending.
@@ -59,7 +62,7 @@ required before the app reports success. Current main and Quick Note drafts stay
 available, including when verification or opening fails. Close the old window
 when convenient; its ordinary save/recovery guards still apply. Opening an
 already owned Rust library routes to its existing window. A Qt owner must close
-before the separate Rust edition can acquire that library.
+before the Rust app can acquire that library. See [migration](migrating.md).
 
 Use copies and verified backups when moving Qt data. A quotation-format upgrade
 requires Rust; the pre-upgrade backup is the rollback boundary for Qt.

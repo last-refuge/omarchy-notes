@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Real Qt ↔ Rust backup/restore and headless CLI checks, using scratch libraries."""
+"""Rust backup/restore regressions using a frozen legacy library and scratch copies."""
 import argparse
 import hashlib
 import json
 import os
 from pathlib import Path
-import shlex
 import shutil
 import sqlite3
 import subprocess
@@ -13,7 +12,7 @@ import tempfile
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("binary", type=Path)
-parser.add_argument("--quote-driver", type=Path, help="Also verify schema-3 upgrade, old-Qt refusal and rollback")
+parser.add_argument("--quote-driver", type=Path, help="Also verify schema-3 upgrade and rollback")
 args = parser.parse_args()
 binary = args.binary.resolve()
 repo = Path(__file__).resolve().parents[1]
@@ -44,15 +43,6 @@ def dump(root):
 
 with tempfile.TemporaryDirectory(prefix="notes-backup-compatibility-") as temporary:
     root = Path(temporary)
-    probe = root / "qt-backup-probe"
-    flags = shlex.split(subprocess.check_output(["pkg-config", "--cflags", "--libs", "Qt6Core", "sqlite3"], text=True))
-    sources = [repo / "tests/qt-backup-probe.cpp"] + [repo / "src/core" / (name + ".cpp")
-        for name in ["NoteStore", "LibraryBackup", "LibraryPaths", "Database", "BlobStore", "RichDocument"]]
-    result = subprocess.run(["g++", "-std=c++20", "-fPIC", '-DONOTES_VERSION="backup-test"',
-        f"-I{repo / 'src/core'}", *map(str, sources), "-o", str(probe), *flags], capture_output=True, text=True)
-    if result.returncode:
-        raise RuntimeError(result.stdout + result.stderr)
-
     library = root / "library"
     shutil.copytree(repo / "tests/fixtures/qt-v1", library)
     with sqlite3.connect(library / "library.sqlite3") as db:
@@ -63,9 +53,14 @@ with tempfile.TemporaryDirectory(prefix="notes-backup-compatibility-") as tempor
             UPDATE notes SET pinned=1,deleted_at=17,folder_id='child' WHERE title='Groceries';
         """)
 
-    qt_backup = root / "Qt backup"
-    run(probe, "backup", library, qt_backup)
-    assert "databaseSha256" not in json.loads((qt_backup / "manifest.json").read_text())
+    qt_backup = root / "Legacy format backup"
+    run(binary, "--data-dir", library, "--backup", qt_backup)
+    # Exercise the legacy format-1 manifest, which omitted Rust's optional
+    # integrity fields. The fixture manifest itself is not an app backup.
+    manifest = json.loads((qt_backup / "manifest.json").read_text())
+    manifest.pop("databaseSha256", None)
+    manifest.pop("committedRevisions", None)
+    (qt_backup / "manifest.json").write_text(json.dumps(manifest))
     original_backup = hashes(qt_backup)
     original_content = dump(qt_backup)
     original_library = dump(library)
@@ -74,18 +69,18 @@ with tempfile.TemporaryDirectory(prefix="notes-backup-compatibility-") as tempor
     run(binary, "--restore", qt_backup, "--data-dir", restored)
     assert hashes(qt_backup) == original_backup
     assert dump(restored) == original_content
-    run(probe, "verify", restored)
+    assert hashes(restored / "blobs") == hashes(library / "blobs")
     run(binary, "--data-dir", restored, "--capture", "A note added after restore #backup")
     rust_backup = root / "Rust backup ? # ü"
     run(binary, "--data-dir", restored, "--backup", rust_backup)
     assert "databaseSha256" in json.loads((rust_backup / "manifest.json").read_text())
     rust_hashes = hashes(rust_backup)
-    run(probe, "inspect", rust_backup)
+    run(binary, "--inspect-backup", rust_backup)
     assert hashes(rust_backup) == rust_hashes
-    roundtrip = root / "Qt reopen"
+    roundtrip = root / "Rust roundtrip"
     run(binary, "--restore", rust_backup, "--data-dir", roundtrip)
     assert dump(roundtrip) == dump(rust_backup)
-    run(probe, "verify", roundtrip)
+    assert hashes(roundtrip / "blobs") == hashes(rust_backup / "blobs")
     assert hashes(rust_backup) == rust_hashes
     assert dump(library) == original_library
 
@@ -101,8 +96,8 @@ with tempfile.TemporaryDirectory(prefix="notes-backup-compatibility-") as tempor
     assert not (root / "bad").exists() and not (root / "missing").exists()
     assert before == hashes(rust_backup) and dump(library) == original_library
 
-    # A real Qt format-1 manifest with a schema-1 snapshot is still restored as
-    # schema 1; opening a separate restored copy performs the normal migration.
+    # A legacy format-1 manifest with a schema-1 snapshot is restored without
+    # migration; opening the restored copy performs the normal Rust migration.
     old = root / "Schema 1"
     shutil.copytree(qt_backup, old)
     with sqlite3.connect(old / "library.sqlite3") as db:
@@ -118,7 +113,11 @@ with tempfile.TemporaryDirectory(prefix="notes-backup-compatibility-") as tempor
     old_restore = root / "Schema 1 restored"
     run(binary, "--restore", old, "--data-dir", old_restore)
     assert hashes(old) == old_before and dump(old_restore) == dump(old)
-    run(probe, "verify", old_restore)
+    with sqlite3.connect(old_restore / "library.sqlite3") as db:
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 1
+    run(binary, "--data-dir", old_restore, "--capture", "After schema-1 migration")
+    with sqlite3.connect(old_restore / "library.sqlite3") as db:
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 2
     assert hashes(old) == old_before
 
     if args.quote_driver:
@@ -128,22 +127,15 @@ with tempfile.TemporaryDirectory(prefix="notes-backup-compatibility-") as tempor
         safety = root / "before quotes"
         run(args.quote_driver.resolve(), upgraded, safety)
         assert dump(safety) == before_upgrade
-        run(probe, "inspect", safety)
+        run(binary, "--inspect-backup", safety)
         with sqlite3.connect(upgraded / "library.sqlite3") as db:
             assert db.execute("PRAGMA user_version").fetchone()[0] == 3
             assert db.execute("SELECT count(*) FROM schema_migrations WHERE version=3").fetchone()[0] == 1
             quoted = db.execute("SELECT body,body_schema FROM notes WHERE title='A quotation worth keeping.'").fetchone()
             assert quoted[1] == 2 and json.loads(quoted[0])["blocks"][0]["type"] == "quote"
-        rejected_copy = root / "Qt must refuse"
-        shutil.copytree(upgraded, rejected_copy)
-        before_refusal = dump(rejected_copy)
-        rejection = run(probe, "verify", rejected_copy, ok=False)
-        assert "newer version" in rejection.stderr and "schema 3" in rejection.stderr
-        assert dump(rejected_copy) == before_refusal
         new_backup = root / "quoted backup"
         run(binary, "--data-dir", upgraded, "--backup", new_backup)
-        rejection = run(probe, "inspect", new_backup, ok=False)
-        assert "newer version" in rejection.stderr
+        run(binary, "--inspect-backup", new_backup)
         preserved = hashes(new_backup)
         modern_restore = root / "quoted restore"
         run(binary, "--restore", new_backup, "--data-dir", modern_restore)
@@ -151,7 +143,7 @@ with tempfile.TemporaryDirectory(prefix="notes-backup-compatibility-") as tempor
         rollback = root / "quote rollback"
         run(binary, "--restore", safety, "--data-dir", rollback)
         assert dump(rollback) == before_upgrade
-        run(probe, "verify", rollback)
-        print("PASS: actual Qt refuses schema-3 libraries/backups; schema-2 rollback reopens in Qt; later Rust quote edits survive a separate backup/restore.")
+        run(binary, "--data-dir", rollback, "--capture", "After rollback")
+        print("PASS: Rust schema-3 quote backup/restore and schema-2 rollback.")
 
-print("PASS: actual Qt → Rust backup/restore → Qt inspection/open, full table/history/trash/blob preservation, schema-1 restore, immutable backups and headless CLI failure paths.")
+print("PASS: Rust legacy-format backup/restore, full table/history/trash/blob preservation, schema-1 migration, immutable backups and headless CLI failure paths.")

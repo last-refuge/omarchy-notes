@@ -39,9 +39,9 @@ export XDG_DATA_HOME="$test_workspace/data" XDG_CONFIG_HOME="$test_workspace/con
 export PATH="$test_workspace/bin:$PATH"
 unset DISPLAY WAYLAND_DISPLAY
 printf 'Qt library retained\n' > "$XDG_DATA_HOME/omarchy-notes/sentinel"
-bash "$project_dir/install.sh" --edition rust --version "$NOTES_INSTALLER_TEST_TAG" --dry-run
+bash "$project_dir/install.sh" --version "$NOTES_INSTALLER_TEST_TAG" --dry-run
 ! pacman -Q omarchy-notes-rust >/dev/null 2>&1
-bash "$project_dir/install.sh" --edition rust --version "$NOTES_INSTALLER_TEST_TAG" --yes --no-quick-note
+bash "$project_dir/install.sh" --version "$NOTES_INSTALLER_TEST_TAG" --yes --no-quick-note
 [[ $(pacman -Q omarchy-notes-rust) == "$identity" ]]
 [[ $(/usr/bin/omarchy-notes-rust --version) == "omarchy-notes-rust $version" ]]
 [[ $(/usr/bin/omarchy-notes-preview --version) == "omarchy-notes-rust $version" ]]
@@ -50,7 +50,7 @@ request=01234567-89ab-4cde-8fab-0123456789ab
 /usr/bin/omarchy-notes-rust --capture-status "$request"
 test -s "$XDG_DATA_HOME/omarchy-notes-gpui/library.sqlite3"
 before=$(sha256sum "$XDG_DATA_HOME/omarchy-notes-gpui/library.sqlite3")
-bash "$project_dir/install.sh" --edition rust --version "$NOTES_INSTALLER_TEST_TAG" --yes --no-quick-note > "$test_workspace/repeat.log"
+bash "$project_dir/install.sh" --version "$NOTES_INSTALLER_TEST_TAG" --yes --no-quick-note > "$test_workspace/repeat.log"
 rg -q 'already installed' "$test_workspace/repeat.log"
 [[ $(cat "$XDG_DATA_HOME/omarchy-notes/sentinel") == 'Qt library retained' ]]
 sudo -n pacman -R --noconfirm omarchy-notes-rust

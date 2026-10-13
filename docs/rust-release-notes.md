@@ -1,24 +1,26 @@
 # Omarchy Notes Rust 1.0.0
 
-The first separate Rust edition provides an offline notes app with rich writing,
+Omarchy Notes is now Rust-only; Qt is retired and retained only as a legacy
+migration reference. The Rust 1.0 app provides offline notes with rich writing,
 Quick Note and durable command-line capture, nested keyboard-accessible folders,
 pinning, three sort modes, prefix search and snippets, duplication, Recently
 Deleted, Undo and recovery. Settings provides reviewed Markdown/text import,
 Markdown/HTML/PDF note export, library Markdown plus assets, exact backups,
 inspection, safe restore into a new library and library opening.
 
-Install the x86_64 Arch/Omarchy edition explicitly:
+Install on x86_64 Arch/Omarchy. The current installer installs Rust by default;
+older edition-aware installers require `--edition rust`.
 
 ```sh
-bash install.sh --edition rust --version rust-v1.0.0 --no-quick-note
+bash install.sh --version rust-v1.0.0 --no-quick-note
 ```
 
 The executable/package is `omarchy-notes-rust`, desktop identity is
 `org.omarchy.Notes.Rust`, and the `omarchy-notes-preview` compatibility launcher
 forwards to Rust. Existing Rust notes/preferences remain at `omarchy-notes-gpui`.
-Qt remains available and remains the default installer edition.
+Retirement changes neither Rust package identity nor its historical profile paths.
 
-Use copies and verified backups for Qt libraries. Quotation/schema-3 libraries
+Use copies and verified backups for retired Qt libraries; see [migration](migrating.md). Quotation/schema-3 libraries
 require Rust; return to Qt using the pre-upgrade backup, which excludes later
 Rust edits. Keep the newer library and export/backup before rollback. Folder
 deletion Undo restores notes unfiled; it does not rebuild deleted folders.
@@ -27,7 +29,8 @@ Tags/Smart Folder interfaces, advanced table operations, gallery, drag filing,
 bulk organization and browsable revision history remain deferred; existing
 metadata and merged tables are preserved. X11 and other architectures are not
 advertised. Use the desktop Quick Note action or a distinct manual compositor
-binding; the Rust installer does not alter the Qt shortcut.
+binding; automatic compositor setup is not implemented and legacy bindings are
+not altered.
 
 The implemented build was released at the owner's direction on 13 October 2026.
 Recorded checks include 171 Rust tests, six dependency tests, full Qt regression
