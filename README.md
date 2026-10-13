@@ -45,21 +45,16 @@ usability verification gaps.
 
 ## Install
 
-Download the **published Rust 1.0 release installer** and inspect it before
-running. That release's installer requires `--edition rust`:
+On Omarchy or Arch Linux, run:
 
 ```bash
-curl -fsSL https://github.com/last-refuge/omarchy-notes/releases/download/rust-v1.0.0/install.sh -o install.sh
-less install.sh
-bash install.sh --edition rust --version rust-v1.0.0 --dry-run
-bash install.sh --edition rust --version rust-v1.0.0 --no-quick-note
+curl -fsSL https://raw.githubusercontent.com/last-refuge/omarchy-notes/master/install.sh | bash
 ```
 
-The `install.sh` in this repository is now Rust-only: omit `--edition rust`
-when using that version. Qt releases are no longer installation targets.
-
-The installer verifies the release checksum and package identity, then uses
-pacman. Open **Omarchy Notes (Rust)** from your launcher, or run
+This installs the latest stable Omarchy Notes release. There is only one app;
+no edition selector is needed. The installer verifies the release checksum and
+package identity, then uses pacman. You can [inspect the script](install.sh)
+before running it. Open **Omarchy Notes (Rust)** from your launcher, or run
 `omarchy-notes-rust`. The `omarchy-notes-preview` compatibility launcher forwards
 to Rust; an older manual preview earlier on `PATH` may need moving aside.
 The binary and Arch package remain `omarchy-notes-rust`, and the desktop ID remains
