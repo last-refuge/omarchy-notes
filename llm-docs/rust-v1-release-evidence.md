@@ -23,10 +23,10 @@ Orca operation, human first use, or elapsed daily use.
 |---|---|---|---|
 | V1-01 checkpoint | measured / observed | `10f392bb5d6075419b0e3e1549fe892d96b3deca`; archived Git tree and commands below | Checkpoint committed on `codex/rust-v1-release` and pushed to origin with owner approval. Exact archived-source headless CI checks pass locally. All four hosted CI jobs passed, including clean Qt package/install verification. |
 | V1-02 identity/scope | observed contract; distribution unverified | Contract above; [edition audit](../docs/rust-edition.md) | Scope/platform/naming and preview alias route are explicit. AUR name and Rust tags absent at discovery. Executable/package/installer implementation remains R4 work. |
-| V1-03 writing/capture/IME/Orca | unverified; partial native observations | R1 worktree; isolated fcitx5/Orca and native AT-SPI procedures below | Actual CJK composition and silent Orca event processing observed. Frozen-binary rerun, candidate visual review and human screen-reader core tasks remain required. Owner's no-dictation constraint persists. |
+| V1-03 writing/capture/IME/Orca | unverified; frozen-binary engine observations | R1 checkpoint; isolated fcitx5/Orca and native AT-SPI procedures below | Frozen-binary main/Quick CJK composition, handoff and silent Orca event processing observed. Full cached-client suite, candidate visual review, long Quick scrolling and human screen-reader core tasks remain required. Owner's no-dictation constraint persists. |
 | V1-04 organization/search/recovery | unverified | R2 | Keyboard tree, sort, SQLite FTS queries, duplicate and trash UI pending. |
 | V1-05 portability | unverified | R3 | Existing verified storage backup primitives; in-app import/export/backup/restore/open pending. |
-| V1-06 performance/fault/rollback | unverified; measured bounds and CPU diagnostics | R1/R4; [performance record](../docs/rust-performance.md) | Undo and editor/cache bounds implemented; the latest measured CPU edit/scroll run meets its budgets, with previous misses retained. Final frozen-source rerun, native submission/under-load decision and full memory/fault/rollback matrix remain pending. |
+| V1-06 performance/fault/rollback | failed large-edit CPU budget; remaining scopes unverified | R1/R4; [performance record](../docs/rust-performance.md) | Undo and editor/cache bounds implemented. Latest frozen large-edit CPU p95 60.217 ms fails 33 ms; scrolling meets its CPU target. Native submission/under-load decision and full memory/fault/rollback matrix remain pending. |
 | V1-07 visual/native integrations | unverified | R4 state matrix | Existing GPU artifacts are baseline evidence; new paths, scaling and native integrations require review. |
 | V1-08 licenses/package/installer | unverified | R4 | Rust package not yet built; runtime/licenses and disposable installation matrix pending. |
 | V1-09 human acceptance | unverified | R5, identifiable installed candidate | Five actual participants, owner visual scores and five working days of actual use required. No participants or trial results recorded. |
@@ -331,3 +331,10 @@ Python caches. Exclude the unrelated
   `/tmp/omarchy-r1-reviewed-{bounded,layout}.log`). Native submission and the
   performance release gate remain open. No budget changed or retry discarded
   this result; attribution and final-candidate correction remain required.
+- Reviewed R1 checkpoint `12375b25b269380a31e113f5a5df8e555d0c2b5f`
+  committed and pushed to the authorized `codex/rust-v1-release` branch.
+  [Hosted CI](https://github.com/last-refuge/omarchy-notes/actions/runs/38467323907)
+  is **observed in progress**, not yet passed. The checkpoint records bounded
+  editing/cache work, native engine evidence and the known CPU-budget failure;
+  it remains version 0.1.0 and does not claim R1 acceptance or stable readiness.
+  R2 implementation proceeds under the owner's updated verification schedule.

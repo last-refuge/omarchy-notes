@@ -2,7 +2,8 @@
 
 Date: 13 October 2026  
 Status: implementation in progress; R0 checkpoint `10f392b` is backed up on the
-remote, R1 is active, and the stable release gates remain incomplete. See the
+remote, R1 checkpoint `12375b2` is pushed, R2 implementation is active, and the
+stable release gates remain incomplete. See the
 [release evidence](rust-v1-release-evidence.md).
 
 Execution update, 13 October 2026: the owner requested focused, quick checks

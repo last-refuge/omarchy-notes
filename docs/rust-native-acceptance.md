@@ -1,8 +1,9 @@
 # Isolated real input and screen-reader acceptance
 
-Status: scripted real pinyin and basic Orca speech generation observed on
-13 October 2026; candidate visual review, complete Orca caret/selection/task
-acceptance and human listening/usability remain open.
+Status: current-binary main/Quick pinyin, composition handoff, silent installed
+Orca caret/selection processing and cache signatures observed on 13 October
+2026. Full cached-client acceptance, settled resized visual acceptance, real
+Quick document scrolling and human screen-reader usability remain open.
 
 `tests/rust-isolated-desktop.py` exercises the release executable in an owned
 nested Hyprland desktop. Its default command only inspects prerequisites:
@@ -26,10 +27,11 @@ python tests/rust-isolated-desktop.py --run \
   --output target/isolated-native-qa --mode both
 ```
 
-Keep the owned nested window active. The runner refuses input immediately when
-either its host window or exact nested Notes window loses focus or changes
-workspace. A failed guard is an interrupted check, never a passed check; rerun
-with a fresh synthetic library after resolving the cause.
+The exact Notes window must remain focused on its private compositor's current
+workspace. Host focus is independent: normal runs send no host keyboard input
+and make no host focus request. A failed private ownership/focus guard is an
+interrupted check, never a pass. Python `-O`/`PYTHONOPTIMIZE` is rejected before
+launch because assertions enforce this contract.
 
 ## Isolation and cleanup
 
@@ -68,14 +70,36 @@ logs, screenshots and `report.json` remain under the explicit output directory.
 The current notebook, original fixture and production IME/preferences are retained.
 Output directories must be new; the runner refuses to overwrite earlier evidence.
 
-All synthetic input checks exact PID, window address, application identity and
-current workspace inside the nested compositor, plus the exact owned outer
-compositor window in the host. Only printable text, named keys and Ctrl/Shift
-chords are allowed. Window sizing targets the owned nested Notes address.
-Screenshots use the exact owned Notes window geometry, clipped to its nested
-output. A candidate outside that capture needs a separate reviewed owned-window
-capture or manual observation. No clipboard operation,
-external viewer, browser or host window-management action is part of the script.
+All private input/capture/mutations verify distinct host/private socket paths
+and inodes, Linux `SO_PEERCRED` matching the live owned nested PID/UID, exact
+inner Notes PID/address/app identity/current workspace, and the mapped owned
+parent's PID/address/original workspace. Only printable text, named keys and
+Ctrl/Shift chords are allowed. Normal operations require no host focus or
+current host workspace. Parent invisibility can still delay rendering; actual
+timeouts or uncertain rasters remain unverified evidence.
+
+The private configuration uses the audited legacy dispatcher route; the host's
+Lua route is used only for the optional owned-target routing proof. Both require
+explicit `ok` replies because a rejected dispatcher can return exit code zero.
+Sizing targets only the owned inner address. Captures use its exact geometry,
+clipped to the private output; IME captures also include the owned private area
+below it where the fcitx popup can extend. No host pixels, clipboard, external
+viewer, browser or host settings changes are part of these checks.
+
+The routing proof uses `--run --mode ime --routing-proof` and a new output
+directory. A separate owned Gtk Entry remains the host focus target while
+private input changes only the nested fixture. The dated receipt at
+`/tmp/notes-v1-private-routing-a/report.json` verified distinct sockets with peer
+PID 519091/UID 1000, 21 inserted ASCII bytes in Notes and zero host Entry changes.
+All five children stopped. It permits independent host focus, not input to an
+unowned or privately unfocused window.
+
+Viewport acknowledgment uses live Component bounds of the owned rendered root.
+Pinned GPUI's built-in Window wrapper has no bounds. Main renders a bounded
+Window; Quick renders the named `Quick Note` Group. The focused ancestor receipt
+at `/tmp/notes-v1-quick-viewport-a/report.json` measured the Group at
+`[0,0,680,660]` above its built-in frame's `[-1,-1,-1,-1]`. Compositor geometry
+still had to equal 680×660 at `[20,20]`; the oracle was not relaxed.
 
 ## Actual composing engine evidence
 
@@ -89,6 +113,11 @@ calling the GPUI marked-text adapter. Main and Quick Note checks cover:
   cancellation after scrolling/resizing.
 - Quick/main ownership handoff refusal while composing and content retention
   after settling composition.
+
+The final replacement undo/cancellation is explicitly saved and its exact body
+acknowledged on disk before deriving Quick identity. Main really scrolls through
+a long document; the two-character Quick fixture exercises an end caret, not
+real Quick document scrolling.
 
 The fcitx protocol log records actual preedit and a positive candidate-placement
 rectangle. The composition, scrolled and resized screenshots must also be
@@ -147,6 +176,45 @@ Record participant, date, exact binary/source hashes, platform, tasks completed,
 utterance/log excerpts, audible result, failures and friction. Do not rename the
 scripted engine check as an Orca human task pass or replace it with AT-SPI API
 assertions. The release evidence ledger remains the final authority for gate status.
+
+## Current frozen-binary receipt
+
+`/tmp/notes-v1-final-input-i/report.json` completed with status `observed` against
+SHA-256 `b13182321db8318a453c767abd0e7f8f93a96a6aa02fd842e27fff6d58b102dc`.
+Main and Quick real pinyin scenarios, final-body disk acknowledgment and composing
+handoff/content retention passed. Installed Orca 50.2 generated 19 logged
+utterances with audio transport disabled; guarded caret motion, selection offsets
+`[1,2]`, raw private-bus delivery and libatspi parsing passed. The report recorded
+392 cache signals with valid struct boundaries and zero invalid-cache client
+warnings. All five children stopped; no speech server or audio connection was used.
+
+Ordinary/main-scrolled candidates were observed adjacent to preedit; expanded
+private crops include the resized main candidate. Quick end-caret captures are
+not Quick scrolling evidence. Quick's resized raster did not yet reconcile with
+its reported viewport and remains unverified. The small boxed family emoji
+matches installed Noto Color Emoji artwork, not a proven missing glyph; complete
+visual Unicode coverage is not claimed.
+
+Failures remain retained: host-focus interruptions, rejected mixed dispatcher
+calls, the unbounded Quick-frame oracle and the unsaved-final-undo identity
+query. The full cached-client suite still has no complete pass:
+`/tmp/notes-v1-final-accessibility-g` timed out at initial replacement; focused
+Unicode replacement, Ctrl-Z and named Undo controls passed separately. Native
+Tab/leave-table oracles now await expected caret/text boundaries. No product
+failure or final gate is waived by those harness fixes.
+
+## Reusing the private setup
+
+The smallest wrapper would extract only temporary runtime/config/bus/compositor
+startup, peer/parent ownership checks and exact cleanup, then launch a supplied
+command with the resulting `WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR`, private D-Bus
+address and `HYPRLAND_INSTANCE_SIGNATURE`. It need not start IME, Orca or fixture
+Notes. Run the cached API script with `--private-bus` in that session; its existing
+PID/address/workspace guards then target the nested compositor. The timing script
+also inherits that environment and keeps its app guards/final-save checks.
+This wrapper is proposed, not implemented/tested. Timing must record actual
+nested output/GPU/scale/viewport, and must not imply display presentation or a
+host-compositor latency pass.
 
 ## Dated scripted evidence
 

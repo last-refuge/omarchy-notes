@@ -196,7 +196,11 @@ pass.
 
 ## Recorded evidence
 
-On 13 October 2026, the latest release diagnostic used the R1 worktree based on
+The latest reviewed frozen sample is recorded at the end of this section. It
+fails the 33 ms large-edit CPU p95 budget; earlier favorable measurements do
+not replace that result.
+
+On 13 October 2026, an earlier attribution diagnostic used the R1 worktree based on
 `e9c12fc6528d7f2960de106c59c0c8fd7e842934`, including bounded editor/history
 retention, changed-note-only preview updates, linear span normalization,
 core offset/style shortcuts, multi-width shaping/geometry caches and viewport
@@ -211,7 +215,7 @@ Viewport: 1440 × 960 logical, the pinned TestPlatform's 2× scale. The fixture
 contained 33,909,371 body JSON bytes. No other heavy workloads ran during
 sampling; filesystem cache was warm from generating the fixture.
 
-| Diagnostic | Samples | Latest observed result |
+| Diagnostic | Samples | Earlier attribution result |
 |---|---:|---:|
 | Storage open and eager body load | 1 | 281.98 ms |
 | Shell creation to first CPU draw | 1 | 408.06 ms; process startup remains unmeasured |
@@ -284,13 +288,13 @@ edit path (9.75 ms per call), 186.11 ms in 200 editor render constructions,
 in masked paint. Accessibility was inactive. The preceding geometry-only run
 recorded 17.96 ms per edit call and 52.60 ms full-cycle p95. These changes
 reduced the edit region by 7.84 ms per call and also improved work outside
-those regions. The latest full-cycle total was 2,331.76 ms. Defined editor
+those regions. That attribution run’s full-cycle total was 2,331.76 ms. Defined editor
 regions accounted for 1,635.20 ms; Changed callbacks accounted for 401.39 ms,
 including 56.65 ms copying the draft mirror, 344.62 ms for row updates and
 204.93 ms catalog work **inside** the row total. After these non-overlapping
 top-level timers, 2.95 ms per edit remained outside both timer sets. Mirror
 cost fell from 6.89 to 0.57 ms per edit; its last ten-edit batch cost 0.58 ms
-per edit. The current CPU diagnostic meets the unchanged large-note budget.
+per edit. That attribution run met the unchanged large-note CPU budget; the reviewed frozen run below does not.
 Region maxima are cumulative lifetime
 values and include initial layout; they are not maxima of the measured delta.
 
@@ -319,13 +323,85 @@ accounted for 2,710.74 ms of the 3,018.90 ms complete-cycle total, leaving
 3.08 ms per edit outside both timer sets. The root mirror and closed picker
 work were identified as the next measured fixes; this run supplies no 33 ms pass.
 
-Those fixes produced the latest 27.55 ms large-edit CPU p95. The previous
+Those fixes produced the earlier 27.55 ms large-edit CPU p95. The previous
 34.60 ms normalization run and 34.61 ms attribution run remain failed
 evidence; no timing budget was changed and no favorable rerun was selected.
 
 An earlier run was stopped after 3 minutes 38 seconds of sustained CPU use
 without completed loop timings. That run supplies no pass. Partial reports
 now survive each sampling batch, and complete-cycle timing includes queued
-subscriptions. The large-note CPU edit path now has a measured fix. Native
+subscriptions. The earlier large-note CPU edit path had a measured improvement. The reviewed frozen run below reopens its p95 failure. Native
 submission, active-accessibility latency, process startup, native idle, complete
 GPU/cache accounting and the full attachment corpus remain unverified.
+
+### Reviewed frozen diagnostic, 13 October 2026
+
+The final controlled run used the reviewed, uncommitted R1 source based on
+`e9c12fc6528d7f2960de106c59c0c8fd7e842934`. All 190 source files matched
+`/tmp/omarchy-r1-reviewed-source-fingerprint.json` immediately before execution.
+Its source digest is
+`f71f4a94736611c0616beb59a8357fc358288ece0c7e65082f70ac59ed91100c`.
+The diagnostic executable SHA-256 is
+`28b701d7625d473bab5a79adb0271609d96e20b1d15bfb5ec867789c55c08869`.
+Both values are included in the raw report's provenance. GPUI and calloop pins
+were unchanged; no other team build, GPU or native workload ran concurrently.
+The workload and timing budgets were unchanged. No rerun was selected.
+
+| Diagnostic | Samples | Reviewed frozen result |
+|---|---:|---:|
+| Storage open and eager body load | 1 | 287.86 ms |
+| Shell creation to first CPU draw | 1 | 397.83 ms |
+| Typical complete foreground edit cycle | 1,000 | p95 4.740 ms; p99 5.112 ms; max 6.772 ms |
+| Ordinary note switch to CPU draw end | 100 | p95 7.433 ms |
+| Large note first CPU viewport | 1 | 122.02 ms |
+| Large complete foreground edit cycle | 100 | p95 **60.217 ms**; p99 71.675 ms; max 95.500 ms; **fails 33 ms p95** |
+| Large document scrolling CPU draw | 100 | p95 4.913 ms; meets 8 ms CPU target |
+| Achieved large-document scroll positions | 100 | 100 distinct offsets, 0 through −99,000 logical pixels |
+| Main/Quick window cycles | 100 | 5 retained session-owned editors; RSS 662.27 → 663.81 MiB, then plateau |
+| Final pending edit/composition/media/save sessions | 1 checkpoint | 0 |
+| Simulated idle, no forced draw | 5 simulated seconds | 0 draw samples; native idle remains unverified |
+
+Raw evidence is `/tmp/omarchy-performance-r1-reviewed/headless.json` and
+`/tmp/omarchy-performance-r1-reviewed.log`; the report includes complete raw
+sample arrays and `large_scroll_position_proof.achieved_y`. Large-cycle median
+was 26.903 ms and mean 30.245 ms. Ten-edit means were 18.169, 20.441, 22.730,
+25.047, 26.470, 26.416, 28.491, 49.965, 47.642 and 37.083 ms. The late increase
+starts around edit 72; edit 79 reached 95.500 ms. This is an unresolved frozen
+sample failure, not native input-to-submission evidence. Accessibility was
+inactive.
+
+For the 100 large edits, editor regions totaled 1,260.78 ms in edit,
+281.93 ms in render, 517.82 ms in layout, 43.09 ms in prepaint and 60.68 ms
+in paint. Changed callbacks totaled 488.52 ms, including 70.67 ms in the
+incremental draft mirror and 417.69 ms in row updates; catalog work was
+247.53 ms **inside** row updates. The full-cycle total was 3,024.55 ms, leaving
+3.717 ms per edit outside the non-overlapping editor and Changed timers.
+Mirror cost remained 0.707 ms per edit, so the earlier full-document draft
+copying hotspot was not reproduced.
+
+Root/width retention and shape counters matched the earlier attributed run:
+3,020 roots, 6,040 entries, 20,524,638 estimated bytes, 609,840 hits and 6,240
+misses. Scrolling left shape counters and geometry misses unchanged, used two
+geometry entries estimated at 337,472 bytes and painted 11 of 3,180 lines.
+All retained editors ended with 29,025,009 estimated shape-cache bytes and
+343,008 estimated geometry bytes. History retained 30,142,584 bytes and eight
+undo steps.
+
+RSS already measured 605.67 MiB after initial open, compared with 377.10 MiB
+in the earlier attribution run, before large edits. It reached 675.74 MiB
+after large edits, compared with 461.20 MiB earlier. The higher initial
+resident footprint makes runtime font/allocator/cache conditions a lead;
+their contribution was not measured. Continuous Changed callbacks reset the
+700 ms autosave delay, so current-note autosave overlap is not established.
+The report contains no per-save timestamps. Late batches and broader region
+costs require further attribution; the data does not justify assigning one
+confirmed cause or relaxing the budget.
+
+The two affected GPU regressions passed serially after the CPU run, with no
+rebuild: bounded editor workflow/typing/reading-state eviction and layout
+cache/geometry/scroll checks. Logs are
+`/tmp/omarchy-r1-reviewed-bounded.log` and
+`/tmp/omarchy-r1-reviewed-layout.log`. Their executable SHA-256 values were
+`94290fe44b274ff9cc5abbb86263f1e34a4d7e51363119b658c74d93029a8af6`
+and `1ade6c6537409daf0f92936502122b4607dc0bba8a94364162b1a387d4e42551`,
+respectively. These passing regressions do not override the timing failure.
