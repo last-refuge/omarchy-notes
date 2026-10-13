@@ -75,6 +75,10 @@ jobs:
           shellcheck install.sh tests/test-installer.sh tests/test-installer-package.sh
       - name: Test installer without network or system changes
         run: runuser -u builder -- ./tests/test-installer.sh
+      - name: Check separate Rust identity and immutable preparation
+        run: |
+          pacman -S --noconfirm --needed git
+          runuser -u builder -- python3 tests/test_rust_release.py
 
   build-and-test:
     runs-on: ubuntu-latest
@@ -131,3 +135,34 @@ jobs:
         run: ./tests/check-arch-package.sh build-aur-ci/aur
       - name: Install and verify through the installer in the disposable container
         run: runuser -u builder -- ./tests/test-installer-package.sh build-aur-ci/aur
+
+  rust-arch-candidate:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    timeout-minutes: 90
+    steps:
+      - name: Install Rust packaging tools
+        run: pacman -Syu --noconfirm appstream base-devel clang cmake curl desktop-file-utils git namcap pkgconf python ripgrep rustup shellcheck sudo util-linux
+      - uses: actions/checkout@v4
+      - name: Prepare immutable separate Rust candidate
+        run: |
+          useradd --create-home builder
+          echo 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
+          chmod 440 /etc/sudoers.d/builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          runuser -u builder -- git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          runuser -u builder -- python3 packaging/prepare-release.py --edition rust --candidate --ref HEAD --output build-rust-ci
+      - name: Build from the archived Rust recipe and locked dependencies
+        run: runuser -u builder -- bash -c 'cd build-rust-ci/aur && makepkg --syncdeps --noconfirm --cleanbuild'
+      - name: Validate separate package metadata and files
+        run: ./tests/check-rust-arch-package.sh build-rust-ci/aur
+      - name: Verify actual Rust install, alias, headless capture and retained data on removal
+        run: runuser -u builder -- ./tests/test-rust-installer-package.sh build-rust-ci/aur
+      - name: Retain exact candidate identity
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-candidate-source-identity
+          path: |
+            build-rust-ci/SOURCE_REVISION
+            build-rust-ci/RELEASE_KIND
+            build-rust-ci/SHA256SUMS

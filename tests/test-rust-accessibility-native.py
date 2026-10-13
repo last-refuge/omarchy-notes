@@ -17,7 +17,7 @@ import uuid
 from rust_native_test import InstanceSocket
 
 REPO = Path(__file__).resolve().parents[1]
-BINARY = REPO / "target/release/omarchy-notes-preview"
+BINARY = REPO / "target/release/omarchy-notes-rust"
 
 
 def stop(process):
@@ -93,7 +93,7 @@ def run():
             def guard():
                 assert process.poll() is None, "Owned process exited"
                 active, workspace = compositor("activewindow"), compositor("activeworkspace")
-                assert active.get("pid") == process.pid and active.get("address") == address and active.get("class") == "org.omarchy.Notes.Preview", "Refusing input: owned test window lost focus"
+                assert active.get("pid") == process.pid and active.get("address") == address and active.get("class") == "org.omarchy.Notes.Rust", "Refusing input: owned test window lost focus"
                 assert active["workspace"]["id"] == workspace["id"], "Refusing input: workspace changed"
 
             def key(name, ctrl=True, shift=False):
@@ -131,7 +131,7 @@ def run():
 
             def owned_window():
                 assert process.poll() is None, (root / "app.log").read_text()[-2000:]
-                return next((w for w in compositor("clients") if w.get("pid") == process.pid and w.get("class") == "org.omarchy.Notes.Preview"), None)
+                return next((w for w in compositor("clients") if w.get("pid") == process.pid and w.get("class") == "org.omarchy.Notes.Rust"), None)
 
             address = wait(owned_window, "owned window")["address"]
             guard()

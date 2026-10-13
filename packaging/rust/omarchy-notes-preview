@@ -1,0 +1,3 @@
+#!/bin/sh
+# Compatibility route for preview users. Keep the same process and exit status.
+exec /usr/bin/omarchy-notes-rust "$@"

@@ -19,8 +19,8 @@ import uuid
 from rust_native_test import InstanceSocket
 
 REPO = Path(__file__).resolve().parents[1]
-BINARY = REPO / "target/release/omarchy-notes-preview"
-APP_ID = "org.omarchy.Notes.Preview"
+BINARY = REPO / "target/release/omarchy-notes-rust"
+APP_ID = "org.omarchy.Notes.Rust"
 
 
 def stop(process):

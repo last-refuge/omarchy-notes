@@ -13,7 +13,7 @@ import time
 from rust_native_test import InstanceSocket
 
 repo = Path(__file__).resolve().parents[1]
-binary = repo / "target/release/omarchy-notes-preview"
+binary = repo / "target/release/omarchy-notes-rust"
 with tempfile.TemporaryDirectory(prefix="notes-pdf-native-") as temporary:
     root = Path(temporary)
     os.environ["XDG_CONFIG_HOME"] = str(root / "config")
@@ -30,7 +30,7 @@ with tempfile.TemporaryDirectory(prefix="notes-pdf-native-") as temporary:
     def guard():
         assert process.poll() is None, "Owned process exited"
         window, workspace = state("activewindow"), state("activeworkspace")
-        assert window.get("pid") == process.pid and window.get("address") == address and window.get("class") == "org.omarchy.Notes.Preview", "Refusing input: test window lost focus"
+        assert window.get("pid") == process.pid and window.get("address") == address and window.get("class") == "org.omarchy.Notes.Rust", "Refusing input: test window lost focus"
         assert window["workspace"]["id"] == workspace["id"], "Refusing input: workspace changed"
 
     def key(name, ctrl=False, shift=False):
@@ -46,7 +46,7 @@ with tempfile.TemporaryDirectory(prefix="notes-pdf-native-") as temporary:
     try:
         deadline = time.monotonic() + 15
         while time.monotonic() < deadline:
-            owned = [w for w in state("clients") if w.get("pid") == process.pid and w.get("class") == "org.omarchy.Notes.Preview"]
+            owned = [w for w in state("clients") if w.get("pid") == process.pid and w.get("class") == "org.omarchy.Notes.Rust"]
             if owned:
                 address = owned[0]["address"]
                 guard()

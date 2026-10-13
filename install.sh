@@ -13,6 +13,7 @@ Installs a verified release package on Omarchy or Arch Linux.
 Run again to update. Your notes and running application are kept.
 
   --version TAG       select a published release (for example v1.0.0)
+  --edition qt|rust    choose the edition (default: qt; Rust is separate)
   --source            build the selected release with makepkg as your user
   --yes, -y           accept package installation without confirmation
   --dry-run           inspect the release and show the plan without installing
@@ -156,7 +157,7 @@ download_verified() {
 verify_package() {
   local path=$1 expected=$2 metadata architecture
   metadata=$(LC_ALL=C pacman -Qp "$path" </dev/null 2>>"$LOG") || die 'Could not read package identity.'
-  [[ $metadata == "omarchy-notes $expected" ]] || die "Unexpected package identity: $metadata. Nothing was installed."
+  [[ $metadata == "$PACKAGE_NAME $expected" ]] || die "Unexpected package identity: $metadata. Nothing was installed."
   LC_ALL=C pacman -Qip "$path" </dev/null >"$WORK/package-info" 2>>"$LOG" || die 'Could not read package architecture.'
   architecture=$(awk '/^Architecture[[:space:]]*:/ {print $3}' "$WORK/package-info")
   [[ $architecture == "$ARCH" ]] || die "Unexpected package architecture: $architecture. Nothing was installed."
@@ -192,29 +193,46 @@ build_source() {
   done
   (( ${#candidates[@]} == 1 )) || die 'The build did not produce exactly one matching application package.'
   PACKAGE=${candidates[0]}
-  PACKAGE_VERSION=${PACKAGE##*/}; PACKAGE_VERSION=${PACKAGE_VERSION#omarchy-notes-}; PACKAGE_VERSION=${PACKAGE_VERSION%-"$ARCH".pkg.tar.zst}
+  PACKAGE_VERSION=${PACKAGE##*/}; PACKAGE_VERSION=${PACKAGE_VERSION#"$PACKAGE_NAME"-}; PACKAGE_VERSION=${PACKAGE_VERSION%-"$ARCH".pkg.tar.zst}
 }
 
 finish() {
-  local binary='' package_name path count=0 output shadow config data
-  pacman -Ql omarchy-notes </dev/null >"$WORK/installed-files" 2>>"$LOG" || die 'Installed package file list is unavailable.'
+  local binary='' preview_alias='' package_name path count=0 alias_count=0 output shadow config data
+  pacman -Ql "$PACKAGE_NAME" </dev/null >"$WORK/installed-files" 2>>"$LOG" || die 'Installed package file list is unavailable.'
   while read -r package_name path; do
-    if [[ $package_name == omarchy-notes && $path == /*/bin/omarchy-notes ]]; then
+    if [[ $package_name == "$PACKAGE_NAME" && $path == /*/bin/"$EXECUTABLE" ]]; then
       binary=$path; count=$((count + 1))
+    fi
+    if [[ $EDITION == rust && $package_name == "$PACKAGE_NAME" && $path == /*/bin/omarchy-notes-preview ]]; then
+      preview_alias=$path; alias_count=$((alias_count + 1))
     fi
   done <"$WORK/installed-files"
   (( count == 1 )) && [[ -x $binary ]] || die 'The installed application executable is missing or ambiguous.'
   output=$(env -u QT_QPA_PLATFORMTHEME QT_QPA_PLATFORM=offscreen "$binary" --version </dev/null 2>>"$LOG") ||
     die 'Package installed, but application verification failed. See the log before launching it.'
-  [[ $output == "omarchy-notes $VERSION" ]] || die "Installed application reports an unexpected version: $output."
+  [[ $output == "$EXECUTABLE $VERSION" ]] || die "Installed application reports an unexpected version: $output."
   ok "Application verified $BULLET $output"
-  shadow=$(command -v omarchy-notes || true)
+  shadow=$(command -v "$EXECUTABLE" || true)
   if [[ -n $shadow && $(readlink -f -- "$shadow") != "$(readlink -f -- "$binary")" ]]; then
     warn "An older or separate copy at $shadow takes precedence on PATH."
     note "Use $binary for the package version; move the older copy aside when ready."
   fi
+  if [[ $EDITION == rust ]]; then
+    (( alias_count == 1 )) && [[ -x $preview_alias ]] || die 'The package-owned preview compatibility launcher is missing or ambiguous.'
+    output=$("$preview_alias" --version </dev/null 2>>"$LOG") || die 'The preview compatibility launcher could not execute Rust.'
+    [[ $output == "$EXECUTABLE $VERSION" ]] || die "The preview compatibility launcher reports an unexpected version: $output."
+    shadow=$(command -v omarchy-notes-preview || true)
+    if [[ -n $shadow && $(readlink -f -- "$shadow") != "$(readlink -f -- "$preview_alias")" ]]; then
+      warn "An older preview at $shadow takes precedence on PATH; move that specific copy aside when ready."
+    fi
+  fi
   config=${XDG_CONFIG_HOME:-$HOME/.config}
-  if (( IS_OMARCHY )) && [[ -f $config/hypr/bindings.lua && -f $config/hypr/hyprland.lua ]]; then
+  if [[ $EDITION == rust ]]; then
+    if [[ $QUICK == yes ]]; then
+      note 'Rust Quick Note is available in the desktop launcher or with omarchy-notes-rust --quick-note.'
+      note 'Automatic Rust compositor setup is not implemented; use the distinct-key instructions in docs/rust-release.md. No bindings were changed.'
+    fi
+  elif (( IS_OMARCHY )) && [[ -f $config/hypr/bindings.lua && -f $config/hypr/hyprland.lua ]]; then
     if [[ $QUICK == ask ]] && (( HAVE_TTY && ! YES )); then
       if confirm 'Set up Quick Note with Super + Alt + N?' y/N; then QUICK=yes; fi
     fi
@@ -231,22 +249,23 @@ finish() {
   elif [[ $QUICK == yes ]]; then
     warn 'Notes is installed. Quick Note setup requires compatible Omarchy Lua configuration.'
   fi
-  data=${OMARCHY_NOTES_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-notes}
+  if [[ $EDITION == rust ]]; then data=${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-notes-gpui
+  else data=${OMARCHY_NOTES_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-notes}; fi
   [[ $data == /* ]] || data=$PWD/$data
   printf '\n  %sReady to write%s\n' "$BOLD" "$RESET"
-  if (( IS_OMARCHY )); then printf '     Super + Space, then type "Omarchy Notes"\n'; fi
+  if (( IS_OMARCHY )); then printf '     Super + Space, then type "%s"\n' "$DISPLAY_NAME"; fi
   printf '     Or run %s\n' "$binary"
   note 'If Notes is open, close and reopen it normally to use the installed version.'
   printf '\n  %sYour notes%s\n     %s\n' "$BOLD" "$RESET" "$data"
   printf '\n  %sUpdate%s\n     Run this installer again.\n' "$BOLD" "$RESET"
-  printf '\n  %sRemove the app%s\n     sudo pacman -R omarchy-notes\n' "$BOLD" "$RESET"
+  printf '\n  %sRemove the app%s\n     sudo pacman -R %s\n' "$BOLD" "$RESET" "$PACKAGE_NAME"
   note 'Removing the package keeps your notes.'
   printf '\n'
 }
 
 main() {
   presentation
-  YES=0; DRY=0; SOURCE=0; QUICK=ask; TAG=''; WORK=''; LOG=''; ACTIVE_PID=''; RETAIN_LOG=0
+  YES=0; DRY=0; SOURCE=0; QUICK=ask; TAG=''; EDITION=qt; WORK=''; LOG=''; ACTIVE_PID=''; RETAIN_LOG=0
   local quick_option='' option
   while (( $# )); do
     option=$1
@@ -255,6 +274,8 @@ main() {
       --yes|-y) YES=1 ;;
       --dry-run) DRY=1 ;;
       --source) SOURCE=1 ;;
+      --edition) shift; (( $# )) || die '--edition requires qt or rust.'; EDITION=$1 ;;
+      --edition=*) EDITION=${option#*=} ;;
       --version) shift; (( $# )) && [[ -n $1 ]] || die '--version requires a release tag.'; TAG=$1 ;;
       --version=*) TAG=${option#*=}; [[ -n $TAG ]] || die '--version requires a release tag.' ;;
       --quick-note|--no-quick-note)
@@ -265,7 +286,12 @@ main() {
     esac
     shift
   done
-  [[ -z $TAG || $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || die '--version must be a stable release tag such as v1.0.0.'
+  case "$EDITION" in
+    qt) PACKAGE_NAME=omarchy-notes; EXECUTABLE=omarchy-notes; TAG_PREFIX=v; DISPLAY_NAME='Omarchy Notes' ;;
+    rust) PACKAGE_NAME=omarchy-notes-rust; EXECUTABLE=omarchy-notes-rust; TAG_PREFIX=rust-v; DISPLAY_NAME='Omarchy Notes (Rust)' ;;
+    *) die '--edition must be qt or rust.' ;;
+  esac
+  [[ -z $TAG || $TAG =~ ^${TAG_PREFIX}[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "--version must be a stable release tag for $EDITION such as ${TAG_PREFIX}1.0.0."
   HAVE_TTY=0
   if ( : </dev/tty ) 2>/dev/null; then HAVE_TTY=1; fi
   if (( ! DRY )); then
@@ -278,8 +304,9 @@ main() {
   [[ -f /etc/arch-release ]] || die 'This installer supports Omarchy and Arch Linux. See the README for a CMake build.'
   ARCH=$(uname -m)
   [[ $ARCH == x86_64 || $ARCH == aarch64 ]] || die "Unsupported architecture: $ARCH. See the README for building with CMake."
+  [[ $EDITION != rust || $ARCH == x86_64 ]] || die 'The Rust edition currently supports x86_64 only.'
   local tool
-  for tool in curl sha256sum pacman setsid mktemp awk sed tail readlink; do
+  for tool in curl sha256sum pacman setsid mktemp awk sed tail readlink python3; do
     command -v "$tool" >/dev/null || die "Missing prerequisite: $tool. Install it and try again."
   done
   if (( ! DRY )); then command -v sudo >/dev/null || die 'sudo is required to install the package.'; fi
@@ -292,59 +319,76 @@ main() {
   LOG=$(mktemp "${TMPDIR:-/tmp}/omarchy-notes-install.XXXXXX.log")
   CURL=(curl --fail --location --silent --show-error --proto '=https' --proto-redir '=https'
     --retry 2 --retry-delay 1 --connect-timeout 10 --max-time 180)
-  local repo_url=https://github.com/last-refuge/omarchy-notes url version_pattern
+  local repo_url=https://github.com/last-refuge/omarchy-notes version_pattern
   printf '\n  %s%somarchy notes%s  %s%s  A place for your thoughts.%s\n\n' "$ACCENT" "$BOLD" "$RESET" "$DIM" "$BULLET" "$RESET"
   if (( IS_OMARCHY )); then ok "Omarchy detected $BULLET $ARCH"; else ok "Arch Linux detected $BULLET $ARCH"; fi
   if [[ -z $TAG ]]; then
-    # The child shell handles the redirect using its positional arguments.
-    # shellcheck disable=SC2016
-    step 'Finding the latest published release' bash -c 'out=$1; shift; exec "$@" >"$out"' _ "$WORK/latest-url" \
-      "${CURL[@]}" --head --output /dev/null --write-out '%{url_effective}' "$repo_url/releases/latest" ||
+    step 'Finding the latest published release' "${CURL[@]}" --output "$WORK/releases.json" \
+      'https://api.github.com/repos/last-refuge/omarchy-notes/releases?per_page=100' ||
       die 'Could not resolve the latest release. Check GitHub and your network, or select --version TAG.'
-    url=$(cat "$WORK/latest-url")
-    [[ $url =~ ^https://github.com/last-refuge/omarchy-notes/releases/tag/(v[0-9]+\.[0-9]+\.[0-9]+)$ ]] ||
+    TAG=$(python3 - "$WORK/releases.json" "$TAG_PREFIX" <<'PY'
+import json, re, sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    releases = json.load(source)
+if not isinstance(releases, list):
+    raise ValueError("GitHub did not return a release list")
+pattern = re.compile(re.escape(sys.argv[2]) + r"[0-9]+\.[0-9]+\.[0-9]+")
+matches = [release for release in releases if isinstance(release, dict)
+           and not release.get("draft") and not release.get("prerelease")
+           and isinstance(release.get("tag_name"), str)
+           and pattern.fullmatch(release["tag_name"])
+           and isinstance(release.get("published_at"), str)]
+if not matches:
+    sys.exit(1)
+print(max(matches, key=lambda release: release["published_at"])["tag_name"])
+PY
+    ) ||
       die 'No supported published release was found. Select --version TAG or check GitHub Releases.'
-    TAG=${BASH_REMATCH[1]}
   fi
-  VERSION=${TAG#v}; BASE=$repo_url/releases/download/$TAG
+  VERSION=${TAG#"$TAG_PREFIX"}; BASE=$repo_url/releases/download/$TAG
   version_pattern=${VERSION//./\\.}
-  PACKAGE_PATTERN="^omarchy-notes-${version_pattern}-[0-9]+(\\.[0-9]+)?-${ARCH}\\.pkg\\.tar\\.zst$"
+  PACKAGE_PATTERN="^${PACKAGE_NAME}-${version_pattern}-[0-9]+(\\.[0-9]+)?-${ARCH}\\.pkg\\.tar\\.zst$"
   ok "Release $TAG selected"
   step 'Reading release checksums' "${CURL[@]}" --output "$WORK/SHA256SUMS" "$BASE/SHA256SUMS" ||
     die "Could not download checksums for $TAG. Check that the release exists and the network is available."
   read_manifest
   PACMAN_FLAGS=(); (( ! YES )) || PACMAN_FLAGS+=(--noconfirm)
   BUILD_DEPS=(base-devel cmake ninja pkgconf qt6-base qt6-declarative qt6-svg sqlite)
+  if [[ $EDITION == rust ]]; then
+    BUILD_DEPS=(base-devel rustup clang cmake pkgconf git vulkan-headers python glib2 cairo pango libxcb
+      libxkbcommon libxkbcommon-x11 wayland vulkan-icd-loader hicolor-icon-theme noto-fonts-cjk noto-fonts-emoji xdg-desktop-portal xdg-utils)
+  fi
   local recipe='' recipe_hash='' source='' source_hash='' installed=''
   if (( SOURCE )); then
-    select_asset "^omarchy-notes-${version_pattern}-aur\\.tar\\.gz$" 'AUR recipe'
+    select_asset "^${PACKAGE_NAME}-${version_pattern}-aur\\.tar\\.gz$" 'AUR recipe'
     recipe=$ASSET; recipe_hash=$HASH
-    select_asset "^omarchy-notes-${version_pattern}\\.tar\\.gz$" 'source archive'
+    select_asset "^${PACKAGE_NAME}-${version_pattern}\\.tar\\.gz$" 'source archive'
     source=$ASSET; source_hash=$HASH
     note "Build $TAG as your user, then install with pacman."
     note "Build dependencies: ${BUILD_DEPS[*]}"
   else
     select_asset "$PACKAGE_PATTERN" "$ARCH application package"
     PACKAGE=$WORK/$ASSET
-    PACKAGE_VERSION=${ASSET#omarchy-notes-}; PACKAGE_VERSION=${PACKAGE_VERSION%-"$ARCH".pkg.tar.zst}
-    installed=$(pacman -Q omarchy-notes </dev/null 2>/dev/null || true)
-    if [[ $installed == "omarchy-notes $PACKAGE_VERSION" ]]; then note "Package $PACKAGE_VERSION is already installed."; fi
+    PACKAGE_VERSION=${ASSET#"$PACKAGE_NAME"-}; PACKAGE_VERSION=${PACKAGE_VERSION%-"$ARCH".pkg.tar.zst}
+    installed=$(pacman -Q "$PACKAGE_NAME" </dev/null 2>/dev/null || true)
+    if [[ $installed == "$PACKAGE_NAME $PACKAGE_VERSION" ]]; then note "Package $PACKAGE_VERSION is already installed."; fi
   fi
   if (( DRY )); then
     note 'Dry run: release inspected; no packages or configuration will be changed.'
     if (( SOURCE )); then
       note "Would download and verify $recipe and $source."
       note "Would run sudo pacman -S --needed ${BUILD_DEPS[*]}, then makepkg --cleanbuild."
-    elif [[ $installed != "omarchy-notes $PACKAGE_VERSION" ]]; then
+    elif [[ $installed != "$PACKAGE_NAME $PACKAGE_VERSION" ]]; then
       note "Would download and verify $ASSET, and check its package identity."
     fi
-    if (( SOURCE )) || [[ $installed != "omarchy-notes $PACKAGE_VERSION" ]]; then note 'Would run sudo pacman -U <verified-package>.'; fi
+    if (( SOURCE )) || [[ $installed != "$PACKAGE_NAME $PACKAGE_VERSION" ]]; then note 'Would run sudo pacman -U <verified-package>.'; fi
     note 'Would verify the package-owned executable with off-screen --version.'
-    if [[ $QUICK == yes ]]; then note 'Would set up Quick Note on compatible Omarchy configuration.'
-    elif [[ $QUICK == ask ]] && (( IS_OMARCHY && ! YES )); then note 'Would offer optional Quick Note setup in an interactive terminal.'; fi
+    if [[ $QUICK == yes && $EDITION == rust ]]; then note 'Would show the Rust desktop Quick Note action and manual distinct-key setup instructions.'
+    elif [[ $QUICK == yes ]]; then note 'Would set up Quick Note on compatible Omarchy configuration.'
+    elif [[ $EDITION == qt && $QUICK == ask ]] && (( IS_OMARCHY && ! YES )); then note 'Would offer optional Quick Note setup in an interactive terminal.'; fi
     printf '\n'; return 0
   fi
-  if (( SOURCE )) || [[ $installed != "omarchy-notes $PACKAGE_VERSION" ]]; then
+  if (( SOURCE )) || [[ $installed != "$PACKAGE_NAME $PACKAGE_VERSION" ]]; then
     if ! confirm "Install Omarchy Notes $TAG?" Y/n; then note 'Installation cancelled.'; return 0; fi
     if (( SOURCE )); then build_source "$recipe" "$recipe_hash" "$source" "$source_hash"
     else download_verified "$ASSET" "$HASH" "$PACKAGE"; fi

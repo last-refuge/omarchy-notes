@@ -26,11 +26,14 @@ import unittest
 INSTALLER = Path(sys.argv.pop(1)).resolve()
 PACKAGE = "omarchy-notes-1.0.0-1-x86_64.pkg.tar.zst"
 REPO = "https://github.com/last-refuge/omarchy-notes"
+RELEASES_API = "https://api.github.com/repos/last-refuge/omarchy-notes/releases?per_page=100"
 
 SHIM = r'''#!/usr/bin/env python3
 import json, os, pathlib, subprocess, sys, time
 root = pathlib.Path(os.environ["MOCK_ROOT"])
 cfg = json.loads((root / "config.json").read_text())
+package = cfg.get("package", "omarchy-notes")
+version = cfg.get("version", "1.0.0")
 name = pathlib.Path(sys.argv[0]).name
 args = sys.argv[1:]
 with (root / "calls.jsonl").open("a") as calls:
@@ -48,10 +51,12 @@ elif name == "curl":
         (root / "child.pid").write_text(str(child.pid))
         (root / "worker.pid").write_text(str(os.getpid()))
         child.wait()
-    if cfg.get("fail_asset") == asset:
+    if cfg.get("fail_asset") == asset or (url.startswith("https://api.github.com/") and cfg.get("fail_asset") == "latest"):
         fail("curl: simulated HTTP 404 / network failure", 22)
-    if "--write-out" in args:
-        print(cfg.get("latest_url", "https://github.com/last-refuge/omarchy-notes/releases/tag/v1.0.0"), end="")
+    if url.startswith("https://api.github.com/"):
+        tag = cfg.get("latest_url", "https://github.com/last-refuge/omarchy-notes/releases/tag/v1.0.0").rsplit("/",1)[-1]
+        data = json.dumps(cfg.get("releases", [{"tag_name":tag,"published_at":"2026-10-13T00:00:00Z","draft":False,"prerelease":False}])).encode()
+        pathlib.Path(args[args.index("--output") + 1]).write_bytes(data)
     else:
         source = root / "assets" / asset
         if not source.exists():
@@ -67,18 +72,20 @@ elif name == "sudo":
     sys.exit(subprocess.call(args, stdin=sys.stdin))
 elif name == "pacman":
     if args[0] == "-Q":
-        state = root / "installed"
+        state = root / ("installed-rust" if args[1] == "omarchy-notes-rust" else "installed")
         if not state.exists(): sys.exit(1)
-        print("omarchy-notes " + state.read_text())
+        print(args[1] + " " + state.read_text())
     elif args[0] == "-Qp":
-        print(cfg.get("identity", "omarchy-notes 1.0.0-1"))
+        print(cfg.get("identity", package + " " + version + "-1"))
     elif args[0] == "-Qip":
         print("Architecture    : " + cfg.get("package_arch", "x86_64"))
     elif args[0] == "-Ql":
-        print("omarchy-notes " + str(root / "system/bin/omarchy-notes"))
+        print(args[1] + " " + str(root / "system/bin" / args[1]))
+        if args[1] == "omarchy-notes-rust":
+            print(args[1] + " " + str(root / "system/bin/omarchy-notes-preview"))
     elif args[0] == "-U":
         if cfg.get("deny_pacman"): fail("pacman: simulated transaction failure")
-        (root / "installed").write_text("1.0.0-1")
+        (root / ("installed-rust" if package == "omarchy-notes-rust" else "installed")).write_text(version + "-1")
         print("pacman transaction visible")
     elif args[0] == "-S":
         print("build dependency transaction visible")
@@ -86,13 +93,13 @@ elif name == "pacman":
 elif name == "makepkg":
     if cfg.get("fail_build"): fail("simulated compiler failure")
     destination = pathlib.Path(os.environ["PKGDEST"])
-    (destination / "omarchy-notes-1.0.0-1-x86_64.pkg.tar.zst").write_bytes(b"built package")
-    (destination / "omarchy-notes-debug-1.0.0-1-x86_64.pkg.tar.zst").write_bytes(b"debug")
-elif name == "omarchy-notes":
+    (destination / f"{package}-{version}-1-x86_64.pkg.tar.zst").write_bytes(b"built package")
+    (destination / f"{package}-debug-{version}-1-x86_64.pkg.tar.zst").write_bytes(b"debug")
+elif name in ("omarchy-notes", "omarchy-notes-rust"):
     if args == ["--version"]:
-        if os.environ.get("QT_QPA_PLATFORM") != "offscreen": fail("not off-screen")
+        if name == "omarchy-notes" and os.environ.get("QT_QPA_PLATFORM") != "offscreen": fail("not off-screen")
         if cfg.get("fail_verify"): fail("simulated Qt failure")
-        print(cfg.get("app_version", "omarchy-notes 1.0.0"))
+        print(cfg.get("app_version", name + " " + version))
     elif args == ["--setup-hyprland"]:
         if cfg.get("quick_conflict"):
             print("Super + Alt + N is already bound, so nothing was changed.")
@@ -118,6 +125,10 @@ class InstallerTests(unittest.TestCase):
         for name in ("curl", "sudo", "pacman", "uname", "makepkg", "omarchy"):
             (self.root / "bin" / name).symlink_to(shim)
         (self.root / "system/bin/omarchy-notes").symlink_to(shim)
+        (self.root / "system/bin/omarchy-notes-rust").symlink_to(shim)
+        alias = self.root / "system/bin/omarchy-notes-preview"
+        alias.write_text('#!/bin/sh\nexec "' + str(self.root / "system/bin/omarchy-notes-rust") + '" "$@"\n')
+        alias.chmod(0o755)
         self.config = {}
         (self.root / "config/hypr/bindings.lua").write_text("-- sentinel binding\n")
         (self.root / "config/hypr/hyprland.lua").write_text("-- sentinel rule\n")
@@ -190,7 +201,7 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(list((self.root / "tmp").iterdir()), [])
         self.assertNotIn("\x1b", result.stdout)
         urls = [args[-1] for args in self.calls("curl")]
-        self.assertEqual(urls.count(REPO + "/releases/latest"), 1)
+        self.assertEqual(urls.count(RELEASES_API), 1)
         self.assertTrue(all("/download/v1.0.0/" in url for url in urls[1:]))
         self.assertFalse(any("debug" in url for url in urls))
 
@@ -325,6 +336,59 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual([args[0] for args in self.mutations()], ["-S", "-U"])
         self.assertEqual(len(self.calls("makepkg")), 1)
         self.assertFalse(any(PACKAGE == args[-1].rsplit("/", 1)[-1] for args in self.calls("curl")))
+
+    def rust_release(self):
+        self.config.update(package="omarchy-notes-rust", version="0.1.0")
+        name = "omarchy-notes-rust-0.1.0"
+        (self.root / "assets" / f"{name}-1-x86_64.pkg.tar.zst").write_bytes(b"separate rust package")
+        self.archive(f"{name}-aur.tar.gz", {"aur/PKGBUILD":"pkgname=omarchy-notes-rust\n", "aur/.SRCINFO":"pkgname = omarchy-notes-rust\n"})
+        self.archive(f"{name}.tar.gz", {f"{name}/Cargo.toml":"source"})
+        self.manifest()
+        self.config["releases"] = [
+            {"tag_name":"rust-v0.1.0", "published_at":"2026-10-13T00:00:00Z"},
+            {"tag_name":"v1.0.0", "published_at":"2026-09-23T00:00:00Z"},
+            {"tag_name":"rust-v9.0.0", "published_at":"2026-10-14T00:00:00Z", "prerelease":True},
+            {"tag_name":"rust-v8.0.0", "published_at":"2026-10-15T00:00:00Z", "draft":True},
+        ]
+
+    def test_rust_edition_coexists_and_latest_selection_is_edition_filtered(self):
+        self.rust_release()
+        (self.root / "installed").write_text("1.0.0-1")
+        result = self.run_installer("--yes", "--edition", "rust", "--quick-note")
+        self.assert_success(result)
+        self.assertIn("rust-v0.1.0 selected", result.stdout)
+        self.assertIn(str(self.root / "data/omarchy-notes-gpui"), result.stdout)
+        self.assertIn("No bindings were changed", result.stdout)
+        self.assertEqual(self.calls("omarchy-notes-rust"), [["--version"], ["--version"]])
+        self.assertEqual(self.calls("omarchy-notes"), [])
+        self.assertEqual((self.root / "installed").read_text(), "1.0.0-1")
+        self.assertEqual((self.root / "data/omarchy-notes/library.sqlite3").read_bytes(), b"untouched notes")
+        self.assertEqual((self.root / "config/hypr/bindings.lua").read_text(), "-- sentinel binding\n")
+        self.assertTrue(all("/download/rust-v0.1.0/" in url[-1] for url in self.calls("curl")[1:]))
+        # The Qt default still selects its own release despite a newer Rust one.
+        self.config.pop("package"); self.config.pop("version")
+        result = self.run_installer("--yes", "--no-quick-note")
+        self.assert_success(result)
+        self.assertIn("Release v1.0.0 selected", result.stdout)
+
+    def test_cross_edition_tags_packages_and_architectures_are_refused(self):
+        self.rust_release()
+        self.assert_failure(self.run_installer("--yes", "--edition=rust", "--version=v1.0.0"), "stable release tag for rust")
+        self.assert_failure(self.run_installer("--yes", "--version=rust-v0.1.0"), "stable release tag for qt")
+        self.assert_failure(self.run_installer("--yes", "--edition=other"), "must be qt or rust")
+        self.config["identity"] = "omarchy-notes 0.1.0-1"
+        self.assert_failure(self.run_installer("--yes", "--edition=rust"), "Unexpected package identity")
+        self.config["arch"] = "aarch64"
+        self.assert_failure(self.run_installer("--yes", "--edition=rust"), "x86_64 only")
+        self.assertEqual(self.mutations(), [])
+
+    def test_rust_source_route_selects_separate_recipe_and_dependencies(self):
+        self.rust_release()
+        self.assert_success(self.run_installer("--yes", "--source", "--edition=rust"))
+        deps = next(args for args in self.mutations() if args[0] == "-S")
+        self.assertIn("rustup", deps)
+        self.assertNotIn("qt6-base", deps)
+        self.assertEqual(self.calls("omarchy-notes-rust"), [["--version"], ["--version"]])
 
     def test_source_failures(self):
         self.config["corrupt_asset"] = "omarchy-notes-1.0.0-aur.tar.gz"

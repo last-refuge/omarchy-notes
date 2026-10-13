@@ -5,6 +5,10 @@ Discovery recorded 13 October 2026 for R0 of the
 This is a release contract and implementation map, **not an announcement that
 Rust v1 has shipped**. Current source and release tooling still identify the
 Rust application as a `0.1.0` preview. Human release gates remain required.
+R4 source now provides the separate Rust executable/package, compatibility
+launcher and metadata, candidate preparation, edition-filtered installer and
+CI routes. Focused identity/installer checks pass; clean package builds,
+installed/native matrices and the complete license audit remain acceptance work.
 
 ## Separate editions
 
@@ -83,7 +87,7 @@ and `src/app/main.cpp`, compared with `crates/omarchy-notes/src/main.rs`.
 
 | Advertised Qt option | Rust preview route | Stable Rust decision |
 |---|---|---|
-| `--help`, `--version` | Implemented; reports preview identity | Report stable edition identity and matching workspace/package version |
+| `--help`, `--version` | Source builds provide both executable names; the installed alias reports Rust identity | Match Rust workspace/package version; no stable claim while version is 0.x |
 | `--data-dir PATH` | Opens any compatible directory supplied by the caller | Retain; guide Qt imports to copies and verified backups |
 | `--new` | Main-window launch/forwarding | Retain |
 | `--note UUID` | Specific-note launch/forwarding | Retain |
@@ -147,11 +151,11 @@ captured by the tree.
 | `.github/workflows/ci.yml`, `release.yml` | Preserve Qt CI; add clean Rust packaging and `rust-v*` tag route; checksums/source hash and draft release from exact committed source |
 | Rust release/build/rollback docs | Separate source build and installer commands, feature limits and actual screenshots; no untested X11/aarch64 claims |
 
-The current installer hardcodes `omarchy-notes` at package metadata, file-list,
-version, installed-package and executable checks. Parameterize from a closed
-edition allowlist; never accept arbitrary names. Its current `vX.Y.Z` tag parser
-must reject Rust tags in Qt mode and Qt tags in Rust mode. Rust Quick Note setup
-must avoid taking the Qt key if both editions are installed.
+The installer now selects package, executable, tag and asset patterns from a
+closed Qt/Rust allowlist; it rejects cross-edition names. Latest discovery filters
+published release tags by edition. Rust Quick Note uses its desktop action or
+the documented manual distinct-key route; automatic Qt setup is never invoked
+for Rust. See [Rust release instructions](rust-release.md).
 
 ## Runtime and license discovery
 

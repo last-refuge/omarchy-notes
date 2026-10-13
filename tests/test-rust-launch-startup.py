@@ -14,7 +14,7 @@ import uuid
 from rust_native_test import InstanceSocket
 
 REPO = Path(__file__).resolve().parents[1]
-BINARY = REPO / "target/release/omarchy-notes-preview"
+BINARY = REPO / "target/release/omarchy-notes-rust"
 
 
 def wait(predicate, label, timeout=15):
@@ -77,7 +77,7 @@ def run():
             clients = json.loads(subprocess.check_output(["hyprctl", "clients", "-j"], timeout=3))
             owned = [w for w in clients if w.get("pid") in [p.pid for p in pair]]
             assert len(owned) == 1 and owned[0]["pid"] == owner.pid
-            assert owned[0]["class"] == "org.omarchy.Notes.Preview"
+            assert owned[0]["class"] == "org.omarchy.Notes.Rust"
             cli(root, "--new")
             assert len(rows(root)) == 3
             stop(owner)
@@ -86,7 +86,7 @@ def run():
             # private socket; it must neither create nor duplicate a note.
             id = rows(root)[0][0]
             owner = start(root, "specific", "--note", id)
-            wait(lambda: any(w.get("pid") == owner.pid and w.get("class") == "org.omarchy.Notes.Preview" for w in json.loads(subprocess.check_output(["hyprctl", "clients", "-j"], timeout=3))), "specific note startup")
+            wait(lambda: any(w.get("pid") == owner.pid and w.get("class") == "org.omarchy.Notes.Rust" for w in json.loads(subprocess.check_output(["hyprctl", "clients", "-j"], timeout=3))), "specific note startup")
             endpoints.append(InstanceSocket(root, owner))
             assert id in cli(root).stdout and len(rows(root)) == 3
             stop(owner)
@@ -96,7 +96,7 @@ def run():
 
             failed = Path(temporary) / "failure"
             owner = start(failed, "failure", "--simulate-save-failure")
-            wait(lambda: any(w.get("pid") == owner.pid and w.get("class") == "org.omarchy.Notes.Preview" for w in json.loads(subprocess.check_output(["hyprctl", "clients", "-j"], timeout=3))), "failure owner")
+            wait(lambda: any(w.get("pid") == owner.pid and w.get("class") == "org.omarchy.Notes.Rust" for w in json.loads(subprocess.check_output(["hyprctl", "clients", "-j"], timeout=3))), "failure owner")
             endpoints.append(InstanceSocket(failed, owner))
             reply = cli(failed, "--new", ok=False)
             assert "Couldn’t create" in reply.stderr and not rows(failed)

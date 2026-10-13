@@ -29,7 +29,8 @@ def args():
         raise RuntimeError("Native ownership guards require Python assertions; do not use -O or PYTHONOPTIMIZE")
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--run", action="store_true", help="Actually launch the isolated desktop; otherwise inspect prerequisites only")
-    p.add_argument("--binary", type=Path, default=REPO / "target/release/omarchy-notes-preview")
+    p.add_argument("--binary", type=Path, default=REPO / "target/release/omarchy-notes-rust")
+    p.add_argument("--app-id", choices=("org.omarchy.Notes.Rust", "org.omarchy.Notes.Preview"), default="org.omarchy.Notes.Rust", help="Exact owned application identity; select Preview explicitly only for frozen historical binaries")
     p.add_argument("--output", type=Path, default=REPO / "target/isolated-native-qa")
     p.add_argument("--mode", choices=("ime", "orca", "both"), default="both")
     p.add_argument("--manual-seconds", type=int, default=0, help="Keep the owned desktop open after scripted checks; no automatic human-pass claim")
@@ -59,7 +60,7 @@ def preflight(a):
         missing.append("audited Hyprland 0.56.2 / Aquamarine 0.15.0 / libseat 0.9.3 versions")
     if a.mode in ("orca", "both") and "orca 50.2-" not in packages:
         missing.append("audited Orca 50.2 silent transport initializer")
-    report = {"status": "unverified" if missing else "observed", "installed_packages": packages.splitlines(), "missing": missing, "launched": False, "binary": str(a.binary.resolve())}
+    report = {"status": "unverified" if missing else "observed", "installed_packages": packages.splitlines(), "missing": missing, "launched": False, "binary": str(a.binary.resolve()), "app_id": a.app_id}
     if a.binary.is_file():
         report["binary_sha256"] = hashlib.sha256(a.binary.read_bytes()).hexdigest()
     print(json.dumps(report, indent=2), flush=True)
@@ -118,7 +119,7 @@ class Desktop:
         active, workspace = self.compositor("activewindow"), self.compositor("activeworkspace")
         expected = address or self.app_address
         assert active.get("pid") == self.app.pid and active.get("address") == expected, "Refusing input: exact nested app window lost focus"
-        assert active.get("class") in ("org.omarchy.Notes.Preview", "org.omarchy.Notes.Rust"), "Unexpected owned application identity"
+        assert active.get("class") == self.a.app_id, "Unexpected owned application identity"
         assert active["workspace"]["id"] == workspace["id"], "Refusing input: nested workspace changed"
         parent = next((c for c in self.compositor("clients", host=True)
                        if c.get("pid") == self.nest.pid and c.get("address") == self.outer_address), None)
@@ -800,7 +801,7 @@ def main():
   </policy>
 </busconfig>
 ''')
-        command = ["dbus-run-session", "--config-file=" + str(bus_config), "--", sys.executable, str(Path(__file__).resolve()), "--run", "--private-worker", directory, "--binary", str(a.binary), "--output", str(a.output), "--mode", a.mode, "--manual-seconds", str(a.manual_seconds)]
+        command = ["dbus-run-session", "--config-file=" + str(bus_config), "--", sys.executable, str(Path(__file__).resolve()), "--run", "--private-worker", directory, "--binary", str(a.binary), "--app-id", a.app_id, "--output", str(a.output), "--mode", a.mode, "--manual-seconds", str(a.manual_seconds)]
         if a.routing_proof:
             command.append("--routing-proof")
         with (a.output / "driver.log").open("w") as driver_log:

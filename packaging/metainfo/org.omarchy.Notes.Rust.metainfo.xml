@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.omarchy.Notes.Rust</id>
+  <name>Omarchy Notes (Rust)</name>
+  <summary>Local notes, Rust edition in early access</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>The separate Rust edition of Omarchy Notes keeps rich notes in a local SQLite library, without an account. This early-access candidate has not completed v1 release acceptance.</p>
+    <ul>
+      <li>Rich writing, headings, lists, checklists, basic tables, images and attached files</li>
+      <li>Nested folders, pinning, prefix search and recoverable deletion</li>
+      <li>Quick Note and durable command-line capture</li>
+      <li>Portable import/export and verified library backups</li>
+    </ul>
+    <p>Rust uses its preview data directory and coexists with the Qt edition. Tags and Smart Folder interfaces are deferred; existing records remain preserved. Quotation libraries require Rust and returning to Qt uses a pre-upgrade backup.</p>
+  </description>
+  <launchable type="desktop-id">org.omarchy.Notes.Rust.desktop</launchable>
+  <provides><binary>omarchy-notes-rust</binary></provides>
+  <url type="homepage">https://lastrefuge.ai/projects/omarchy-notes</url>
+  <url type="bugtracker">https://github.com/last-refuge/omarchy-notes/issues</url>
+  <url type="vcs-browser">https://github.com/last-refuge/omarchy-notes</url>
+  <developer id="com.github.last-refuge"><name>Omarchy Notes contributors</name></developer>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.0" date="2026-10-13" type="development">
+      <description><p>Early-access Rust edition; stable release gates remain open.</p></description>
+    </release>
+  </releases>
+</component>

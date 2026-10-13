@@ -8,7 +8,7 @@ from pathlib import Path
 from rust_native_test import InstanceSocket
 root=Path(tempfile.mkdtemp(prefix='notes-media-native-'))
 os.environ['XDG_CONFIG_HOME']=str(root/'config')
-repo=Path(__file__).resolve().parents[1];binary=repo/'target/release/omarchy-notes-preview';probe=repo/'target/debug/examples/clipboard-probe'
+repo=Path(__file__).resolve().parents[1];binary=repo/'target/release/omarchy-notes-rust';probe=repo/'target/debug/examples/clipboard-probe'
 children=[];owners=[];instance_sockets=[];active=None;address=None
 fixture=repo/'tests/fixtures/qt-v1/blobs'
 png=fixture/'bd/bdec1de53e3c856d6973c7324a5d719d6f6169e01a6f75ae3b4453f419d625e2';pdf=root/'Release notes.pdf';pdf.write_bytes((fixture/'d7/d7449961543b028f75a5778a6cbcfb8d3b7ea2dfe66da1efc60d9747f4fc4803').read_bytes())
@@ -19,14 +19,14 @@ def read_json(*args):return json.loads(subprocess.check_output(['hyprctl',*args]
 def guard():
  assert active and active.poll() is None,'Owned process exited'
  w=read_json('activewindow','-j');ws=read_json('activeworkspace','-j')
- assert w.get('pid')==active.pid and w.get('address')==address and w.get('class')=='org.omarchy.Notes.Preview','Refusing input: test window lost focus'
+ assert w.get('pid')==active.pid and w.get('address')==address and w.get('class')=='org.omarchy.Notes.Rust','Refusing input: test window lost focus'
  assert w['workspace']['id']==ws['id'],'Refusing input: workspace changed'
 def launch(name):
  global active,address
  with (root/f'{name}.log').open('a') as log:active=subprocess.Popen([str(binary),'--reference','--data-dir',str(root/name)],stdout=log,stderr=log)
  children.append(active);deadline=time.monotonic()+15
  while time.monotonic()<deadline:
-  own=[w for w in read_json('clients','-j') if w.get('pid')==active.pid and w.get('class')=='org.omarchy.Notes.Preview']
+  own=[w for w in read_json('clients','-j') if w.get('pid')==active.pid and w.get('class')=='org.omarchy.Notes.Rust']
   if own:address=own[0]['address'];guard();instance_sockets.append(InstanceSocket(root/name,active));time.sleep(.3);return
   assert active.poll() is None,(root/f'{name}.log').read_text();time.sleep(.1)
  raise AssertionError('Window did not appear')

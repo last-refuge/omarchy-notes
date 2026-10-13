@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
+import tomllib
 
 
 def git(repo, *args):
@@ -35,7 +36,9 @@ def archive(path, root, names, epoch):
                 tar.add(root / name, arcname=name, filter=normalize)
 
 
-def prepare(repo, ref, output):
+def prepare(repo, ref, output, edition="qt", candidate=False):
+    if edition not in ("qt", "rust"):
+        raise ValueError("Edition must be qt or rust")
     revision = git(repo, "rev-parse", "--verify", f"{ref}^{{commit}}").decode().strip()
     epoch = int(git(repo, "show", "-s", "--format=%ct", revision))
     if output.exists():
@@ -46,17 +49,39 @@ def prepare(repo, ref, output):
         tree.mkdir()
         with tarfile.open(fileobj=io.BytesIO(git(repo, "archive", revision))) as tar:
             tar.extractall(tree, filter="data")
-        match = re.search(r"^project\(omarchy-notes\s+VERSION ([0-9]+\.[0-9]+\.[0-9]+)\b",
-                          (tree / "CMakeLists.txt").read_text(), re.M)
-        if not match:
-            raise ValueError("Source revision has no supported release version")
-        version = match[1]
-        if ref.startswith("v") and ref != f"v{version}":
-            raise ValueError("Tag does not match the source version")
-        template = (tree / "packaging/arch/PKGBUILD.in").read_text()
+        if edition == "rust":
+            version = tomllib.loads((tree / "Cargo.toml").read_text())["workspace"]["package"]["version"]
+            if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+                raise ValueError("Rust workspace must use a supported release version")
+            if ref.startswith("v") or (ref.startswith("rust-v") and ref != f"rust-v{version}"):
+                raise ValueError("Rust tag does not match the source version or edition")
+            if not candidate and (version.startswith("0.") or ref != f"rust-v{version}"):
+                raise ValueError("Unreleased Rust sources require --candidate; stable preparation requires the exact rust-vVERSION tag")
+            template = (tree / "packaging/arch/PKGBUILD-rust.in").read_text()
+            if template.count("@RUST_VERSION@") != 1:
+                raise ValueError("Rust PKGBUILD has no unique version placeholder")
+            template = template.replace("@RUST_VERSION@", version)
+            if not candidate:
+                template = template.replace(" (early access; v1 acceptance pending)", "")
+            source_name = f"omarchy-notes-rust-{version}"
+            kind = "candidate" if candidate else "stable"
+            (tree / "SOURCE_REVISION").write_text(revision + "\n")
+            (tree / "RELEASE_KIND").write_text(kind + "\n")
+        else:
+            if candidate:
+                raise ValueError("--candidate is specific to the separate Rust edition")
+            match = re.search(r"^project\(omarchy-notes\s+VERSION ([0-9]+\.[0-9]+\.[0-9]+)\b",
+                              (tree / "CMakeLists.txt").read_text(), re.M)
+            if not match:
+                raise ValueError("Source revision has no supported release version")
+            version = match[1]
+            if ref.startswith("rust-v") or (ref.startswith("v") and ref != f"v{version}"):
+                raise ValueError("Tag does not match the source version or edition")
+            template = (tree / "packaging/arch/PKGBUILD.in").read_text()
+            source_name = f"omarchy-notes-{version}"
+            kind = "qt"
         if f"pkgver={version}\n" not in template or template.count("@SOURCE_B2SUM@") != 1:
             raise ValueError("PKGBUILD template does not match the source version")
-        source_name = f"omarchy-notes-{version}"
         source = work / source_name
         tree.rename(source)
         artifacts = work / "artifacts"
@@ -73,6 +98,7 @@ def prepare(repo, ref, output):
         # makepkg uses this exact archive locally before it is published at the source URL.
         shutil.copyfile(source_archive, aur / source_archive.name)
         (artifacts / "SOURCE_REVISION").write_text(revision + "\n")
+        (artifacts / "RELEASE_KIND").write_text(kind + "\n")
         with (artifacts / "SHA256SUMS").open("w") as sums:
             for path in sorted(artifacts.iterdir()):
                 if path.is_file() and path.name != "SHA256SUMS":
@@ -86,9 +112,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", type=Path, default=Path(__file__).resolve().parent.parent)
     parser.add_argument("--ref", required=True, help="Committed revision or release tag")
+    parser.add_argument("--edition", choices=("qt", "rust"), default="qt", help="Separate edition; Qt remains the default")
+    parser.add_argument("--candidate", action="store_true", help="Prepare unannounced Rust candidate artifacts without claiming a stable release")
     parser.add_argument("--output", required=True, type=Path, help="New output directory")
     args = parser.parse_args()
     try:
-        prepare(args.repo.resolve(), args.ref, args.output.resolve())
+        prepare(args.repo.resolve(), args.ref, args.output.resolve(), args.edition, args.candidate)
     except (ValueError, OSError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"Release preparation failed: {error}\n")

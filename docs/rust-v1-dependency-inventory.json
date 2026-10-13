@@ -1,0 +1,310 @@
+{
+  "bundled_asset_and_vendor_files": [
+    {
+      "path": "LICENSE",
+      "sha256": "5667439af4e6d3a8d91fa4efbff2e8d66eae7eba880c2acb700da6b412b7081b"
+    },
+    {
+      "path": "crates/notes-ui/assets/NOTICE.md",
+      "sha256": "a860e37c4291987aca16cd0a9221aa66c000ee0314cb51b437f87cb4fb81b153"
+    },
+    {
+      "path": "crates/notes-ui/assets/GPUI-LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "path": "crates/notes-ui/assets/fonts/OFL.txt",
+      "sha256": "cee9892f9f0cc8fe882c9e9537ee6a89621d86ee7ceaf70b02e2b2b1c25c061a"
+    },
+    {
+      "path": "vendor/accesskit_unix/LICENSE-MIT",
+      "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+    },
+    {
+      "path": "vendor/accesskit_unix/LICENSE-APACHE",
+      "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+    },
+    {
+      "path": "vendor/accesskit_unix/OMARCHY-PATCH.md",
+      "sha256": "d7408bb48784bfc81100f71cfb495fd443d5c295f5de72abb1ecfbabde9a74ae"
+    },
+    {
+      "path": "packaging/icons/org.omarchy.Notes.Rust.svg",
+      "sha256": "860568773a12270ee3171aca869faaa7adc3df2747ec2493d798ffbc866cfb88"
+    },
+    {
+      "path": "crates/notes-ui/assets/fonts/NotoSans-Medium.ttf",
+      "sha256": "635d93d1131d791f2576de90b3bb0f7cdf61929906e8420a61b5f7f8e76420bb"
+    },
+    {
+      "path": "crates/notes-ui/assets/fonts/NotoSans-Regular.ttf",
+      "sha256": "478c558ea716033cd60c03438f628dfa75694dcf6b5f6d505a2f05fd2b4f3823"
+    },
+    {
+      "path": "crates/notes-ui/assets/fonts/NotoSerif-Bold.ttf",
+      "sha256": "96656aa5cec8f1d6fd0e804c1fad397e1a1cfa082e6642124e0bda68cd8363ce"
+    },
+    {
+      "path": "crates/notes-ui/assets/fonts/NotoSerif-Italic.ttf",
+      "sha256": "749e80e313ef711f9373c6cce17c72297ef05490b3dcda7967d1d5d90bf1183f"
+    },
+    {
+      "path": "crates/notes-ui/assets/fonts/NotoSerif-Regular.ttf",
+      "sha256": "19e72cd8d595fae5bd74a5206f5d938512e1183d4fed7abb1ec1be1d7efa5f88"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/all-notes.svg",
+      "sha256": "e68aa0f057c7a2a62bc669ad9e00f6f04a07757b8f9a0b11bc7cb5600d50ced3"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/arrow.svg",
+      "sha256": "615144f4ca0b21f09a4f3a31e2820d6219969ed11f474d52cc0653e21ea127d8"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/attach.svg",
+      "sha256": "134a9017889e0b71e5a8c34b376da9cc34da12e84a553e2d9e4269f1b0546adc"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/back.svg",
+      "sha256": "996e5a4b1673eb2adafe8b27cbe02a5dfd5a38f4b395382f8739e3bd7db00b11"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/check.svg",
+      "sha256": "d83dabb1807f2b82810f82916a4e0a324fa30211762d4c7c2bdba47714a607ac"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/checklist.svg",
+      "sha256": "7868cb15a643ff72b186d5e23ff914846c19cd8462d8ea3b06513adfad4bfc6a"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/close.svg",
+      "sha256": "064ef2ab2b2997065a581097689093415f13e43b29d33f04322e1bfb9ea025a2"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/focus.svg",
+      "sha256": "a4ba28f686a33ea7fcfffa53a6a268b71241670ad2233c029e9773707f902b9c"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/folder.svg",
+      "sha256": "cf16952b6d051f0312a48b0957c44156650b8e3265c7ac6900f87a40a209cb72"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/gallery.svg",
+      "sha256": "b70f360f98835b171aa8a43c0385498b23d11240ddc1432855000b5dbdc73d25"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/link.svg",
+      "sha256": "8256e5e95b50d8838fbd12cdef846f319c276ba99b21af6417ec44285f1e7064"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/list.svg",
+      "sha256": "da8eba3aee122d03e1808eb45dcea0b1af9eb1d99461e0c95576a07b1bbb8fb9"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/maximize.svg",
+      "sha256": "9b6b7dbae83f7f1babd1b9bb0c707258f5349efbca7ef8d4870b4995da5f4832"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/minus.svg",
+      "sha256": "3d858f38a417207907f7bd187bbd7b9fb20c52070275420c3ba1b7649778312b"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/more.svg",
+      "sha256": "481fbb9d55b757671c639145ba6cbc21b5701bec8718215f50c3818194855188"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/note.svg",
+      "sha256": "1711776daecf6fa742a164a7c9fe11653d7249d80d0fdeadf3027bded4620da8"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/pin.svg",
+      "sha256": "c39f9997335746943788393d86bdcdc55fd32b0cbe1cc5254e943499569dbd56"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/plus.svg",
+      "sha256": "bc30fdf06276287fcef7802da8dd282e9854ea130bbaea9e327dca61914417ca"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/search.svg",
+      "sha256": "3a03d7de92b868b74731e0e478458cb1a34af3315caa28880176f733bdd9514e"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/sidebar.svg",
+      "sha256": "668c512445a29cd00a29d9a2a12bdd151e29891f75e712bf23321df0eabdcbb4"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/sort.svg",
+      "sha256": "5556fd8917c5bfe5bdf6d359f9445111862cc71057cc9c5b3b7a89c85ce6f8b0"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/star.svg",
+      "sha256": "7bdeaccbaae607d22a8cb240f4b1630aa46f9b6b50e462a14bd7c834949e4e53"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/sun.svg",
+      "sha256": "6606b37b9e6cecc7a5c9bf4d6bb119daa8b354fe21795f508ecab0fe146ba19d"
+    },
+    {
+      "path": "crates/notes-ui/assets/icons/trash.svg",
+      "sha256": "60095122806ebeca6f314c08f72df02681df03610afa6969a9b401157410ea40"
+    }
+  ],
+  "cargo_lock_sha256": "96a0998af78c6b369eac99bf11d38065bf03e17aebdabd39bf923ba4723a9c3c",
+  "copied_notice_count": 921,
+  "date": "2026-10-13",
+  "graph": "cargo-tree-selected non-dev normal+build closure",
+  "limits": [
+    "Build dependencies are included as conservative provenance, not a claim that their code is in the executable.",
+    "Cargo license declarations are not independently verified SPDX conclusions.",
+    "Dynamic system libraries, bundled fonts/icons, generated native code, and modified vendor notices require separate artifact review.",
+    "This does not prove runtime loading, clean installation, or stable release acceptance."
+  ],
+  "package": "omarchy-notes-preview",
+  "package_version": "0.1.0",
+  "selected_package_count": 523,
+  "source_text_gaps": [
+    {
+      "license": "CC0-1.0",
+      "license_files": [],
+      "manual_review": "Review expression, copyright/NOTICE requirements, native vendored components, and any exceptions; collection does not select a legal licensing option.",
+      "name": "hexf-parse",
+      "publisher_evidence": {
+        "authors": [
+          "Kang Seonghoon <public+rust@mearie.org>"
+        ],
+        "homepage": "https://github.com/lifthrasiir/hexf",
+        "manifest_sha256": "dd7274968556f3f3309df5615d94437ec4e4823777cc440f91177b2170cbe2a7",
+        "original_manifest_sha256": "4a56dbdbc12054fd33b7a2634a45cbbe6fe12f5e6f4081002cbfa527f7220c70",
+        "registry_package_sha256": "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df",
+        "repository": "https://github.com/lifthrasiir/hexf",
+        "vcs_revision": "4225763d744183d720f575ae96d04161b4d08ea0"
+      },
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "source_copyright_evidence": [],
+      "source_copyright_evidence_limit": "Only bounded src/lib.rs, README and original manifest inspection; an empty result does not prove no copyright holder.",
+      "version": "0.2.1"
+    },
+    {
+      "license": "MIT/Apache-2.0",
+      "license_files": [],
+      "manual_review": "Review expression, copyright/NOTICE requirements, native vendored components, and any exceptions; collection does not select a legal licensing option.",
+      "name": "pathfinder_geometry",
+      "publisher_evidence": {
+        "authors": [
+          "Patrick Walton <pcwalton@mimiga.net>"
+        ],
+        "homepage": "https://github.com/servo/pathfinder",
+        "manifest_sha256": "141871f41ab4ac7af854e54f1f637fb168ffbc97fdb57c60608f11b8eb95f1d7",
+        "original_manifest_sha256": "fdcc9be8eb9a2f08cd416fffc6e6c3d5c3311a9d06a2b8210e16e38ac91e9f78",
+        "registry_package_sha256": "0b7b7e7b4ea703700ce73ebf128e1450eb69c3a8329199ffbfb9b2a0418e5ad3",
+        "repository": "https://github.com/servo/pathfinder",
+        "vcs_revision": "a5e98fac00f433fe2ff4b2135383d82491b8bfc5"
+      },
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "source_copyright_evidence": [
+        {
+          "excerpts": [
+            {
+              "line": 3,
+              "text": "// Copyright © 2019 The Pathfinder Project Developers."
+            },
+            {
+              "line": 5,
+              "text": "// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or"
+            }
+          ],
+          "sha256": "cedfb2d85e682e9b9e327a169347bf0cebecd52668e1ed91a3af05ec91b42090",
+          "upstream_path": "src/lib.rs"
+        }
+      ],
+      "source_copyright_evidence_limit": "Only bounded src/lib.rs, README and original manifest inspection; an empty result does not prove no copyright holder.",
+      "version": "0.5.1"
+    },
+    {
+      "license": "MIT",
+      "license_files": [],
+      "manual_review": "Review expression, copyright/NOTICE requirements, native vendored components, and any exceptions; collection does not select a legal licensing option.",
+      "name": "seahash",
+      "publisher_evidence": {
+        "authors": [
+          "ticki <ticki@users.noreply.github.com>",
+          "Tom Almeida <tom@tommoa.me>"
+        ],
+        "homepage": null,
+        "manifest_sha256": "1d610f6d1bce065add6ec5f2fb764e97eeda505afbe26271acc5f3d73a8c410a",
+        "original_manifest_sha256": "dd213de338ca98b7ef7a2562bcf4e4214d215d1a8277750a6a72b4e809c8d0dd",
+        "registry_package_sha256": "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b",
+        "repository": "https://gitlab.redox-os.org/redox-os/seahash",
+        "vcs_revision": "94b632aeac099031c373599313d5b5f0acbbaec0"
+      },
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "source_copyright_evidence": [],
+      "source_copyright_evidence_limit": "Only bounded src/lib.rs, README and original manifest inspection; an empty result does not prove no copyright holder.",
+      "version": "4.1.0"
+    },
+    {
+      "license": "MIT OR Apache-2.0 OR Zlib",
+      "license_files": [],
+      "manual_review": "Review expression, copyright/NOTICE requirements, native vendored components, and any exceptions; collection does not select a legal licensing option.",
+      "name": "zune-inflate",
+      "publisher_evidence": {
+        "authors": [],
+        "homepage": "https://github.com/etemesi254/zune-image/tree/main/zune-inflate",
+        "manifest_sha256": "f3da162dd3818fcdf23c9ce34930d66064106873a692d6994abd49b80e60ea66",
+        "original_manifest_sha256": "a7e3d8fd82218e7f9f2172d41a048e4879abc81228589539e1ec750d72811f90",
+        "registry_package_sha256": "73ab332fe2f6680068f3582b16a24f90ad7096d5d39b974d1c0aff0125116f02",
+        "repository": null,
+        "vcs_revision": "69502ce83fdfecdd0beefd677e2abb3781b29d98"
+      },
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "source_copyright_evidence": [
+        {
+          "excerpts": [
+            {
+              "line": 2,
+              "text": " * Copyright (c) 2023."
+            }
+          ],
+          "sha256": "ee2b5b58f48ee36835bd4e312a26dace36be39d1c4af956f4e2e04d0620667f9",
+          "upstream_path": "src/lib.rs"
+        }
+      ],
+      "source_copyright_evidence_limit": "Only bounded src/lib.rs, README and original manifest inspection; an empty result does not prove no copyright holder.",
+      "version": "0.2.54"
+    }
+  ],
+  "spdx_declaration_counts": {
+    "(Apache-2.0 OR MIT) AND BSD-3-Clause": 1,
+    "(MIT OR Apache-2.0) AND Unicode-3.0": 1,
+    "0BSD OR MIT OR Apache-2.0": 1,
+    "Apache-2.0": 22,
+    "Apache-2.0 OR BSL-1.0": 1,
+    "Apache-2.0 OR GPL-2.0-only": 1,
+    "Apache-2.0 OR MIT": 56,
+    "Apache-2.0 WITH LLVM-exception": 1,
+    "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT": 2,
+    "Apache-2.0/MIT": 6,
+    "BSD-2-Clause": 1,
+    "BSD-2-Clause OR Apache-2.0 OR MIT": 2,
+    "BSD-3-Clause": 6,
+    "BSD-3-Clause OR Apache-2.0": 2,
+    "CC0-1.0": 2,
+    "ISC": 1,
+    "MIT": 123,
+    "MIT / Apache-2.0": 1,
+    "MIT OR Apache-2.0": 229,
+    "MIT OR Apache-2.0 OR Zlib": 6,
+    "MIT OR Zlib OR Apache-2.0": 2,
+    "MIT/Apache-2.0": 22,
+    "MPL-2.0": 1,
+    "Unicode-3.0": 18,
+    "Unlicense OR MIT": 6,
+    "Unlicense/MIT": 2,
+    "Zlib": 3,
+    "Zlib OR Apache-2.0 OR MIT": 3,
+    "bzip2-1.0.6": 1
+  },
+  "status": "incomplete source-text collection; no legal/runtime/stable acceptance",
+  "target": "x86_64-unknown-linux-gnu",
+  "version": 1
+}

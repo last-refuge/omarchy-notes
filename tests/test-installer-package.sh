@@ -31,11 +31,13 @@ while (( $# )); do
   case "$1" in
     --output) output=$2; shift ;;
     --write-out) latest=1; shift ;;
-    https://github.com/last-refuge/omarchy-notes/releases/*) url=$1 ;;
+    https://github.com/last-refuge/omarchy-notes/releases/*|https://api.github.com/repos/last-refuge/omarchy-notes/releases*) url=$1 ;;
   esac
   shift
 done
-if (( latest )); then
+if [[ $url == https://api.github.com/* ]]; then
+  printf '[{"tag_name":"%s","published_at":"2026-10-13T00:00:00Z","draft":false,"prerelease":false}]' "$NOTES_INSTALLER_TEST_TAG" >"$output"
+elif (( latest )); then
   printf 'https://github.com/last-refuge/omarchy-notes/releases/tag/%s' "$NOTES_INSTALLER_TEST_TAG"
 else
   [[ $url == "https://github.com/last-refuge/omarchy-notes/releases/download/$NOTES_INSTALLER_TEST_TAG/"* ]]
