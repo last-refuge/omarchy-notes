@@ -19,7 +19,7 @@ fn settle(cx: &mut HeadlessAppContext, h: WindowHandle<Shell>) -> anyhow::Result
     loop {
         let busy = h.update(cx, |s, w, cx| {
             s.poll_storage(w, cx);
-            s.preferences.busy()
+            s.preferences.busy() || s.folder_view_busy()
         })?;
         draw(cx, h)?;
         if !busy {
@@ -79,6 +79,7 @@ pub fn settings_check(directory: &Path) -> anyhow::Result<()> {
             let mut s =
                 Shell::new_live(Appearance::Reference, root.clone(), worker, library, w, cx);
             s.configure_preferences(preferences, cx);
+            s.configure_folder_view_in(root.clone(), Some(tmp.path().join("config")), cx);
             s.command(Command::Select(note.id.clone()), w, cx);
             s
         })
@@ -224,6 +225,9 @@ pub fn settings_check(directory: &Path) -> anyhow::Result<()> {
     h.update(&mut cx, |s, w, cx| {
         s.command(Command::Focus, w, cx);
         s.command(Command::Sort, w, cx);
+        assert_eq!(s.query.sort, notes_core::library::Sort::Created);
+        s.command(Command::Sort, w, cx);
+        assert_eq!(s.query.sort, notes_core::library::Sort::Title);
         s.command(Command::Quick, w, cx);
     })?;
     cx.run_until_parked();
@@ -292,9 +296,11 @@ pub fn settings_check(directory: &Path) -> anyhow::Result<()> {
             cx.new(|cx| {
                 let mut s = Shell::new_live(appearance, root.clone(), worker, library, w, cx);
                 s.configure_preferences(preferences, cx);
+                s.configure_folder_view_in(root.clone(), Some(tmp.path().join("config")), cx);
                 s
             })
         })?;
+        settle(&mut cx, h)?;
         h.update(&mut cx, |s, w, cx| {
             assert_eq!(s.preferences.session.value.note_size, 23);
             assert_eq!(s.sidebar_width, 281.);
@@ -307,14 +313,14 @@ pub fn settings_check(directory: &Path) -> anyhow::Result<()> {
         draw(&mut cx, h)?;
         cx.capture_screenshot(h.into())?
             .save(directory.join(format!("settings-{name}.png")))?;
-        for index in 1..14 {
+        for index in (1..14).chain(std::iter::once(15)) {
             super::super::visual_keys(&mut cx, h.into(), "tab")?;
             draw(&mut cx, h)?;
             draw(&mut cx, h)?;
             h.update(&mut cx, |s,w,_| {
                 assert!(s.preferences.focus[index].is_focused(w), "Settings Tab order at {index}");
                 let extra=usize::from(s.preferences.appearance_override.is_some());
-                let item=match index {1..=3=>4,4..=6=>6+extra,7..=8=>7+extra,9..=10=>10+extra,11..=12=>11+extra,_=>12+extra};
+                let item=match index {1..=3=>4,4..=6=>6+extra,7..=8=>7+extra,9..=10=>10+extra,11..=12=>11+extra,15=>15+extra,_=>12+extra};
                 let bounds=s.preferences.scroll.bounds_for_item(item).unwrap();
                 let painted=bounds+s.preferences.scroll.offset();
                 let viewport=s.preferences.scroll.bounds();
@@ -338,6 +344,7 @@ pub fn settings_check(directory: &Path) -> anyhow::Result<()> {
         cx.new(|cx| {
             let mut s = Shell::new_live(Appearance::Omarchy, root.clone(), worker, library, w, cx);
             s.configure_preferences(preferences, cx);
+            s.configure_folder_view_in(root.clone(), Some(tmp.path().join("config")), cx);
             s.toggle_settings(w, cx);
             s
         })

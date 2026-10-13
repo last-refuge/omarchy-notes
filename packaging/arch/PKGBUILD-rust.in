@@ -7,6 +7,8 @@ pkgdesc='Omarchy Notes Rust edition (early access; v1 acceptance pending)'
 arch=('x86_64')
 url='https://lastrefuge.ai/projects/omarchy-notes'
 license=('MIT')
+# GCC LTO objects from bundled C crates cannot link with Rust's LLVM linker.
+options=('!lto')
 depends=('glibc' 'libgcc' 'glib2' 'cairo' 'pango' 'libxcb' 'libxkbcommon' 'libxkbcommon-x11'
          'wayland' 'vulkan-icd-loader' 'hicolor-icon-theme' 'noto-fonts-cjk' 'noto-fonts-emoji'
          'xdg-desktop-portal' 'xdg-utils')

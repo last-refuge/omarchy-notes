@@ -400,6 +400,64 @@ fn settle(cx: &mut HeadlessAppContext, shell: &Entity<Shell>, h: AnyWindowHandle
         std::thread::sleep(Duration::from_millis(2));
     }
 }
+fn wait_initial_query(
+    cx: &mut HeadlessAppContext,
+    shell: &Entity<Shell>,
+    h: AnyWindowHandle,
+    expected: &[String],
+) -> Result<Value> {
+    let started = Instant::now();
+    let deadline = started + Duration::from_secs(30);
+    loop {
+        let state = h.update(cx, |_, w, cx| {
+            shell.update(cx, |s, cx| {
+                s.poll_storage(w, cx);
+                (
+                    s.query.loading,
+                    s.query.error.clone(),
+                    s.library
+                        .visible
+                        .iter()
+                        .map(|&i| s.library.notes[i].id.clone())
+                        .collect::<Vec<_>>(),
+                    s.query.has_more,
+                    s.query.sort,
+                )
+            })
+        })?;
+        cx.run_until_parked();
+        ensure!(
+            state.1.is_none(),
+            "Initial diagnostic query failed: {:?}",
+            state.1
+        );
+        if !state.0 {
+            ensure!(
+                state.2 == expected,
+                "Initial diagnostic sidebar does not contain the exact first 100 Edited query IDs"
+            );
+            ensure!(
+                state.3,
+                "The 10,000-note fixture must have another SQL page"
+            );
+            ensure!(
+                state.4 == notes_core::library::Sort::Edited,
+                "The diagnostic initial sort changed"
+            );
+            return Ok(json!({
+                "additional_wait_after_first_cpu_draw_ms": ms(started.elapsed()),
+                "rows": state.2.len(), "ids": state.2, "has_more": state.3,
+                "sort": "edited", "scope": "all", "query": "",
+                "method": "Production poll_storage acknowledges the exact initial SQL page before measured edit loops; this is separate from first CPU draw startup timing."
+            }));
+        }
+        ensure!(
+            Instant::now() < deadline,
+            "Timed out waiting for the diagnostic initial SQL page"
+        );
+        std::thread::sleep(Duration::from_millis(2));
+    }
+}
 fn select(
     cx: &mut HeadlessAppContext,
     shell: &Entity<Shell>,
@@ -424,6 +482,22 @@ fn headless(directory: &Path, f: Fixture) -> Result<()> {
     let started = Instant::now();
     let (worker, library) = Worker::start(f.root.clone(), false)?;
     report["storage_open_and_eager_load_ms"] = json!(ms(started.elapsed()));
+    let mut ordered: Vec<_> = library.notes.iter().collect();
+    ordered.sort_by(|a, b| {
+        b.pinned
+            .cmp(&a.pinned)
+            .then(b.updated_at.cmp(&a.updated_at))
+            .then(a.id.cmp(&b.id))
+    });
+    let expected_first_page: Vec<_> = ordered
+        .into_iter()
+        .take(100)
+        .map(|n| n.id.clone())
+        .collect();
+    ensure!(
+        expected_first_page.len() == 100,
+        "The diagnostic fixture lacks the required initial page"
+    );
     let mut cx = HeadlessAppContext::with_platform(
         gpui_platform::current_platform(true).text_system(),
         Arc::new(crate::assets::Assets),
@@ -453,6 +527,11 @@ fn headless(directory: &Path, f: Fixture) -> Result<()> {
     let editor = select(&mut cx, &shell, main, &f.typical[0])?;
     draw(&mut cx, main)?;
     report["shell_creation_to_first_cpu_draw_ms"] = json!(ms(started.elapsed()));
+    report["initial_query_readiness"] =
+        wait_initial_query(&mut cx, &shell, main, &expected_first_page)?;
+    report["initial_query_readiness"]["shell_creation_to_query_ready_ms"] =
+        json!(ms(started.elapsed()));
+    draw(&mut cx, main)?;
     let started = Instant::now();
     let screenshot = cx.capture_screenshot(main)?;
     report["gpu_raster_dimensions"] = json!(screenshot.dimensions());
