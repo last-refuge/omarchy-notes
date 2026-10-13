@@ -171,6 +171,7 @@ pub fn writing_check(directory: &std::path::Path) -> anyhow::Result<()> {
                 s.poll_storage(w, cx);
                 let live = s.live.as_ref().unwrap();
                 live.creating.is_none()
+                    && !s.query.loading
                     && live
                         .notes
                         .values()

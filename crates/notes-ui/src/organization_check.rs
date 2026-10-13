@@ -424,7 +424,7 @@ pub fn organization_check(directory: &Path) -> anyhow::Result<()> {
         h.update(&mut cx, |s, w, cx| {
             s.command(Command::Select(note.id.clone()), w, cx)
         })?;
-        draw(&mut cx, h)?;
+        settle(&mut cx, h)?;
         cx.capture_screenshot(h.into())?
             .save(directory.join(format!("folders-library-{name}.png")))?;
         super::super::visual_keys(&mut cx, h.into(), "ctrl-alt-m")?;
