@@ -1,0 +1,22 @@
+[package]
+name = "notes-storage"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+notes-core = { path = "../notes-core" }
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2 = "0.10"
+notes-exchange = { path = "../notes-exchange" }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
+mime_guess = "2"
+libc = "0.2"
+
+[dev-dependencies]
+tempfile.workspace = true
+notes-editor = { path = "../notes-editor" }

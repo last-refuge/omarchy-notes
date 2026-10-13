@@ -1,0 +1,23 @@
+[package]
+name = "notes-platform"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+notes-storage = { path = "../notes-storage" }
+notes-core = { path = "../notes-core" }
+serde.workspace = true
+serde_json.workspace = true
+sha2 = "0.10"
+libc = "0.2"
+tempfile.workspace = true
+raw-window-handle = "0.6"
+wayland-backend = { version = "0.3", features = ["client_system", "dlopen"] }
+wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["client", "staging"] }
+
+[dev-dependencies]
+tempfile.workspace = true

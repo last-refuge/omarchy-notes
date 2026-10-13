@@ -1,0 +1,19 @@
+[package]
+name = "notes-export"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+notes-core = { path = "../notes-core" }
+notes-storage = { path = "../notes-storage" }
+cairo-rs = { version = "0.21", features = ["pdf", "v1_16"] }
+pango = { version = "0.21", features = ["v1_50"] }
+pangocairo = "0.21"
+tempfile.workspace = true
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+
+[dev-dependencies]
+serde_json.workspace = true

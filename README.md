@@ -28,6 +28,46 @@ The idea is simple: Apple Notes' easy note-taking, on Linux. Open it, start typi
 
 ## ✨ What you can do today
 
+> **Rust / GPUI rebuild:** the [writing preview](docs/gpui-preview.md) now creates,
+> formats, autosaves and reopens real notes, with inline images, attachment cards
+> and rich clipboard exchange on supported Wayland desktops. Export a carefully
+> typeset PDF with **Ctrl+Shift+P**, in US Letter or A4. Run
+> `cargo run --release -p omarchy-notes-preview -- --reference` to try it.
+> Tables now support insertion, cell navigation, row/column editing and splitting
+> existing merged cells, with undo and compatible saving.
+> **Format** exposes all text marks and paragraph/list styles; **Ctrl+F** finds
+> words inside the current note, with highlighted matches and keyboard navigation.
+> **Link** adds or edits web links; **Ctrl+L** connects notes with a searchable
+> chooser, in-app navigation and a return action. Selection formatting appears
+> beside your words; **Ctrl+Shift+R** explores explicit related notes.
+> Headless backup, verification and restore-to-new-folder commands now preserve
+> complete libraries in the Qt-compatible backup format.
+> **Quote** or **Ctrl+Shift+Q** adds an editable quotation with a quiet gold rule.
+> Saving quotes requires an explicit library upgrade with a verified backup;
+> the upgraded library opens in Rust, and its pre-upgrade backup remains available
+> for returning to Qt. See the [upgrade guide](docs/gpui-preview.md#quotations-with-room-to-breathe).
+> Command-line capture now works with the Rust app open, confirms durable saves,
+> and supports request IDs and status lookup for retries without duplicate notes.
+> **Quick Note** opens with **Ctrl+Shift+N**, or `--quick-note`. Its compact
+> window shares the rich editor and autosave; **Ctrl+Shift+O**
+> moves the note into Notes with its selection and undo history intact.
+> Closing an untouched Quick Note leaves no saved blank note.
+> Reopening the Rust app now reaches its running window; `--new`, `--note UUID`
+> and `--quick-note` forward to the same library owner, even from a display-free
+> terminal. Wayland activation tokens go to the requested window; desktop focus
+> policy still applies.
+> **Settings** or **Ctrl+,** remembers your palette, writing font and size, pane
+> widths, focus mode and sort choice, with live previews and keyboard navigation.
+> Typography changes keep your note content, caret and undo history intact.
+> Nested folders now support creation, renaming and moves. File the current note
+> with **Ctrl+Alt+M**; searchable destinations show complete folder paths, and
+> filing preserves your draft, caret and undo history.
+> Writing and search expose Linux accessible text and selection, with checklist actions;
+> Orca usability verification is still pending.
+> It uses a separate local library. The Qt app described below remains the supported
+> release while accessibility and full feature parity are completed. Beauty, delight and
+> reliable writing remain core [rebuild requirements](llm-docs/rust-gpui-rebuild-plan.md).
+
 - ⚡ **Start typing right away.** Notes save automatically, usually within a second. "Saved" only appears once your note is actually on disk.
 - ✍️ **Format like you'd expect:** title, heading and subheading styles, plus bold, italic, underline, strikethrough, highlight and monospace.
 - ✅ **Checklists and lists.** Bulleted, numbered and checklist items, nested as deep as you like. Click a checkbox to tick it off.
