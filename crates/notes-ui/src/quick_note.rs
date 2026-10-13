@@ -42,7 +42,7 @@ pub(super) fn options(cx: &App, quick: bool) -> WindowOptions {
             cx,
         ))),
         titlebar: None,
-        app_id: Some("org.omarchy.Notes.Preview".into()),
+        app_id: Some("org.omarchy.Notes.Rust".into()),
         window_background: WindowBackgroundAppearance::Opaque,
         window_min_size: Some(size(px(420.), px(420.))),
         ..Default::default()
@@ -415,8 +415,7 @@ impl Shell {
                         s.library.scope = Scope::All;
                         s.library.query.clear();
                         s.search.update(cx, |f, cx| f.clear_silently(w, cx));
-                        s.library.refresh();
-                        s.list.reset(s.library.visible.len());
+                        s.queue_library_query(false, cx);
                         s.command(Command::Select(id), w, cx);
                     }
                 });
@@ -494,6 +493,8 @@ impl Shell {
             return;
         };
         let handle = *handle;
+        let folder_view_busy = self.windows.main.is_none() && self.folder_view_busy();
+        let library_busy = self.library_recovery.busy() || self.portability.busy();
         let live = self.live.as_mut().unwrap();
         let session = &live.notes[id];
         if session.error.is_some() {
@@ -501,6 +502,8 @@ impl Shell {
             return;
         }
         if self.preferences.busy()
+            || library_busy
+            || folder_view_busy
             || session.pending.is_some()
             || session.revision != session.saved
             || session.has_unobserved_edit(cx)
@@ -516,6 +519,24 @@ impl Shell {
         self.windows.closing = false;
         self.cancel_activation_for(handle, cx);
         self.refresh_real_library(cx);
+        cx.defer(move |cx| {
+            let _ = handle.update(cx, |_, w, _| w.remove_window());
+        });
+    }
+    /// Only the already verified clean recovery path calls this before removing
+    /// its session, so the shared Quick view never renders a removed editor.
+    pub(super) fn close_recovery_quick(&mut self, id: &str, cx: &mut Context<Self>) {
+        let Some((handle, quick_id)) = self.windows.quick.as_ref() else {
+            return;
+        };
+        if quick_id != id {
+            return;
+        }
+        let handle = *handle;
+        self.windows.quick = None;
+        self.windows.closing = false;
+        self.windows.notice = None;
+        self.cancel_activation_for(handle, cx);
         cx.defer(move |cx| {
             let _ = handle.update(cx, |_, w, _| w.remove_window());
         });

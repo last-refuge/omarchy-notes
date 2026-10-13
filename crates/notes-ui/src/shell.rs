@@ -10,6 +10,18 @@ use notes_core::preview::{Block, Library, Scope};
 #[cfg(feature = "performance-diagnostics")]
 pub use performance::performance_check;
 use std::{collections::HashMap, time::Duration};
+#[path = "library_query.rs"]
+mod library_query;
+#[path = "library_recovery.rs"]
+mod library_recovery;
+#[path = "portability.rs"]
+mod portability;
+#[cfg(feature = "visual-tests")]
+pub use library_query::library_query_check;
+#[cfg(feature = "visual-tests")]
+pub use library_recovery::library_recovery_check;
+#[cfg(feature = "visual-tests")]
+pub use portability::portability_check;
 #[path = "organization.rs"]
 mod organization;
 #[cfg(feature = "visual-tests")]
@@ -56,6 +68,7 @@ actions!(
     ]
 );
 pub fn bind_keys(cx: &mut App) {
+    organization::bind_keys(cx);
     cx.bind_keys([
         KeyBinding::new("ctrl-n", NewNote, Some("Notes")),
         KeyBinding::new("ctrl-,", OpenSettings, Some("Notes")),
@@ -83,6 +96,8 @@ pub fn bind_keys(cx: &mut App) {
 
 #[derive(Clone)]
 enum Command {
+    LibraryRecovery(library_recovery::Action),
+    Portability(portability::Action),
     Organize(organization::Action),
     New,
     Quick,
@@ -112,6 +127,8 @@ enum Command {
     Preference(notes_core::preferences::Patch),
     RetryPreferences,
     Sort,
+    MoreResults,
+    RetryQuery,
     Minimize,
     Maximize,
     Close,
@@ -134,6 +151,9 @@ pub struct Shell {
     launches: window_launch::State,
     preferences: settings::State,
     organization: organization::State,
+    query: library_query::State,
+    library_recovery: library_recovery::State,
+    portability: portability::State,
     _write_task: Option<Task<()>>,
     library: Library,
     theme: Theme,
@@ -215,6 +235,9 @@ impl Shell {
             launches: window_launch::State::default(),
             preferences: settings::State::memory(appearance),
             organization: organization::State::new(cx),
+            query: library_query::State::default(),
+            library_recovery: library_recovery::State::new(cx),
+            portability: portability::State::default(),
             _write_task: None,
             library,
             theme: Theme::reference(),
@@ -233,7 +256,7 @@ impl Shell {
             _subscriptions: vec![subscription],
             _theme_task: task,
         };
-        this.preferences.focus = (0..15).map(|_| cx.focus_handle()).collect();
+        this.preferences.focus = (0..16).map(|_| cx.focus_handle()).collect();
         let organization_subscription = this.organization_subscription(cx);
         this._subscriptions.push(organization_subscription);
         this.apply_theme(cx);
@@ -248,8 +271,13 @@ impl Shell {
         cx.subscribe_in(search, window, |this, _, event, window, cx| {
             match event {
                 SearchEvent::Changed(query) => {
-                    this.library.search(query.clone());
-                    this.list.reset(this.library.visible.len());
+                    if this.live.is_some() {
+                        this.library.query = query.clone();
+                        this.queue_library_query(true, cx);
+                    } else {
+                        this.library.search(query.clone());
+                        this.list.reset(this.library.visible.len());
+                    }
                     this.reading = false;
                 }
                 SearchEvent::Next => {
@@ -287,6 +315,7 @@ impl Shell {
     }
     pub(super) fn bind_main(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.windows.main = Some(window.window_handle());
+        self.install_folder_tree_focus(window, cx);
         self._subscriptions[0] = Self::search_subscription(&self.search, window, cx);
         let weak = cx.weak_entity();
         window.on_window_should_close(cx, move |w, cx| {
@@ -321,6 +350,21 @@ impl Shell {
     }
 
     fn command(&mut self, command: Command, window: &mut Window, cx: &mut Context<Self>) {
+        if (self.library_recovery.blocks_mutations() || self.portability.busy())
+            && matches!(
+                &command,
+                Command::New
+                    | Command::Recover
+                    | Command::Organize(_)
+                    | Command::UpgradeChoose
+                    | Command::UpgradeStart
+            )
+        {
+            self.library_recovery.error =
+                Some("Finish the current library operation first. Your draft is retained.".into());
+            cx.notify();
+            return;
+        }
         if self.organization.open()
             && !matches!(
                 command,
@@ -330,6 +374,20 @@ impl Shell {
             return;
         }
         match command {
+            Command::LibraryRecovery(action) => self.library_recovery_action(action, window, cx),
+            Command::Portability(action) => {
+                if self.library_recovery.blocks_mutations()
+                    && !matches!(
+                        action,
+                        portability::Action::Close | portability::Action::Cancel
+                    )
+                {
+                    self.library_recovery.error =
+                        Some("Finish the current recovery operation first.".into());
+                } else {
+                    self.portability_command(action, window, cx);
+                }
+            }
             Command::Organize(action) => self.organize(action, window, cx),
             Command::UpgradePanel
             | Command::UpgradeChoose
@@ -351,7 +409,10 @@ impl Shell {
                 }
             }
             Command::Scope(scope) => {
+                let query = std::mem::take(&mut self.library.query);
                 self.library.set_scope(scope);
+                self.library.query = query;
+                self.queue_library_query(false, cx);
                 self.activate_selected_media(window, cx);
                 self.list.reset(self.library.visible.len());
                 self.folders_open = false;
@@ -378,9 +439,20 @@ impl Shell {
                 }
             }
             Command::Pin => {
-                self.library.toggle_pin();
-                self.list.reset(self.library.visible.len());
-                self.pin_real_note(cx);
+                if self.live.is_some() {
+                    if let Some(note) = self
+                        .library
+                        .notes
+                        .iter_mut()
+                        .find(|note| Some(&note.id) == self.library.selected.as_ref())
+                    {
+                        note.pinned = !note.pinned;
+                    }
+                    self.pin_real_note(cx);
+                } else {
+                    self.library.toggle_pin();
+                    self.list.reset(self.library.visible.len());
+                }
             }
             Command::Check(id, block) => self.library.toggle_check(&id, block),
             Command::Focus => {
@@ -437,6 +509,19 @@ impl Shell {
             Command::RetryPreferences => {
                 self.preferences.session.retry();
                 self.poll_preferences(cx);
+            }
+            Command::MoreResults => self.more_library_results(cx),
+            Command::RetryQuery => self.queue_library_query(false, cx),
+            Command::Sort if self.live.is_some() => {
+                self.query.sort = match self.query.sort {
+                    notes_core::library::Sort::Edited => notes_core::library::Sort::Created,
+                    notes_core::library::Sort::Created => notes_core::library::Sort::Title,
+                    notes_core::library::Sort::Title => notes_core::library::Sort::Edited,
+                };
+                self.library.sort_by_title = self.query.sort == notes_core::library::Sort::Title;
+                self.query.sort_loaded = true;
+                self.set_folder_view_sort(self.query.sort, cx);
+                self.queue_library_query(false, cx);
             }
             Command::Sort => {
                 self.library.sort_by_title = !self.library.sort_by_title;
@@ -689,6 +774,23 @@ impl Shell {
                 self.library.notes.iter().filter(|n| n.pinned).count(),
                 cx,
             ))
+            .when(self.live.is_some(), |d| {
+                d.child(
+                    self.control(
+                        "recently-deleted",
+                        "Recently Deleted",
+                        Command::LibraryRecovery(library_recovery::Action::OpenTrash),
+                        cx,
+                    )
+                    .flex()
+                    .items_center()
+                    .gap(px(12.))
+                    .h(px(42.))
+                    .px(px(12.))
+                    .child(icon("all-notes", theme.muted, 20.))
+                    .child("Recently Deleted"),
+                )
+            })
             .child(div().my(px(20.)).mx(px(10.)).h(px(1.)).bg(theme.border))
             .child(
                 div()
@@ -804,13 +906,30 @@ impl Shell {
                                     ),
                             ),
                     )
-                    .child(self.icon_button(
-                        "sort",
-                        "Toggle sorting by title or date",
-                        "sort",
-                        Command::Sort,
-                        cx,
-                    )),
+                    .when(self.library.query.is_empty(), |d| {
+                        d.child(
+                            self.control(
+                                "sort",
+                                format!(
+                                    "Sort: {}. Activate to change sorting.",
+                                    self.library_sort_label()
+                                ),
+                                Command::Sort,
+                                cx,
+                            )
+                            .flex()
+                            .items_center()
+                            .gap(px(6.))
+                            .px(px(8.))
+                            .py(px(6.))
+                            .text_size(px(12.))
+                            .child(icon("sort", theme.muted, 16.))
+                            .child(self.library_sort_label()),
+                        )
+                    })
+                    .when(!self.library.query.is_empty(), |d| {
+                        d.child(label("By relevance", theme))
+                    }),
             )
             .child(div().mx(px(24.)).h(px(1.)).bg(theme.border))
             .when(
@@ -874,13 +993,21 @@ impl Shell {
                                 .p(px(28.))
                                 .text_color(theme.muted)
                                 .text_size(px(14.))
-                                .child(if self.library.query.is_empty() {
+                                .child(if self.query.loading {
+                                    "Searching…"
+                                } else if self.query.error.is_some() {
+                                    "Search needs attention."
+                                } else if self.library.query.is_empty() {
                                     "No notes here yet."
                                 } else {
                                     "No notes found."
                                 })
                                 .child(div().mt(px(8.)).text_size(px(12.)).child(
-                                    if self.library.query.is_empty() {
+                                    if self.query.loading {
+                                        "Your open note stays available."
+                                    } else if self.query.error.is_some() {
+                                        "Retry below, or narrow your search."
+                                    } else if self.library.query.is_empty() {
                                         "New notes will appear here."
                                     } else {
                                         "Try another word, or clear the search."
@@ -900,11 +1027,72 @@ impl Shell {
                         )
                     }),
             )
+            .when(
+                self.query.loading || self.query.error.is_some() || self.query.has_more,
+                |d| {
+                    d.child(
+                        div()
+                            .flex_none()
+                            .px(px(20.))
+                            .py(px(10.))
+                            .border_t_1()
+                            .border_color(theme.border)
+                            .when(self.query.loading, |d| {
+                                d.child(
+                                    label("Updating results…", theme)
+                                        .id("library-query-status")
+                                        .role(Role::Status),
+                                )
+                            })
+                            .when_some(self.query.error.clone(), |d, error| {
+                                d.child(
+                                    label(error, theme)
+                                        .id("library-query-error")
+                                        .role(Role::Status),
+                                )
+                                .child(
+                                    self.control(
+                                        "retry-search",
+                                        "Retry search",
+                                        Command::RetryQuery,
+                                        cx,
+                                    )
+                                    .px(px(8.))
+                                    .py(px(6.))
+                                    .child("Retry"),
+                                )
+                            })
+                            .when(self.query.has_more && !self.query.loading, |d| {
+                                d.child(
+                                    self.control(
+                                        "load-more-notes",
+                                        "Load more notes",
+                                        Command::MoreResults,
+                                        cx,
+                                    )
+                                    .w_full()
+                                    .px(px(8.))
+                                    .py(px(6.))
+                                    .child("Load more"),
+                                )
+                            }),
+                    )
+                },
+            )
     }
 
     fn note_row(&self, index: usize, cx: &mut Context<Self>) -> Div {
         let theme = self.theme;
         let note = &self.library.notes[self.library.visible[index]];
+        let summary = if self.query.enabled && !self.library.query.is_empty() {
+            self.query
+                .snippets
+                .get(&note.id)
+                .map(String::as_str)
+                .unwrap_or(&note.summary)
+        } else {
+            &note.summary
+        };
         let selected = self.library.selected.as_ref() == Some(&note.id);
         let group = if note.pinned {
             "PINNED"
@@ -988,7 +1176,7 @@ impl Shell {
                         .truncate()
                         .text_size(px(12.))
                         .text_color(theme.muted)
-                        .child(note.summary.clone()),
+                        .child(summary.to_owned()),
                 )
                 .child(
                     div()
@@ -1340,16 +1528,22 @@ impl Render for Shell {
         let wide = width >= 1200. + text_extra * 12.;
         let narrow = width < 850. + text_extra * 10.;
         let theme = self.theme;
-        let show_sidebar = !self.organization.open()
+        let library_page = self.library_recovery.open
+            || self.library_recovery.confirm.is_some()
+            || self.portability.open;
+        let show_sidebar = !library_page
+            && !self.organization.open()
             && !self.focused
             && !self.settings_open
             && (wide || self.folders_open);
-        let show_list = !self.focused
+        let show_list = !library_page
+            && !self.focused
             && !self.organization.open()
             && !self.settings_open
             && (!narrow || !self.reading)
             && !(self.folders_open && !wide);
-        let show_editor = !self.settings_open
+        let show_editor = !library_page
+            && !self.settings_open
             && !self.organization.open()
             && (self.focused || (!narrow || self.reading))
             && !(self.folders_open && !wide);
@@ -1410,7 +1604,11 @@ impl Render for Shell {
                 cx.listener(|s, _: &CloseNotes, window, cx| s.command(Command::Close, window, cx)),
             )
             .on_action(cx.listener(|s, _: &FocusSearch, window, cx| {
-                if s.organization.open() {
+                if s.organization.open()
+                    || s.library_recovery.open
+                    || s.library_recovery.confirm.is_some()
+                    || s.portability.open
+                {
                     return;
                 }
                 s.focused = false;
@@ -1430,8 +1628,20 @@ impl Render for Shell {
             .on_action(
                 cx.listener(|s, _: &ToggleFocus, window, cx| s.command(Command::Focus, window, cx)),
             )
+            .on_action(
+                cx.listener(|s, _: &organization::FocusFolderTree, w, cx| {
+                    s.focus_folder_tree(w, cx)
+                }),
+            )
             .on_action(cx.listener(|s, _: &NextFocus, window, cx| {
-                if s.organization.open() {
+                if s.library_recovery.open
+                    || s.library_recovery.confirm.is_some()
+                    || s.library_recovery.actions_open
+                {
+                    s.recovery_focus(false, window, cx);
+                } else if s.portability.open {
+                    s.portability_focus(false, window, cx);
+                } else if s.organization.open() {
                     s.organization_tab(false, window, cx);
                 } else if s.settings_open {
                     s.move_settings_focus(false, window, cx);
@@ -1440,7 +1650,14 @@ impl Render for Shell {
                 }
             }))
             .on_action(cx.listener(|s, _: &PreviousFocus, window, cx| {
-                if s.organization.open() {
+                if s.library_recovery.open
+                    || s.library_recovery.confirm.is_some()
+                    || s.library_recovery.actions_open
+                {
+                    s.recovery_focus(true, window, cx);
+                } else if s.portability.open {
+                    s.portability_focus(true, window, cx);
+                } else if s.organization.open() {
                     s.organization_tab(true, window, cx);
                 } else if s.settings_open {
                     s.move_settings_focus(true, window, cx);
@@ -1449,6 +1666,18 @@ impl Render for Shell {
                 }
             }))
             .on_action(cx.listener(|s, _: &Escape, window, cx| {
+                if s.library_recovery.confirm.is_some() {
+                    s.library_recovery_action(library_recovery::Action::Cancel, window, cx);
+                    return;
+                }
+                if s.library_recovery.open {
+                    s.library_recovery_action(library_recovery::Action::CloseTrash, window, cx);
+                    return;
+                }
+                if s.library_recovery.actions_open {
+                    s.library_recovery_action(library_recovery::Action::CloseActions, window, cx);
+                    return;
+                }
                 if s.organization.open() {
                     s.organize(organization::Action::Close, window, cx);
                     return;
@@ -1460,6 +1689,10 @@ impl Render for Shell {
                 }
                 if s.live.as_ref().is_some_and(|l| l.upgrade.open) {
                     s.command(Command::UpgradeCancel, window, cx);
+                    return;
+                }
+                if s.portability.open {
+                    s.command(Command::Portability(portability::Action::Close), window, cx);
                     return;
                 }
                 if s.live.as_ref().is_some_and(|l| l.pdf.open) {
@@ -1523,7 +1756,7 @@ impl Render for Shell {
                     cx.notify();
                 },
             ))
-            .when(!self.organization.open(), |d| {
+            .when(!library_page && !self.organization.open(), |d| {
                 d.child(self.header(width, cx))
             })
             .when_some(
@@ -1558,13 +1791,28 @@ impl Render for Shell {
                     .when(show_editor, |d| {
                         d.child(self.editor(narrow, window.viewport_size().height.into(), cx))
                     })
-                    .when(self.settings_open && !self.organization.open(), |d| {
-                        d.child(self.settings(width, cx))
-                    })
-                    .when(self.organization.open(), |d| {
+                    .when(
+                        self.settings_open && !library_page && !self.organization.open(),
+                        |d| d.child(self.settings(width, cx)),
+                    )
+                    .when(self.organization.open() && !library_page, |d| {
                         d.child(self.organization_page(cx))
-                    }),
+                    })
+                    .when(
+                        self.library_recovery.open || self.library_recovery.confirm.is_some(),
+                        |d| d.child(self.recovery_panel(cx)),
+                    )
+                    .when(
+                        self.portability.open
+                            && !self.library_recovery.open
+                            && self.library_recovery.confirm.is_none(),
+                        |d| d.child(self.portability_panel(cx)),
+                    ),
             )
+            .when(self.live.is_some() && !library_page, |d| {
+                d.child(self.recovery_status())
+                    .child(self.recovery_retained_controls(cx))
+            })
     }
 }
 

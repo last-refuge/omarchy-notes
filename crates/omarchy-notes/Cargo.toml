@@ -1,5 +1,7 @@
 [package]
 name = "omarchy-notes-preview"
+autobins = false
+default-run = "omarchy-notes-rust"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,3 +14,13 @@ notes-core = { path = "../notes-core" }
 notes-storage = { path = "../notes-storage" }
 notes-platform = { path = "../notes-platform" }
 anyhow.workspace = true
+
+[[bin]]
+name = "omarchy-notes-rust"
+path = "src/main.rs"
+
+# Source-build compatibility; installed packages ship an explicit forwarding
+# launcher so both names enter the same stable Rust executable.
+[[bin]]
+name = "omarchy-notes-preview"
+path = "src/preview.rs"

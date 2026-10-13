@@ -213,7 +213,11 @@ impl Shell {
         live.upgrade.details_scroll.scroll_to_bottom();
         cx.notify();
     }
-    pub(super) fn upgrade_panel(&self, height: f32, cx: &mut Context<Self>) -> AnyElement {
+    pub(in crate::shell) fn upgrade_panel(
+        &self,
+        height: f32,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let live = self.live.as_ref().unwrap();
         let upgrade = &live.upgrade;
         let theme = self.theme;

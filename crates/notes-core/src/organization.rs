@@ -92,6 +92,57 @@ pub fn destinations(folders: &[Folder], moving: Option<&str>) -> HashSet<String>
     valid
 }
 
+/// Children-before-parents deletion order. Malformed cycles are rejected before
+/// storage changes anything; same-name folders are addressed only by identity.
+pub fn descendants(folders: &[Folder], root: &str) -> Result<Vec<String>> {
+    let by_id: HashMap<_, _> = folders.iter().map(|f| (f.id.as_str(), f)).collect();
+    ensure!(
+        by_id.len() == folders.len(),
+        "This folder hierarchy has duplicate identities."
+    );
+    ensure!(by_id.contains_key(root), "That folder no longer exists.");
+    let mut children: HashMap<&str, Vec<&str>> = HashMap::new();
+    for folder in folders {
+        if let Some(parent) = folder.parent.as_deref() {
+            children.entry(parent).or_default().push(&folder.id);
+        }
+    }
+    let mut visiting = HashSet::new();
+    let mut visited = HashSet::new();
+    let mut result = vec![];
+    let mut stack = vec![(root, false)];
+    while let Some((id, leaving)) = stack.pop() {
+        if leaving {
+            visiting.remove(id);
+            visited.insert(id);
+            result.push(id.to_owned());
+        } else {
+            ensure!(
+                visiting.insert(id),
+                "Repair this cyclic folder hierarchy before deleting it."
+            );
+            ensure!(
+                !visited.contains(id),
+                "This folder hierarchy has duplicate ancestry."
+            );
+            ensure!(
+                visiting.len() + visited.len() <= 100_000,
+                "Delete a smaller folder subtree first."
+            );
+            stack.push((id, true));
+            stack.extend(
+                children
+                    .get(id)
+                    .into_iter()
+                    .flatten()
+                    .rev()
+                    .map(|child| (*child, false)),
+            );
+        }
+    }
+    Ok(result)
+}
+
 #[derive(Clone, Debug)]
 pub struct Row {
     pub folder: Folder,
@@ -188,6 +239,22 @@ mod tests {
             name: id.into(),
             sort_key: 0,
         }
+    }
+    #[test]
+    fn subtree_deletion_uses_ids_child_order_and_rejects_cycles() {
+        let folders = vec![
+            folder("root", None),
+            folder("child", Some("root")),
+            folder("deep", Some("child")),
+            folder("other", None),
+        ];
+        assert_eq!(
+            descendants(&folders, "root").unwrap(),
+            ["deep", "child", "root"]
+        );
+        assert!(descendants(&folders, "missing").is_err());
+        let cyclic = vec![folder("a", Some("b")), folder("b", Some("a"))];
+        assert!(descendants(&cyclic, "a").is_err());
     }
     #[test]
     fn names_and_hierarchy_preserve_identity_and_reject_cycles() {

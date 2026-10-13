@@ -17,13 +17,36 @@ fn settle(cx: &mut HeadlessAppContext, h: WindowHandle<Shell>) -> anyhow::Result
     loop {
         let busy = h.update(cx, |s, w, cx| {
             s.poll_storage(w, cx);
-            s.organization.busy()
+            s.organization.busy() || s.query.loading || s.folder_view_busy()
         })?;
         draw(cx, h)?;
         if !busy {
             return Ok(());
         }
         anyhow::ensure!(Instant::now() < deadline, "Organization save timed out");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+fn settle_view(cx: &mut HeadlessAppContext, h: WindowHandle<Shell>) -> anyhow::Result<()> {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let busy = h.update(cx, |s, w, cx| {
+            s.poll_storage(w, cx);
+            assert!(
+                s.organization.view.error.is_none(),
+                "{:?}",
+                s.organization.view.error
+            );
+            s.folder_view_busy() || s.query.loading
+        })?;
+        draw(cx, h)?;
+        if !busy {
+            return Ok(());
+        }
+        anyhow::ensure!(
+            Instant::now() < deadline,
+            "Folder view persistence timed out"
+        );
         std::thread::sleep(Duration::from_millis(5));
     }
 }
@@ -96,6 +119,61 @@ pub fn organization_check(directory: &Path) -> anyhow::Result<()> {
     let personal = create(&mut cx, h, "Personal")?;
     let other_clients = create(&mut cx, h, "Clients")?;
     assert_ne!(clients, other_clients);
+    let view_config = tmp.path().join("view-config");
+    h.update(&mut cx, |s, _, cx| {
+        s.configure_folder_view_in(root.clone(), Some(view_config.clone()), cx)
+    })?;
+    settle_view(&mut cx, h)?;
+    // Focus moves independently of the opened note scope, and traversal uses
+    // stable IDs rather than equally named folders or virtualized row handles.
+    h.update(&mut cx, |s, w, cx| {
+        s.command(Command::Scope(Scope::All), w, cx);
+        s.organization.focused_folder = Some(work.clone());
+        s.focus.focus(w, cx);
+    })?;
+    draw(&mut cx, h)?;
+    super::super::visual_keys(&mut cx, h.into(), "ctrl-alt-f")?;
+    h.update(&mut cx, |s, w, _| {
+        assert!(s.organization.tree_focus.is_focused(w))
+    })?;
+    let first = h.update(&mut cx, |s, _, _| s.organization.rows[0].folder.id.clone())?;
+    super::super::visual_keys(&mut cx, h.into(), "home down up")?;
+    h.update(&mut cx, |s, _, _| {
+        assert_eq!(s.organization.focused_folder.as_ref(), Some(&first));
+        assert_eq!(s.library.scope, Scope::All);
+    })?;
+    h.update(&mut cx, |s, w, cx| {
+        s.organization.focused_folder = Some(work.clone());
+        s.focus_folder_tree(w, cx);
+    })?;
+    super::super::visual_keys(&mut cx, h.into(), "right")?;
+    h.update(&mut cx, |s, _, _| {
+        assert_eq!(s.organization.focused_folder.as_ref(), Some(&clients));
+        assert_eq!(
+            s.library.scope,
+            Scope::All,
+            "Arrow navigation must not open a folder"
+        );
+    })?;
+    super::super::visual_keys(&mut cx, h.into(), "left left")?;
+    h.update(&mut cx, |s, _, _| {
+        assert_eq!(s.organization.focused_folder.as_ref(), Some(&work));
+        assert!(s.organization.collapsed.contains(&work));
+        assert!(!s.organization.rows.iter().any(|r| r.folder.id == clients));
+    })?;
+    super::super::visual_keys(&mut cx, h.into(), "right right enter")?;
+    h.update(&mut cx, |s, w, _| {
+        assert_eq!(s.organization.focused_folder.as_ref(), Some(&clients));
+        assert_eq!(s.library.scope, Scope::FolderId(Some(clients.clone())));
+        assert!(s.organization.tree_focus.is_focused(w));
+    })?;
+    h.update(&mut cx, |s, w, cx| {
+        s.command(
+            Command::Scope(Scope::FolderId(Some(other_clients.clone()))),
+            w,
+            cx,
+        )
+    })?;
     super::super::visual_keys(&mut cx, h.into(), "ctrl-n")?;
     let deadline = Instant::now() + Duration::from_secs(8);
     while h.update(&mut cx, |s, w, cx| {
@@ -105,6 +183,7 @@ pub fn organization_check(directory: &Path) -> anyhow::Result<()> {
         anyhow::ensure!(Instant::now() < deadline, "New note timed out");
         std::thread::sleep(Duration::from_millis(5));
     }
+    settle(&mut cx, h)?;
     h.update(&mut cx, |s, w, cx| {
         assert_eq!(
             s.library.scope,
@@ -167,12 +246,20 @@ pub fn organization_check(directory: &Path) -> anyhow::Result<()> {
             cx,
         )
     })?;
+    h.update(&mut cx, |s, w, cx| {
+        s.organization.focused_folder = Some(clients.clone());
+        s.focus_folder_tree(w, cx);
+    })?;
     super::super::visual_keys(&mut cx, h.into(), "f2")?;
     input(&mut cx, h, "Projects")?;
     super::super::visual_keys(&mut cx, h.into(), "enter")?;
     settle(&mut cx, h)?;
     h.update(&mut cx, |s, w, cx| {
         assert_eq!(s.organization.paths[&clients], "Work / Projects");
+        assert_eq!(s.organization.focused_folder.as_ref(), Some(&clients));
+        assert!(s.organization.tree_focus.is_focused(w));
+        s.organization.focused_folder = Some(clients.clone());
+        s.focus_folder_tree(w, cx);
         s.organize(Action::MoveFolder, w, cx);
     })?;
     input(&mut cx, h, "Personal")?;
@@ -189,6 +276,8 @@ pub fn organization_check(directory: &Path) -> anyhow::Result<()> {
     settle(&mut cx, h)?;
     h.update(&mut cx, |s, w, cx| {
         assert_eq!(s.organization.paths[&clients], "Personal / Projects");
+        assert_eq!(s.organization.focused_folder.as_ref(), Some(&clients));
+        assert!(s.organization.tree_focus.is_focused(w));
         s.command(Command::Scope(Scope::All), w, cx);
         s.command(Command::Select(note.id.clone()), w, cx);
     })?;
@@ -255,6 +344,43 @@ pub fn organization_check(directory: &Path) -> anyhow::Result<()> {
     })?;
     h.update(&mut cx, |s, _, _| assert!(s.organization.open()))?;
     super::super::visual_keys(&mut cx, h.into(), "escape")?;
+    // A full per-library snapshot preserves the independent sort while
+    // expansion changes are being acknowledged; a reopened worker restores it.
+    h.update(&mut cx, |s, w, cx| {
+        s.set_folder_view_sort(notes_core::library::Sort::Created, cx);
+        s.organization.focused_folder = Some(personal.clone());
+        s.focus_folder_tree(w, cx);
+    })?;
+    super::super::visual_keys(&mut cx, h.into(), "left")?;
+    settle_view(&mut cx, h)?;
+    assert!(h.update(&mut cx, |s, _, _| {
+        s.organization.collapsed.contains(&personal)
+    })?);
+    h.update(&mut cx, |s, _, cx| {
+        s.configure_folder_view_in(root.clone(), Some(view_config.clone()), cx)
+    })?;
+    settle_view(&mut cx, h)?;
+    h.update(&mut cx, |s, _, _| {
+        assert!(s.organization.collapsed.contains(&personal));
+        assert_eq!(
+            s.query.sort,
+            notes_core::library::Sort::Created,
+            "Existing library sort wins over initial fallback"
+        );
+    })?;
+    // A user's expansion/sort change made before initial load is delivered
+    // must survive that older durable snapshot, including a collapse removal.
+    h.update(&mut cx, |s, w, cx| {
+        s.configure_folder_view_in(root.clone(), Some(view_config.clone()), cx);
+        s.organize(Action::Collapse(personal.clone()), w, cx);
+        s.query.sort = notes_core::library::Sort::Title;
+        s.set_folder_view_sort(notes_core::library::Sort::Title, cx);
+    })?;
+    settle_view(&mut cx, h)?;
+    h.update(&mut cx, |s, _, _| {
+        assert!(!s.organization.collapsed.contains(&personal));
+        assert_eq!(s.query.sort, notes_core::library::Sort::Title);
+    })?;
     h.update(&mut cx, |s, w, cx| {
         s.request_close(w, cx);
     })?;
@@ -334,6 +460,8 @@ pub fn organization_check(directory: &Path) -> anyhow::Result<()> {
         cx.new(|cx| Shell::new_live(Appearance::Reference, root.clone(), worker, library, w, cx))
     })?;
     draw(&mut cx, h)?;
+    h.update(&mut cx, |s, w, cx| s.focus_folder_tree(w, cx))?;
+    super::super::visual_keys(&mut cx, h.into(), "end")?;
     h.update(&mut cx, |s, _, cx| {
         let measured = s.organization.rendered_rows.borrow().len();
         assert!(
@@ -341,6 +469,12 @@ pub fn organization_check(directory: &Path) -> anyhow::Result<()> {
             "Measured {measured} of 10,005 folder rows"
         );
         let last = s.organization.rows.len() - 1;
+        assert_eq!(
+            s.organization.focused_folder.as_deref(),
+            Some(s.organization.rows[last].folder.id.as_str())
+        );
+        s.organization.focused_folder = Some("large-9999".into());
+        s.reveal_folder_focus();
         s.organization.rendered_rows.borrow_mut().clear();
         s.organization
             .nav
@@ -352,7 +486,58 @@ pub fn organization_check(directory: &Path) -> anyhow::Result<()> {
         let last = s.organization.rows.len() - 1;
         assert!(s.organization.rendered_rows.borrow().contains(&last));
         assert!(s.organization.rendered_rows.borrow().len() < 64);
-        assert_eq!(s.organization.nav.is_scrolled_to_end(), Some(true));
+        // GPUI's f32 scroll calculations can differ by a fraction of a pixel
+        // at this 420,210-pixel content height. Assert the actual viewport,
+        // with half a logical pixel tolerance, instead of exact float equality.
+        let scroll = s.organization.nav.0.borrow();
+        let end_difference = scroll.base_handle.max_offset().y + scroll.base_handle.offset().y;
+        assert!(
+            end_difference.abs() <= px(0.5),
+            "Last row is not revealed: end difference {end_difference:?}"
+        );
+        drop(scroll);
+        let focused = s.organization.focused_folder.clone().unwrap();
+        let first = (f32::from(-s.organization.nav.0.borrow().base_handle.offset().y) / 42.).floor()
+            as usize;
+        let anchor = s.organization.rows[first].folder.id.clone();
+        s.live
+            .as_mut()
+            .unwrap()
+            .folders
+            .iter_mut()
+            .find(|f| f.id == focused)
+            .unwrap()
+            .name = "A reordered collection".into();
+        s.refresh_folder_rows();
+        assert_eq!(s.organization.focused_folder.as_ref(), Some(&focused));
+        let new_first = (f32::from(-s.organization.nav.0.borrow().base_handle.offset().y) / 42.)
+            .floor() as usize;
+        assert_eq!(
+            s.organization.rows[new_first].folder.id, anchor,
+            "Reorder keeps the visible anchor ID"
+        );
+        s.live.as_mut().unwrap().folders.retain(|f| f.id != focused);
+        s.refresh_folder_rows();
+        assert!(
+            s.organization.focused_folder.as_ref().is_some_and(|id| s
+                .organization
+                .rows
+                .iter()
+                .any(|r| &r.folder.id == id)),
+            "Removed focus recovers to a visible row"
+        );
+        // Keep the later destination-search fixture's final collection intact.
+        s.live
+            .as_mut()
+            .unwrap()
+            .folders
+            .push(notes_storage::Folder {
+                id: focused.clone(),
+                parent: None,
+                name: "Collection 09999".into(),
+                sort_key: 0,
+            });
+        s.refresh_folder_rows();
         s.command(Command::Select(note.id.clone()), w, cx);
     })?;
     super::super::visual_keys(&mut cx, h.into(), "ctrl-alt-m")?;
@@ -368,7 +553,7 @@ pub fn organization_check(directory: &Path) -> anyhow::Result<()> {
     h.update(&mut cx, |_, w, _| w.remove_window())?;
     cx.run_until_parked();
     println!(
-        "PASS: nested create, duplicate-name scope isolation, new note in selected folder, sibling-name rejection/retry, rename identity, folder move, dirty-note move, retained selection/undo, stable result routing, durable reopen, bounded 10,005-folder layout/search, and dark/light/compact organization layouts."
+        "PASS: routed folder focus/arrows/Home/End/Enter, collapse/expand/parent traversal, retained folder IDs and visible anchors, vanished-ID recovery, per-library expansion/sort receipts and pending-load merge, nested create, duplicate-name scopes, rename/move, retained note selection/undo, durable reopen, bounded 10,005-folder layout/search, and dark/light/compact organization layouts."
     );
     Ok(())
 }

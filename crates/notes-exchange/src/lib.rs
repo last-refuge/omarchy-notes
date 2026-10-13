@@ -1,4 +1,5 @@
 //! Bounded, inert clipboard conversion. No network or filesystem access.
+pub mod file_import;
 pub mod html;
 pub mod markdown;
 use anyhow::{Result, ensure};

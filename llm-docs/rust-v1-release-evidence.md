@@ -24,8 +24,8 @@ Orca operation, human first use, or elapsed daily use.
 | V1-01 checkpoint | measured / observed | `10f392bb5d6075419b0e3e1549fe892d96b3deca`; archived Git tree and commands below | Checkpoint committed on `codex/rust-v1-release` and pushed to origin with owner approval. Exact archived-source headless CI checks pass locally. All four hosted CI jobs passed, including clean Qt package/install verification. |
 | V1-02 identity/scope | observed contract; distribution unverified | Contract above; [edition audit](../docs/rust-edition.md) | Scope/platform/naming and preview alias route are explicit. AUR name and Rust tags absent at discovery. Executable/package/installer implementation remains R4 work. |
 | V1-03 writing/capture/IME/Orca | unverified; frozen-binary engine observations | R1 checkpoint; isolated fcitx5/Orca and native AT-SPI procedures below | Frozen-binary main/Quick CJK composition, handoff and silent Orca event processing observed. Full cached-client suite, candidate visual review, long Quick scrolling and human screen-reader core tasks remain required. Owner's no-dictation constraint persists. |
-| V1-04 organization/search/recovery | unverified | R2 | Keyboard tree, sort, SQLite FTS queries, duplicate and trash UI pending. |
-| V1-05 portability | unverified | R3 | Existing verified storage backup primitives; in-app import/export/backup/restore/open pending. |
+| V1-04 organization/search/recovery | implementation / focused checks | R2 source increments below | Keyboard tree, per-library persistence and tagged FTS sorting/paging pass focused GPU checks. Duplicate/trash UI integration and final end-to-end acceptance remain open. |
+| V1-05 portability | implementation / focused backend checks | R3 source increments below | Prepared atomic file import, portable exports with assets and controlled exact-boundary backup checks pass. App integration, native chooser/open-window and final failure/round-trip matrix remain open. |
 | V1-06 performance/fault/rollback | failed large-edit CPU budget; remaining scopes unverified | R1/R4; [performance record](../docs/rust-performance.md) | Undo and editor/cache bounds implemented. Latest frozen large-edit CPU p95 60.217 ms fails 33 ms; scrolling meets its CPU target. Native submission/under-load decision and full memory/fault/rollback matrix remain pending. |
 | V1-07 visual/native integrations | unverified | R4 state matrix | Existing GPU artifacts are baseline evidence; new paths, scaling and native integrations require review. |
 | V1-08 licenses/package/installer | unverified | R4 | Rust package not yet built; runtime/licenses and disposable installation matrix pending. |
@@ -334,7 +334,79 @@ Python caches. Exclude the unrelated
 - Reviewed R1 checkpoint `12375b25b269380a31e113f5a5df8e555d0c2b5f`
   committed and pushed to the authorized `codex/rust-v1-release` branch.
   [Hosted CI](https://github.com/last-refuge/omarchy-notes/actions/runs/38467323907)
-  is **observed in progress**, not yet passed. The checkpoint records bounded
+  is **observed passed**: all four jobs completed successfully, including
+  the clean Rust/Qt package and installer jobs. The checkpoint records bounded
   editing/cache work, native engine evidence and the known CPU-budget failure;
   it remains version 0.1.0 and does not claim R1 acceptance or stable readiness.
   R2 implementation proceeds under the owner's updated verification schedule.
+
+
+## R2/R3 focused implementation checks
+
+These checks apply to source increments after `b7bfbad`, before the next
+coherent checkpoint. They do not replace final-candidate acceptance.
+
+- Folder tree optimized GPU workflow passed in
+  `/tmp/omarchy-r2-organization-check.log`; binary SHA-256
+  `ba22682d8d4e5749d1686fd4e25b0fbca7518e3a4517f94f4ce7e2001829587a`.
+  Actual Ctrl+Alt+F, arrows/Home/End/Enter, parent/child and collapse behavior,
+  retained folder IDs/reading anchor, asynchronous preference merge and durable
+  per-library expansion/sort reopening were exercised. The 10,005-row list
+  remained virtualized. Its last row was mounted with an actual end gap of
+  0.03125 logical pixel; the focused oracle accepts at most 0.5 pixel of layout
+  rounding, with the bounded mounted-row assertion retained.
+- Tagged SQL query optimized GPU workflow passed in 0.324 seconds,
+  `/tmp/omarchy-r2-query-check-c.log`: prefix matching/contextual snippets,
+  stale generation/scope rejection, current draft and selection retained,
+  Edited/Created/Title commands, 100/200/225-row paging, committed reorder with
+  retained ID/pixel anchor (row 150 to 151, 17-pixel offset), and durable reopen.
+  Earlier `a`/`b` harness timeouts are retained; the pinned deterministic test
+  dispatcher needed its actual 45-ms debounce clock advanced after the change
+  event. No query assertion or deadline was relaxed.
+- Focused storage recovery tests (11), prefix/subtree checks and the corrected
+  long-token Unicode snippet test passed. The snippet remains limited to 160
+  UTF-16 units including truncation. [ADR 0022](../docs/decisions/0022-library-storage-and-recovery.md)
+  records revision-checked deletion, exact immediate Undo and asset retention.
+- Prepared file-import tests (five) passed in 0.02 seconds: preparation purity,
+  immutable reviewed source bytes, copied local assets/imported-note links and
+  folder topology, explicit warning acceptance, retry/reopen, cancellation/SQL
+  rollback and the quotation-format upgrade guard. Portable export tests (two),
+  controlled backup tests (two) and existing-library validation (one) passed.
+  Backup manifests now record the exact committed note/revision boundary;
+  cancellation before atomic publication exposes no completed or partial copy.
+- Full native, fault, performance, installed-package and human matrices remain
+  scheduled for the completed candidate. The recorded large-edit CPU failure
+  remains open and has not been replaced by these functional passes.
+
+- Recovery focused GPU workflow **passed** in 0.665 seconds at
+  `/tmp/omarchy-r2-recovery-check-b.log`, binary SHA-256
+  `6ca2848bf06baec2637bbd1b423f81896e82a90d336566c86adf9f7ebbb374d6`:
+  duplication with immutable assets, nested folder deletion/notes-only Undo,
+  bounded trash/preview/restore and permanent confirmation, a real late Quick
+  edit after the writer's Trash request, held-draft autosave blocking, explicit
+  return to that draft, restoration without overwriting its model, explicit
+  save and durable reopen. Later small changes retain another note's selection
+  after duplication and defer housekeeping until clean idle time; final matrix
+  acceptance remains open. The earlier missing-window harness failure used an
+  already handed-off Quick handle and was corrected to actual list navigation.
+- Portability focused GPU workflow **passed** at
+  `/tmp/omarchy-r3-portability-check-d.log`, binary SHA-256
+  `be5f7fcc8b55194ca3cc684f25ffd7c7dcb66e981724ee63cfeaec04bf9c8691`:
+  file/folder review and atomic import, preserved labels/styles/note links,
+  per-note Markdown/HTML and library Markdown with byte-exact assets,
+  same-update main/Quick backup barrier, five committed note revisions in the
+  exact manifest, controlled inspect/restore-new, exact models/assets and
+  original-library durable restart. Native chooser and process/window opening
+  were deliberately excluded from this focused check and remain final gates.
+  The check found a real dropped local-file link label; the importer now keeps
+  all its styled text before one adjacent file object. Its targeted backend
+  regression also passes. The failing export and logs are retained at
+  `/tmp/omarchy-r3-portability-check-c/exported-note.md`.
+- Targeted UI/application all-target/all-feature Clippy with warnings denied
+  **passed** in 2.46 seconds (`/tmp/omarchy-r2-r3-focused-clippy-b.log`);
+  workspace formatting and diff checks passed. The observed portability
+  header shrink issue was corrected with explicit panel/header/footer sizing;
+  the same workflow passed again in `/tmp/omarchy-r3-portability-check-e.log`,
+  binary `451872645ed53aa41f4cdfc7a1938e958080e2b8f1925406db3892c03e15d0d9`,
+  with restored title/Back pixels inspected. These are increment checks; the
+  comprehensive candidate matrix is pending.

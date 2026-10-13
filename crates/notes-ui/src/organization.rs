@@ -2,6 +2,15 @@
 use super::*;
 use notes_core::organization::{Change, Mutation, Row};
 use std::collections::HashSet;
+#[path = "organization_tree.rs"]
+mod tree;
+#[path = "organization_view.rs"]
+mod view;
+pub(super) use tree::{FocusFolderTree, bind_keys};
+use tree::{
+    FolderTreeDown, FolderTreeEnd, FolderTreeHome, FolderTreeLeft, FolderTreeOpen, FolderTreeRight,
+    FolderTreeUp, TreeKey,
+};
 #[cfg(feature = "visual-tests")]
 #[path = "organization_check.rs"]
 mod check;
@@ -55,6 +64,11 @@ pub(super) struct State {
     pub rows: Vec<Row>,
     pub paths: HashMap<String, String>,
     collapsed: HashSet<String>,
+    tree_focus: FocusHandle,
+    tree_active: bool,
+    tree_subscriptions: Vec<Subscription>,
+    focused_folder: Option<String>,
+    view: view::State,
     nav: UniformListScrollHandle,
     #[cfg(feature = "visual-tests")]
     rendered_rows: std::cell::RefCell<HashSet<usize>>,
@@ -78,6 +92,11 @@ impl State {
             rows: vec![],
             paths: HashMap::new(),
             collapsed: HashSet::new(),
+            tree_focus: cx.focus_handle(),
+            tree_active: false,
+            tree_subscriptions: vec![],
+            focused_folder: None,
+            view: view::State::default(),
             nav: UniformListScrollHandle::new(),
             #[cfg(feature = "visual-tests")]
             rendered_rows: Default::default(),
@@ -145,7 +164,24 @@ impl Shell {
         let Some(live) = &self.live else {
             return;
         };
+        let focused = self.organization.focused_folder.clone();
+        let focus_index = focused.as_ref().and_then(|id| {
+            self.organization
+                .rows
+                .iter()
+                .position(|r| &r.folder.id == id)
+        });
         let offset = self.organization.nav.0.borrow().base_handle.offset();
+        let before = self.organization.collapsed.len();
+        let valid: HashSet<_> = live.folders.iter().map(|f| f.id.as_str()).collect();
+        self.organization
+            .collapsed
+            .retain(|id| valid.contains(id.as_str()));
+        if before != self.organization.collapsed.len() {
+            self.organization
+                .view
+                .pruned_collapsed(&self.organization.collapsed);
+        }
         let first = (f32::from(-offset.y) / 42.).floor() as usize;
         let anchor = self
             .organization
@@ -158,6 +194,40 @@ impl Shell {
             .collect();
         self.organization.rows =
             notes_core::organization::rows(&live.folders, &self.organization.collapsed);
+        if let Some(id) = focused
+            && !self.organization.rows.iter().any(|r| r.folder.id == id)
+        {
+            let mut parent = live
+                .folders
+                .iter()
+                .find(|f| f.id == id)
+                .and_then(|f| f.parent.clone());
+            let mut seen = HashSet::new();
+            let mut visible_parent = None;
+            while let Some(id) = parent {
+                if !seen.insert(id.clone()) {
+                    break;
+                }
+                if self.organization.rows.iter().any(|r| r.folder.id == id) {
+                    visible_parent = Some(id);
+                    break;
+                }
+                parent = live
+                    .folders
+                    .iter()
+                    .find(|f| f.id == id)
+                    .and_then(|f| f.parent.clone());
+            }
+            self.organization.focused_folder = visible_parent.or_else(|| {
+                let index = focus_index
+                    .unwrap_or(0)
+                    .min(self.organization.rows.len().saturating_sub(1));
+                self.organization
+                    .rows
+                    .get(index)
+                    .map(|r| r.folder.id.clone())
+            });
+        }
         if let Some(index) = anchor.and_then(|id| {
             self.organization
                 .rows
@@ -262,6 +332,7 @@ impl Shell {
                     self.organization.collapsed.insert(id);
                 }
                 self.refresh_folder_rows();
+                self.folder_collapsed_changed(cx);
             }
             Action::Close => {
                 if self.organization.field.read(cx).composing() {
@@ -315,9 +386,13 @@ impl Shell {
                     return;
                 }
                 let live = self.live.as_ref().unwrap();
-                let folder = match &self.library.scope {
-                    Scope::FolderId(id) => id.clone(),
-                    _ => None,
+                let folder = if self.organization.tree_focus.is_focused(w) {
+                    self.organization.focused_folder.clone()
+                } else {
+                    match &self.library.scope {
+                        Scope::FolderId(id) => id.clone(),
+                        _ => None,
+                    }
                 };
                 let (mode, source, input) = match action {
                     Action::New => (
@@ -391,6 +466,12 @@ impl Shell {
                         .and_then(|id| live.notes.get(id))
                         .and_then(|note| note.active_editor().map(|e| e.read(cx).focus.clone()))
                         .filter(|focus| focus.is_focused(w))
+                        .or_else(|| {
+                            self.organization
+                                .tree_focus
+                                .is_focused(w)
+                                .then(|| self.organization.tree_focus.clone())
+                        })
                         .or_else(|| {
                             self.search
                                 .read(cx)
@@ -540,6 +621,7 @@ impl Shell {
                             live.folders.push(folder);
                         }
                         if matches!(mutation, Mutation::CreateFolder { .. }) {
+                            self.organization.focused_folder = Some(id.clone());
                             self.library.scope = Scope::FolderId(Some(id));
                             self.library.selected = None;
                             self.reading = false;
@@ -574,6 +656,7 @@ impl Shell {
                     }
                 }
                 self.refresh_folder_rows();
+                self.folder_collapsed_changed(cx);
                 if let Scope::FolderId(Some(id)) = &self.library.scope
                     && let Some(index) = self
                         .organization
@@ -585,22 +668,23 @@ impl Shell {
                         .nav
                         .scroll_to_item(index, ScrollStrategy::Nearest);
                 }
-                self.refresh_real_library(cx);
                 if matches!(
                     mutation,
                     Mutation::CreateFolder { .. } | Mutation::MoveNote { .. }
                 ) {
                     self.library.query.clear();
                     self.search.update(cx, |s, cx| s.clear_silently(w, cx));
-                    self.library.refresh();
-                    self.list.reset(self.library.visible.len());
                 }
+                self.refresh_real_library(cx);
                 self.organization.mode = None;
                 self.organization.epoch += 1;
                 // Keep the same editor/session after filing; naming a folder
                 // never changes its note bodies, revisions or undo stacks.
                 if let Some(f) = self.organization.return_focus.take() {
                     w.focus(&f, cx);
+                    if f == self.organization.tree_focus {
+                        self.reveal_folder_focus();
+                    }
                 } else {
                     w.focus(&self.focus, cx);
                 }
@@ -609,6 +693,7 @@ impl Shell {
         cx.notify();
     }
     pub(super) fn folder_navigation(&self, cx: &mut Context<Self>) -> AnyElement {
+        let accent = self.theme.accent;
         if self.live.is_none() {
             return div()
                 .children(["Personal", "Work", "Ideas"].map(|name| {
@@ -647,7 +732,20 @@ impl Shell {
                 ),
             )
             .child(
-                uniform_list(
+                div().id("folder-tree").role(Role::Tree).aria_label("Folders")
+                .aria_description("Use arrows to navigate and expand folders; Enter opens the focused folder.")
+                .key_context("FolderTree").track_focus(&self.organization.tree_focus).tab_index(0)
+                .border_1().border_color(gpui::transparent_black())
+                .focus_visible(move|s|s.border_color(accent))
+                .flex_1().min_h_0()
+                .on_action(cx.listener(|s,_:&FolderTreeUp,w,cx|s.folder_tree_key(TreeKey::Up,w,cx)))
+                .on_action(cx.listener(|s,_:&FolderTreeDown,w,cx|s.folder_tree_key(TreeKey::Down,w,cx)))
+                .on_action(cx.listener(|s,_:&FolderTreeHome,w,cx|s.folder_tree_key(TreeKey::Home,w,cx)))
+                .on_action(cx.listener(|s,_:&FolderTreeEnd,w,cx|s.folder_tree_key(TreeKey::End,w,cx)))
+                .on_action(cx.listener(|s,_:&FolderTreeLeft,w,cx|s.folder_tree_key(TreeKey::Left,w,cx)))
+                .on_action(cx.listener(|s,_:&FolderTreeRight,w,cx|s.folder_tree_key(TreeKey::Right,w,cx)))
+                .on_action(cx.listener(|s,_:&FolderTreeOpen,w,cx|s.folder_tree_key(TreeKey::Open,w,cx)))
+                .child(uniform_list(
                     "folder-tree-rows",
                     self.organization.rows.len(),
                     cx.processor(|s, range: std::ops::Range<usize>, _, cx| {
@@ -657,8 +755,18 @@ impl Shell {
                     }),
                 )
                 .track_scroll(&self.organization.nav)
-                .size_full(),
+                .size_full()),
             )
+            .when_some(self.organization.view.error.clone(), |d, error| {
+                d.child(div().id("folder-view-error").role(Role::Status).aria_label(error.clone())
+                    .px(px(12.)).py(px(8.)).text_size(px(11.)).text_color(self.theme.muted)
+                    .child(error)
+                    .when(self.organization.view.can_retry(), |d|d.child(div().id("folder-view-retry")
+                        .role(Role::Button).aria_label("Retry saving folder view").tab_index(0)
+                        .cursor_pointer().text_color(self.theme.accent).child("Retry saving view")
+                        .on_click(cx.listener(|s,_,_,cx|s.retry_folder_view(cx)))))
+                )
+            })
             .into_any_element()
     }
     fn folder_row(&self, index: usize, cx: &mut Context<Self>) -> AnyElement {
@@ -666,49 +774,99 @@ impl Shell {
         self.organization.rendered_rows.borrow_mut().insert(index);
         let row = &self.organization.rows[index];
         let id = row.folder.id.clone();
+        let focused = self.organization.focused_folder.as_ref() == Some(&id);
+        let opened = self.library.scope == Scope::FolderId(Some(id.clone()));
+        let theme = self.theme;
+        let clicked = id.clone();
         div()
+            .id(SharedString::from(format!("folder-{id}")))
+            .role(Role::TreeItem)
+            .aria_label(row.folder.name.clone())
+            .aria_description(row.path.clone())
+            .aria_level(row.depth + 1)
+            .aria_selected(opened)
+            .when(focused, |d| d.aria_active_descendant())
+            .when(row.has_children, |d| {
+                d.aria_expanded(!self.organization.collapsed.contains(&id))
+            })
             .w_full()
             .h(px(42.))
             .flex()
             .items_center()
+            .cursor_pointer()
+            .border_1()
+            .border_color(if focused && self.organization.tree_active {
+                theme.accent
+            } else {
+                gpui::transparent_black()
+            })
+            .bg(if opened {
+                theme.selected
+            } else {
+                theme.navigation
+            })
+            .hover(move |s| s.bg(theme.overlay))
+            .on_click(cx.listener(move |s, _, w, cx| s.click_folder(clicked.clone(), w, cx)))
             .pl(px((row.depth.min(5) * 10) as f32))
             .child(if row.has_children {
-                self.control(
-                    SharedString::from(format!("folder-disclosure-{id}")),
-                    format!("Toggle subfolders of {}", row.path),
-                    Command::Organize(Action::Collapse(id.clone())),
-                    cx,
-                )
-                .aria_expanded(!self.organization.collapsed.contains(&id))
-                .w(px(18.))
-                .h(px(28.))
-                .text_center()
-                .text_color(self.theme.muted)
-                .child(if self.organization.collapsed.contains(&id) {
-                    "›"
-                } else {
-                    "⌄"
-                })
-                .into_any_element()
+                let toggled = id.clone();
+                div()
+                    .id(SharedString::from(format!("folder-disclosure-{id}")))
+                    .role(Role::Button)
+                    .aria_label(format!("Toggle subfolders of {}", row.path))
+                    .tab_index(-1)
+                    .cursor_pointer()
+                    .on_click(cx.listener(move |s, _, w, cx| {
+                        s.organization.focused_folder = Some(toggled.clone());
+                        s.organization.tree_focus.focus(w, cx);
+                        s.organize(Action::Collapse(toggled.clone()), w, cx);
+                        cx.stop_propagation();
+                    }))
+                    .aria_expanded(!self.organization.collapsed.contains(&id))
+                    .w(px(18.))
+                    .h(px(28.))
+                    .text_center()
+                    .text_color(self.theme.muted)
+                    .child(if self.organization.collapsed.contains(&id) {
+                        "›"
+                    } else {
+                        "⌄"
+                    })
+                    .into_any_element()
             } else {
                 div().w(px(18.)).flex_none().into_any_element()
             })
             .child(
-                self.navigation_row(
-                    &format!("folder-{id}"),
-                    &row.folder.name,
-                    "folder",
-                    Scope::FolderId(Some(id.clone())),
-                    self.library
-                        .notes
-                        .iter()
-                        .filter(|n| n.folder_id.as_ref() == Some(&id))
-                        .count(),
-                    cx,
-                )
-                .flex_1()
-                .min_w_0()
-                .aria_description(row.path.clone()),
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(10.))
+                    .px(px(10.))
+                    .flex_1()
+                    .min_w_0()
+                    .child(icon(
+                        "folder",
+                        if opened { theme.accent } else { theme.text },
+                        20.,
+                    ))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .overflow_hidden()
+                            .text_ellipsis()
+                            .child(row.folder.name.clone()),
+                    )
+                    .child(
+                        div().text_size(px(12.)).text_color(theme.muted).child(
+                            self.library
+                                .notes
+                                .iter()
+                                .filter(|n| n.folder_id.as_ref() == Some(&id))
+                                .count()
+                                .to_string(),
+                        ),
+                    ),
             )
             .into_any_element()
     }

@@ -64,6 +64,9 @@ impl Shell {
         preferences.focus = std::mem::take(&mut self.preferences.focus);
         self.preferences = preferences;
         self.apply_preferences(cx);
+        if let Some(root) = self.live.as_ref().map(|live| live.root.clone()) {
+            self.configure_folder_view(root, cx);
+        }
     }
     pub(super) fn poll_preferences(&mut self, cx: &mut Context<Self>) {
         let events: Vec<_> = self
@@ -110,14 +113,21 @@ impl Shell {
         }
     }
     pub(super) fn apply_preferences(&mut self, cx: &mut Context<Self>) {
+        let previous_sort = self.query.sort;
         let p = &self.preferences.session.value;
         if !self.preferences.dragging {
             self.sidebar_width = p.sidebar_width as f32;
             self.list_width = p.list_width as f32;
         }
         self.focused = p.focus_mode;
-        self.library.sort_by_title = p.sort_by_title;
-        self.library.refresh();
+        if !self.query.sort_loaded {
+            self.query.sort = if p.sort_by_title {
+                notes_core::library::Sort::Title
+            } else {
+                notes_core::library::Sort::Edited
+            };
+        }
+        self.library.sort_by_title = self.query.sort == notes_core::library::Sort::Title;
         self.list.remeasure();
         let typography = crate::rich_editor::WritingStyle {
             font: p.note_font,
@@ -129,6 +139,10 @@ impl Shell {
                     editor.update(cx, |e, cx| e.set_typography(typography, cx));
                 }
             }
+        }
+        self.refresh_query_visibility();
+        if previous_sort != self.query.sort {
+            self.queue_library_query(false, cx);
         }
         self.appearance = self.preferences.appearance();
         self.apply_theme(cx);
@@ -173,23 +187,23 @@ impl Shell {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let count = if self.preferences.session.error.is_some() && self.preferences.worker.is_some()
-        {
-            15
-        } else {
-            14
-        };
-        let current = self
-            .preferences
-            .focus
+        let mut active = (0..14).collect::<Vec<_>>();
+        if self.live.is_some() {
+            active.push(15);
+        }
+        if self.preferences.session.error.is_some() && self.preferences.worker.is_some() {
+            active.push(14);
+        }
+        let current = active
             .iter()
-            .position(|h| h.is_focused(window))
+            .position(|&i| self.preferences.focus[i].is_focused(window))
             .unwrap_or(0);
-        let next = if backwards {
-            (current + count - 1) % count
+        let next_position = if backwards {
+            (current + active.len() - 1) % active.len()
         } else {
-            (current + 1) % count
+            (current + 1) % active.len()
         };
+        let next = active[next_position];
         let extra = usize::from(self.preferences.appearance_override.is_some());
         let item = match next {
             1..=3 => Some(4),
@@ -198,6 +212,7 @@ impl Shell {
             9..=10 => Some(10 + extra),
             11..=12 => Some(11 + extra),
             13 => Some(12 + extra),
+            15 => Some(15 + extra),
             _ => None,
         };
         if let Some(item) = item {
@@ -447,6 +462,7 @@ impl Shell {
             .child(self.stepper("note-list-width", "Note list width", p.list_width, 300..=440, |v| Patch { list_width: Some(v), ..Default::default() }, cx))
             .child(self.control("reset-layout", "Restore comfortable pane widths", Command::Preference(Patch { sidebar_width: Some(248), list_width: Some(352), ..Default::default() }), cx).track_focus(&self.preferences.focus[13]).px(px(12.)).py(px(8.)).text_size(px(12.)).border_color(t.border).child("Restore comfortable widths"))
             .child(div().mt(px(12.)).text_size(px(11.)).text_color(t.muted).child("Narrow windows adapt automatically. Your preferred widths return when there’s room."))
+            .when(self.live.is_some(), |d| d.child(self.setting_heading("Your notes and files", "Copy sources, export portable notes or keep a verified library backup.")).child(self.portability_controls(cx)))
             .child(self.setting_heading("A calmer workspace", "Panels stay still, and the writing caret does not blink."))
             .child(div().text_size(px(12.)).line_height(relative(1.7)).text_color(t.muted).child("Ctrl ,  Settings    ·    Ctrl K  Search    ·    Ctrl \\  Focus\nCtrl N  New note    ·    Ctrl Shift N  Quick Note\nCtrl F  Find in note    ·    Ctrl S  Save    ·    Esc  Return"));
         let status = if let Some(error) = &self.preferences.session.error {

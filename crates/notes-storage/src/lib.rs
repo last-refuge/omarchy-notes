@@ -1,12 +1,19 @@
 //! Schema-compatible SQLite storage. Only committed writes produce acknowledgments.
 pub mod backup;
 pub mod capture;
+pub mod file_import;
 mod lock;
 pub mod media;
 pub mod migration;
 pub mod organization;
+pub mod portable;
+pub mod recovery;
+pub mod search;
 use anyhow::{Context, Result, ensure};
 use notes_core::document::{Document, new_id};
+pub use recovery::{
+    FolderDeletion, GarbageReport, PurgeReport, TrashEntry, TrashReceipt, TrashToken,
+};
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -347,6 +354,68 @@ pub fn now() -> i64 {
 }
 
 pub enum Request {
+    PrepareFileImport {
+        paths: Vec<PathBuf>,
+        cancel: file_import::Cancellation,
+        operation: u64,
+    },
+    CommitFileImport {
+        prepared: file_import::PreparedImport,
+        folder: Option<String>,
+        accept_warnings: bool,
+        cancel: file_import::Cancellation,
+        operation: u64,
+    },
+    PortableExport {
+        selection: portable::Selection,
+        destination: PathBuf,
+        format: portable::Format,
+        cancel: backup::Cancellation,
+        operation: u64,
+    },
+    BackUp {
+        destination: PathBuf,
+        cancel: backup::Cancellation,
+        operation: u64,
+    },
+    Query {
+        operation: u64,
+        query: notes_core::library::Query,
+    },
+    Duplicate {
+        id: String,
+        expected_revision: i64,
+        operation: u64,
+    },
+    LoadTrash {
+        id: String,
+        operation: u64,
+    },
+    Trash {
+        notes: Vec<(String, i64)>,
+        operation: u64,
+    },
+    Restore {
+        notes: Vec<(String, i64)>,
+        operation: u64,
+    },
+    UndoTrash {
+        receipt: TrashReceipt,
+        operation: u64,
+    },
+    DeletePermanently {
+        notes: Vec<(String, i64)>,
+        operation: u64,
+    },
+    DeleteFolder {
+        id: String,
+        expected_notes: Vec<(String, i64)>,
+        operation: u64,
+    },
+    Purge {
+        at: i64,
+        operation: u64,
+    },
     Organize {
         operation: u64,
         mutation: notes_core::organization::Mutation,
@@ -386,6 +455,65 @@ pub enum Request {
     },
 }
 pub enum Event {
+    FileImportProgress {
+        operation: u64,
+        progress: file_import::Progress,
+    },
+    FileImportPrepared {
+        operation: u64,
+        result: std::result::Result<file_import::PreparedImport, String>,
+    },
+    FileImportCommitted {
+        operation: u64,
+        result: std::result::Result<file_import::Report, String>,
+    },
+    PortabilityProgress {
+        operation: u64,
+        progress: backup::Progress,
+    },
+    PortableExported {
+        operation: u64,
+        result: std::result::Result<portable::Report, String>,
+    },
+    BackedUp {
+        operation: u64,
+        result: std::result::Result<backup::VerifiedBackup, String>,
+    },
+    Queried {
+        operation: u64,
+        query: notes_core::library::Query,
+        result: std::result::Result<notes_core::library::Page, String>,
+    },
+    Duplicated {
+        operation: u64,
+        source: String,
+        result: std::result::Result<Note, String>,
+    },
+    TrashLoaded {
+        operation: u64,
+        id: String,
+        result: std::result::Result<TrashEntry, String>,
+    },
+    Trashed {
+        operation: u64,
+        result: std::result::Result<TrashReceipt, String>,
+    },
+    Restored {
+        operation: u64,
+        result: std::result::Result<Vec<Note>, String>,
+    },
+    Deleted {
+        operation: u64,
+        result: std::result::Result<Vec<String>, String>,
+    },
+    FolderDeleted {
+        operation: u64,
+        result: std::result::Result<FolderDeletion, String>,
+    },
+    Purged {
+        operation: u64,
+        result: std::result::Result<PurgeReport, String>,
+    },
     Organized {
         operation: u64,
         result: std::result::Result<notes_core::organization::Change, String>,
@@ -426,6 +554,26 @@ pub struct Worker {
     pub events: Receiver<Event>,
     root: PathBuf,
 }
+fn import_progress(
+    sender: &mpsc::Sender<Event>,
+    operation: u64,
+) -> impl FnMut(file_import::Progress) + '_ {
+    let mut last_phase = None;
+    let mut last_sent = std::time::Instant::now();
+    move |progress| {
+        if last_phase != Some(progress.phase)
+            || (progress.total > 0 && progress.completed == progress.total)
+            || last_sent.elapsed() >= Duration::from_millis(50)
+        {
+            last_phase = Some(progress.phase);
+            last_sent = std::time::Instant::now();
+            let _ = sender.send(Event::FileImportProgress {
+                operation,
+                progress,
+            });
+        }
+    }
+}
 impl Worker {
     pub fn root(&self) -> &Path {
         &self.root
@@ -451,6 +599,128 @@ impl Worker {
                 }
                 while let Ok(request) = rx.recv() {
                     let event = match request {
+                        Request::PrepareFileImport {
+                            paths,
+                            cancel,
+                            operation,
+                        } => Event::FileImportPrepared {
+                            operation,
+                            result: file_import::prepare(
+                                paths,
+                                &cancel,
+                                import_progress(&tx, operation),
+                            )
+                            .map_err(|e| format!("{e:#}")),
+                        },
+                        Request::CommitFileImport {
+                            prepared,
+                            folder,
+                            accept_warnings,
+                            cancel,
+                            operation,
+                        } => Event::FileImportCommitted {
+                            operation,
+                            result: store
+                                .import_prepared(
+                                    prepared,
+                                    folder,
+                                    accept_warnings,
+                                    &cancel,
+                                    import_progress(&tx, operation),
+                                )
+                                .map_err(|e| format!("{e:#}")),
+                        },
+                        Request::PortableExport {
+                            selection,
+                            destination,
+                            format,
+                            cancel,
+                            operation,
+                        } => Event::PortableExported {
+                            operation,
+                            result: store
+                                .export_portable(
+                                    selection,
+                                    &destination,
+                                    format,
+                                    &cancel,
+                                    |progress| {
+                                        let _ = tx.send(Event::PortabilityProgress {
+                                            operation,
+                                            progress,
+                                        });
+                                    },
+                                )
+                                .map_err(|e| format!("{e:#}")),
+                        },
+                        Request::BackUp {
+                            destination,
+                            cancel,
+                            operation,
+                        } => Event::BackedUp {
+                            operation,
+                            result: store
+                                .backup_controlled(&destination, &cancel, |progress| {
+                                    let _ = tx.send(Event::PortabilityProgress {
+                                        operation,
+                                        progress,
+                                    });
+                                })
+                                .map_err(|e| format!("{e:#}")),
+                        },
+                        Request::Query { operation, query } => Event::Queried {
+                            operation,
+                            result: store.query(&query).map_err(|e| format!("{e:#}")),
+                            query,
+                        },
+                        Request::Duplicate {
+                            id,
+                            expected_revision,
+                            operation,
+                        } => Event::Duplicated {
+                            operation,
+                            result: store
+                                .duplicate(&id, expected_revision)
+                                .map_err(|e| format!("{e:#}")),
+                            source: id,
+                        },
+                        Request::LoadTrash { id, operation } => Event::TrashLoaded {
+                            operation,
+                            result: store.load_trash(&id).map_err(|e| format!("{e:#}")),
+                            id,
+                        },
+                        Request::Trash { notes, operation } => Event::Trashed {
+                            operation,
+                            result: store.trash(&notes).map_err(|e| format!("{e:#}")),
+                        },
+                        Request::Restore { notes, operation } => Event::Restored {
+                            operation,
+                            result: store.restore_notes(&notes).map_err(|e| format!("{e:#}")),
+                        },
+                        Request::UndoTrash { receipt, operation } => Event::Restored {
+                            operation,
+                            result: store.undo_trash(&receipt).map_err(|e| format!("{e:#}")),
+                        },
+                        Request::DeletePermanently { notes, operation } => Event::Deleted {
+                            operation,
+                            result: store
+                                .delete_permanently(&notes)
+                                .map_err(|e| format!("{e:#}")),
+                        },
+                        Request::DeleteFolder {
+                            id,
+                            expected_notes,
+                            operation,
+                        } => Event::FolderDeleted {
+                            operation,
+                            result: store
+                                .delete_folder(&id, &expected_notes)
+                                .map_err(|e| format!("{e:#}")),
+                        },
+                        Request::Purge { at, operation } => Event::Purged {
+                            operation,
+                            result: store.purge_expired(at).map_err(|e| format!("{e:#}")),
+                        },
                         Request::Organize {
                             operation,
                             mutation,

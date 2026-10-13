@@ -90,7 +90,7 @@ fn directory(path: &Path) -> Result<()> {
     );
     Ok(())
 }
-fn install(root: &Path, bytes: &[u8]) -> Result<String> {
+pub(super) fn install(root: &Path, bytes: &[u8]) -> Result<String> {
     ensure!(bytes.len() <= MAX_ASSET, "The file exceeds 32 MiB.");
     let digest = hash(bytes);
     let target = blob_path(root, &digest)?;

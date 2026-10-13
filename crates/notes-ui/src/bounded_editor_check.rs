@@ -14,6 +14,62 @@ fn draw(cx: &mut HeadlessAppContext, h: WindowHandle<Shell>) -> anyhow::Result<(
     cx.run_until_parked();
     Ok(())
 }
+fn settle_query(cx: &mut HeadlessAppContext, h: WindowHandle<Shell>) -> anyhow::Result<()> {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        draw(cx, h)?;
+        let busy = h.update(cx, |s, w, cx| {
+            s.poll_storage(w, cx);
+            assert!(s.query.error.is_none(), "{:?}", s.query.error);
+            s.query.loading
+        })?;
+        if !busy {
+            return draw(cx, h);
+        }
+        anyhow::ensure!(Instant::now() < deadline, "SQL query did not settle");
+        std::thread::sleep(Duration::from_millis(2));
+    }
+}
+fn load_rows(
+    cx: &mut HeadlessAppContext,
+    h: WindowHandle<Shell>,
+    count: usize,
+) -> anyhow::Result<()> {
+    settle_query(cx, h)?;
+    while h.update(cx, |s, _, _| s.library.visible.len())? < count {
+        h.update(cx, |s, w, cx| {
+            assert!(s.query.has_more, "Fixture must have {count} query rows");
+            s.command(Command::MoreResults, w, cx);
+        })?;
+        settle_query(cx, h)?;
+    }
+    h.update(cx, |s, _, _| assert_eq!(s.library.visible.len(), count))?;
+    Ok(())
+}
+fn save_and_settle(
+    cx: &mut HeadlessAppContext,
+    h: WindowHandle<Shell>,
+    id: &str,
+) -> anyhow::Result<()> {
+    draw(cx, h)?;
+    h.update(cx, |s, _, cx| s.save_real_notes(cx))?;
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let saved = h.update(cx, |s, w, cx| {
+            s.poll_storage(w, cx);
+            let note = &s.live.as_ref().unwrap().notes[id];
+            assert!(note.error.is_none(), "{:?}", note.error);
+            note.pending.is_none() && note.revision == note.saved && !note.has_unobserved_edit(cx)
+        })?;
+        if saved {
+            break;
+        }
+        anyhow::ensure!(Instant::now() < deadline, "Fixture draft did not save");
+        draw(cx, h)?;
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    settle_query(cx, h)
+}
 fn opened(s: &Shell) -> usize {
     s.live
         .as_ref()
@@ -370,6 +426,7 @@ fn incremental_preview_workflow(
 ) -> anyhow::Result<()> {
     let edited = &ids[121];
     let unrelated = &ids[122];
+    load_rows(cx, h, 1_000)?;
     h.update(cx, |s, w, cx| {
         s.command(Command::Select(edited.clone()), w, cx);
         s.list.scroll_to(ListOffset {
@@ -435,7 +492,9 @@ fn incremental_preview_workflow(
                 .starts_with("A fresh title")
         );
     })?;
-    // Search routes use the freshly derived title/body while the note remains open.
+    // Production FTS searches acknowledged content, while the open editor and
+    // its undo/selection remain retained independently of the result list.
+    save_and_settle(cx, h, edited)?;
     for query in ["A fresh title", "AnchorSearchNeedle"] {
         h.update(cx, |s, w, cx| {
             s.search.update(cx, |f, cx| {
@@ -444,6 +503,8 @@ fn incremental_preview_workflow(
             });
         })?;
         draw(cx, h)?;
+        cx.advance_clock(Duration::from_millis(45));
+        settle_query(cx, h)?;
         h.update(cx, |s, _, _| {
             assert_eq!(s.library.visible.len(), 1);
             assert_eq!(&s.library.notes[s.library.visible[0]].id, edited);
@@ -458,15 +519,17 @@ fn incremental_preview_workflow(
         s.search.update(cx, |f, cx| f.clear(w, cx));
     })?;
     draw(cx, h)?;
-    h.update(cx, |s, _, cx| {
+    cx.advance_clock(Duration::from_millis(45));
+    load_rows(cx, h, 1_000)?;
+    h.update(cx, |s, w, cx| {
         assert_eq!(s.library.visible.len(), 1_000);
-        s.change_preferences(
-            notes_core::preferences::Patch {
-                sort_by_title: Some(true),
-                ..Default::default()
-            },
-            cx,
-        );
+        assert_eq!(s.query.sort, notes_core::library::Sort::Edited);
+        s.command(Command::Sort, w, cx);
+        s.command(Command::Sort, w, cx);
+    })?;
+    load_rows(cx, h, 1_000)?;
+    h.update(cx, |s, _, _| {
+        assert_eq!(s.query.sort, notes_core::library::Sort::Title);
         s.list.scroll_to(ListOffset {
             item_ix: 120,
             offset_in_item: px(17.),
@@ -497,6 +560,8 @@ fn incremental_preview_workflow(
     })?;
     h.update(cx, |s, _, _| assert_eq!(list_anchor(s), anchor))?;
     draw(cx, h)?;
+    h.update(cx, |s, _, _| assert_eq!(list_anchor(s), anchor))?;
+    save_and_settle(cx, h, edited)?;
     h.update(cx, |s, _, _| {
         assert_eq!(
             list_anchor(s),
@@ -510,16 +575,11 @@ fn incremental_preview_workflow(
         );
         assert_eq!(preview_content(s, unrelated), old_other);
     })?;
-    h.update(cx, |s, _, cx| {
-        s.change_preferences(
-            notes_core::preferences::Patch {
-                sort_by_title: Some(false),
-                ..Default::default()
-            },
-            cx,
-        );
+    h.update(cx, |s, w, cx| {
+        s.command(Command::Sort, w, cx);
+        assert_eq!(s.query.sort, notes_core::library::Sort::Edited);
     })?;
-    draw(cx, h)?;
+    load_rows(cx, h, 1_000)?;
     h.update(cx, |s, w, cx| {
         s.save_real_notes(cx);
         s.poll_storage(w, cx);
@@ -570,7 +630,8 @@ fn batch_save_anchor_workflow(
         draw(cx, h)?;
         std::thread::sleep(Duration::from_millis(5));
     }
-    draw(cx, h)?;
+    settle_query(cx, h)?;
+    load_rows(cx, h, 1_000)?;
     let (anchor_id, other) = h.update(cx, |s, _, _| {
         assert_eq!(s.library.notes[s.library.visible[0]].id, pinned);
         let a = s.library.notes[s.library.visible[120]].id.clone();
@@ -673,16 +734,25 @@ fn batch_save_anchor_workflow(
     );
     h.update(cx, |s, w, cx| {
         s.poll_storage(w, cx);
-        assert_eq!(s.library.notes[s.library.visible[0]].id, pinned, "P remains pinned at index zero");
-        assert_eq!(s.library.notes[s.library.visible[1]].id, other, "B moved ahead of A in the same acknowledgment batch");
         assert_eq!(list_anchor(s), anchor, "the actual A identity and pixel offset survive a batch where P's own position did not change");
-        assert_eq!(s.list.logical_scroll_top().item_ix, 121);
         for id in [pinned, other.as_str()] {
             let session = &s.live.as_ref().unwrap().notes[id];
             assert!(session.pending.is_none() && session.revision == session.saved);
         }
     })?;
-    draw(cx, h)?;
+    settle_query(cx, h)?;
+    h.update(cx, |s, _, _| {
+        assert_eq!(
+            s.library.notes[s.library.visible[0]].id, pinned,
+            "P remains pinned at index zero"
+        );
+        assert_eq!(
+            s.library.notes[s.library.visible[1]].id, other,
+            "B moves ahead of A after the acknowledged batch query refresh"
+        );
+        assert_eq!(list_anchor(s), anchor);
+        assert_eq!(s.list.logical_scroll_top().item_ix, 121);
+    })?;
     h.update(cx, |s, _, _| assert_eq!(list_anchor(s), anchor))?;
     h.update(cx, |s, _, _| {
         s.list.scroll_to(ListOffset {
@@ -877,6 +947,7 @@ pub fn bounded_editor_check(directory: &Path) -> anyhow::Result<()> {
         assert_eq!(opened(s), 1, "startup creates only the visible editor");
     })?;
     draw(&mut cx, h)?;
+    load_rows(&mut cx, h, 1_000)?;
     document_edge_workflow(&mut cx, h, &ids[0])?;
     h.update(&mut cx, |s, w, cx| {
         s.command(Command::Select(ids[0].clone()), w, cx)

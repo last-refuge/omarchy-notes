@@ -2,7 +2,7 @@
 use super::*;
 use notes_core::organization::{self, Change, Mutation};
 
-fn folders(db: &Connection) -> Result<Vec<Folder>> {
+pub(super) fn folders(db: &Connection) -> Result<Vec<Folder>> {
     let mut q = db.prepare("SELECT id,name,parent_id,sort_key FROM folders WHERE deleted_at IS NULL ORDER BY sort_key,name,id")?;
     Ok(q.query_map([], |r| {
         Ok(Folder {

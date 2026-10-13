@@ -611,3 +611,57 @@ fn crash_child() {
         restore_with(&source, &target, &mut checkpoint).unwrap();
     }
 }
+
+#[test]
+fn controlled_backup_records_exact_committed_boundary() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut store = Store::open(&temp.path().join("library")).unwrap();
+    let mut note = store.create(Document::default(), None).unwrap();
+    let destination = temp.path().join("backup");
+    let saved = store
+        .backup_controlled(&destination, &Cancellation::default(), |_| {})
+        .unwrap();
+    assert_eq!(
+        saved.manifest.committed_revisions.get(&note.id),
+        Some(&note.revision)
+    );
+    note.body.blocks[0].spans = vec![notes_core::document::Span::text("later edit")];
+    store.save(&note).unwrap();
+    let verified = inspect(&destination).unwrap();
+    assert_eq!(
+        verified.manifest.committed_revisions,
+        saved.manifest.committed_revisions
+    );
+    assert_ne!(
+        store.load().unwrap().notes[0].revision,
+        verified.manifest.committed_revisions[&note.id]
+    );
+}
+
+#[test]
+fn controlled_cancel_before_publish_never_exposes_partial_copy() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut store = Store::open(&temp.path().join("library")).unwrap();
+    store.create(Document::default(), None).unwrap();
+    let destination = temp.path().join("backup");
+    let cancel = Cancellation::default();
+    assert!(
+        store
+            .backup_controlled(&destination, &cancel, |p| {
+                if p == Progress::Publishing {
+                    cancel.cancel();
+                }
+            })
+            .is_err()
+    );
+    assert!(!destination.exists());
+    assert_eq!(std::fs::read_dir(temp.path()).unwrap().count(), 1);
+    assert_eq!(store.load().unwrap().notes.len(), 1);
+}
+
+#[test]
+fn validate_existing_library_refuses_empty_folder_without_creating_database() {
+    let temp = tempfile::tempdir().unwrap();
+    assert!(validate_library(temp.path(), &Cancellation::default()).is_err());
+    assert!(!temp.path().join("library.sqlite3").exists());
+}

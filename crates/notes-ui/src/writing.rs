@@ -53,13 +53,14 @@ pub(super) struct Session {
     pub editor: Option<Entity<RichEditor>>,
     view_state: Option<EditorViewState>,
     last_opened: u64,
-    model_revision: u64,
+    pub(super) model_revision: u64,
     pub(super) revision: u64,
     pub(super) saved: u64,
     pub(super) pending: Option<(u64, u64)>,
     pub(super) last_edit: Instant,
     pub(super) dirty_since: Instant,
     pub(super) error: Option<String>,
+    pub(super) recovery_blocked: bool,
     pub(super) needs_upgrade: bool,
     pub(super) owner: AnyWindowHandle,
     _subscriptions: Vec<Subscription>,
@@ -617,6 +618,7 @@ impl Shell {
                 last_edit: now,
                 dirty_since: now,
                 error: None,
+                recovery_blocked: false,
                 needs_upgrade: false,
                 owner: window.window_handle(),
                 _subscriptions: vec![],
@@ -859,6 +861,12 @@ impl Shell {
         }
     }
     pub(super) fn refresh_real_library(&mut self, cx: &mut Context<Self>) {
+        let offset = self.list.logical_scroll_top();
+        let anchor = self
+            .library
+            .visible
+            .get(offset.item_ix)
+            .map(|&i| self.library.notes[i].id.clone());
         let Some(live) = &self.live else {
             return;
         };
@@ -901,15 +909,26 @@ impl Shell {
                         String::new()
                     },
                     pinned: s.note.pinned,
-                    blocks: vec![Block::Paragraph {
-                        text: s.note.body.plain_text(),
-                    }],
+                    blocks: vec![],
                     related: None,
                 }
             })
             .collect();
-        self.library.refresh();
-        self.list.reset(self.library.visible.len());
+        self.invalidate_query_indices();
+        self.refresh_query_visibility();
+        if let Some(anchor) = anchor
+            && let Some(item_ix) = self
+                .library
+                .visible
+                .iter()
+                .position(|&i| self.library.notes[i].id == anchor)
+        {
+            self.list.scroll_to(ListOffset {
+                item_ix,
+                offset_in_item: offset.offset_in_item,
+            });
+        }
+        self.queue_library_query(false, cx);
         self.sync_link_catalog(cx);
         cx.notify();
     }
@@ -948,9 +967,7 @@ impl Shell {
                 String::new()
             },
             pinned: session.note.pinned,
-            blocks: vec![Block::Paragraph {
-                text: session.note.body.plain_text(),
-            }],
+            blocks: vec![],
             related: None,
         };
         let previous = self.library.visible.clone();
@@ -993,7 +1010,10 @@ impl Shell {
         }
         let mut ordering_changed =
             previous_position != self.library.notes.iter().position(|n| n.id == id);
-        self.library.refresh();
+        if reorder || previous_position.is_none() {
+            self.invalidate_query_indices();
+        }
+        self.refresh_query_visibility();
         ordering_changed |= previous_order.is_some_and(|order| {
             !order.iter().map(String::as_str).eq(self
                 .library
@@ -1101,7 +1121,9 @@ impl Shell {
     pub(super) fn save_real_notes(&mut self, cx: &mut Context<Self>) {
         if let Some(live) = &mut self.live {
             for s in live.notes.values_mut() {
-                s.error = None;
+                if !s.recovery_blocked {
+                    s.error = None;
+                }
                 s.last_edit = Instant::now() - Duration::from_secs(4);
             }
             live.message = None;
@@ -1109,6 +1131,8 @@ impl Shell {
         cx.notify();
     }
     pub(super) fn request_close(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let folder_view_busy = self.folder_view_busy();
+        let library_busy = self.library_recovery.busy() || self.portability.busy();
         let Some(live) = &mut self.live else {
             return true;
         };
@@ -1127,6 +1151,8 @@ impl Shell {
         }
         let quick_id = self.windows.quick.as_ref().map(|q| q.1.as_str());
         let pending = self.organization.busy()
+            || library_busy
+            || folder_view_busy
             || self.preferences.busy()
             || live.creating.is_some()
             || live
@@ -1154,6 +1180,13 @@ impl Shell {
     }
     pub(super) fn poll_storage(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.poll_preferences(cx);
+        self.poll_portability(window, cx);
+        if let Some(sort) = self.poll_folder_view(cx) {
+            self.query.sort = sort;
+            self.query.sort_loaded = true;
+            self.library.sort_by_title = sort == notes_core::library::Sort::Title;
+            self.queue_library_query(false, cx);
+        }
         // A successful retry removes its button. Keep focus on a mounted
         // Settings control so Escape and app shortcuts retain their key context.
         if self.settings_open
@@ -1167,6 +1200,21 @@ impl Shell {
             return;
         };
         let events: Vec<_> = live.worker.events.try_iter().collect();
+        let mut mutations = Vec::with_capacity(events.len());
+        for event in events {
+            let Some(event) = self.portability_event(event, window, cx) else {
+                continue;
+            };
+            let Some(event) = self.library_recovery_event(event, window, cx) else {
+                continue;
+            };
+            if matches!(event, Event::Queried { .. }) {
+                self.library_query_event(event, cx);
+            } else {
+                mutations.push(event);
+            }
+        }
+        let events = mutations;
         let changed = !events.is_empty();
         let only_note_updates = changed
             && events
@@ -1309,12 +1357,17 @@ impl Shell {
                     }
                     self.created_launch(operation, launch_result, cx);
                 }
+                _ => {}
             }
         }
+        let folder_view_busy = self.folder_view_busy();
+        let library_busy = self.library_recovery.busy() || self.portability.busy();
         let live = self.live.as_mut().unwrap();
         let mut submitted = false;
         for s in live.notes.values_mut() {
-            if s.revision == s.saved
+            if s.recovery_blocked
+                || self.library_recovery.blocks_save(&s.note.id)
+                || s.revision == s.saved
                 || s.pending.is_some()
                 || s.error.is_some()
                 || s.has_unobserved_edit(cx)
@@ -1355,6 +1408,8 @@ impl Shell {
             && live.creating.is_none()
             && !self.preferences.busy()
             && !self.organization.busy()
+            && !folder_view_busy
+            && !library_busy
             && live
                 .notes
                 .values()
@@ -1375,12 +1430,15 @@ impl Shell {
             for id in saved_rows {
                 self.refresh_real_note(&id, true, cx);
             }
+            self.queue_library_query(false, cx);
         } else if changed {
             self.refresh_real_library(cx);
         }
         if changed || submitted {
             cx.notify();
         }
+        self.submit_library_query(cx);
+        self.poll_library_recovery(window, cx);
     }
     pub(super) fn real_status(&self, id: &str, cx: &App) -> String {
         let live = self.live.as_ref().unwrap();
@@ -1522,6 +1580,7 @@ impl Shell {
                     div()
                         .flex()
                         .gap(px(4.))
+                        .child(self.recovery_controls(cx))
                         .child(
                             self.control(
                                 "export-pdf",

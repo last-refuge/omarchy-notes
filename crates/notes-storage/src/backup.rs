@@ -16,6 +16,55 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[derive(Clone, Default)]
+pub struct Cancellation(std::sync::Arc<std::sync::atomic::AtomicBool>);
+impl Cancellation {
+    pub fn cancel(&self) {
+        self.0.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+    pub fn check(&self) -> Result<()> {
+        ensure!(
+            !self.0.load(std::sync::atomic::Ordering::Relaxed),
+            "Operation cancelled. Your source and any completed copy are retained."
+        );
+        Ok(())
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Progress {
+    Snapshot,
+    Copying,
+    Verifying,
+    Publishing,
+}
+fn controlled<'a>(
+    cancel: &'a Cancellation,
+    mut progress: impl FnMut(Progress) + 'a,
+) -> impl FnMut(Phase) -> Result<()> + 'a {
+    let mut previous = None;
+    move |phase| {
+        // Publication is the completion boundary. Cancellation after it cannot
+        // turn an already durable result into a misleading cancelled receipt.
+        if phase != Phase::Published {
+            cancel.check()?;
+        }
+        let next = match phase {
+            Phase::SnapshotStep | Phase::Snapshot => Progress::Snapshot,
+            Phase::Blob | Phase::CopyChunk => Progress::Copying,
+            Phase::VerifyChunk | Phase::Manifest => Progress::Verifying,
+            Phase::BeforePublish | Phase::Published => Progress::Publishing,
+        };
+        if previous != Some(next) {
+            progress(next);
+            previous = Some(next);
+        }
+        if phase != Phase::Published {
+            cancel.check()?;
+        }
+        Ok(())
+    }
+}
+
 const DATABASE: &str = "library.sqlite3";
 const FORMAT: &str = "omarchy-notes-backup";
 
@@ -33,6 +82,9 @@ pub struct Manifest {
     pub bytes: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub database_sha256: Option<String>,
+    /// Exact committed database boundary, including Recently Deleted.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub committed_revisions: BTreeMap<String, i64>,
 }
 
 #[derive(Clone, Debug)]
@@ -61,6 +113,20 @@ pub fn create(root: &Path, destination: &Path) -> Result<VerifiedBackup> {
 
 impl Store {
     /// Uses this store's existing ownership; cannot overlap a writer operation.
+    pub fn backup_controlled(
+        &mut self,
+        destination: &Path,
+        cancel: &Cancellation,
+        progress: impl FnMut(Progress),
+    ) -> Result<VerifiedBackup> {
+        cancel.check()?;
+        create_from(
+            &self.db,
+            &self.root,
+            destination,
+            &mut controlled(cancel, progress),
+        )
+    }
     pub fn backup_to(&mut self, destination: &Path) -> Result<VerifiedBackup> {
         create_from(&self.db, &self.root, destination, &mut |_| Ok(()))
     }
@@ -72,6 +138,42 @@ pub fn inspect(root: &Path) -> Result<VerifiedBackup> {
     Ok(backup)
 }
 
+pub fn inspect_controlled(
+    root: &Path,
+    cancel: &Cancellation,
+    progress: impl FnMut(Progress),
+) -> Result<VerifiedBackup> {
+    cancel.check()?;
+    Ok(inspect_inner_with(root, &mut controlled(cancel, progress))?.0)
+}
+pub fn restore_controlled(
+    source: &Path,
+    destination: &Path,
+    cancel: &Cancellation,
+    progress: impl FnMut(Progress),
+) -> Result<VerifiedBackup> {
+    cancel.check()?;
+    restore_with(source, destination, &mut controlled(cancel, progress))
+}
+/// Validate an existing library without creating or migrating it. The running
+/// owner is rejected before launch; opening the new process remains separate.
+pub fn validate_library(root: &Path, cancel: &Cancellation) -> Result<PathBuf> {
+    cancel.check()?;
+    let root = root
+        .canonicalize()
+        .context("Choose an existing library folder.")?;
+    let _lock = LibraryLock::acquire(&root)?;
+    regular(&root.join(DATABASE))?;
+    let db = Connection::open_with_flags(
+        root.join(DATABASE),
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )?;
+    let inventory = validate_database(&db)?;
+    verify_blobs_with(&root, &inventory, &mut controlled(cancel, |_| {}))?;
+    cancel.check()?;
+    Ok(root)
+}
+
 /// Restore only to a new folder. The backup and any current library stay intact.
 /// This deliberately does not open/migrate the restored library.
 pub fn restore_to_new(source: &Path, destination: &Path) -> Result<VerifiedBackup> {
@@ -81,6 +183,9 @@ pub fn restore_to_new(source: &Path, destination: &Path) -> Result<VerifiedBacku
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Phase {
     Snapshot,
+    SnapshotStep,
+    CopyChunk,
+    VerifyChunk,
     Blob,
     Manifest,
     BeforePublish,
@@ -104,6 +209,7 @@ pub(crate) fn create_from(
         let started = Instant::now();
         loop {
             use rusqlite::backup::StepResult::*;
+            checkpoint(Phase::SnapshotStep)?;
             match backup.step(256)? {
                 Done => break,
                 More => {}
@@ -125,7 +231,7 @@ pub(crate) fn create_from(
     regular(&path)?.sync_all()?;
     checkpoint(Phase::Snapshot)?;
     copy_blobs(root, &stage.path, &inventory, checkpoint)?;
-    let (database_size, digest) = hash_file(&path)?;
+    let (database_size, digest) = hash_file_with(&path, checkpoint)?;
     let manifest = Manifest {
         format: FORMAT.into(),
         format_version: 1,
@@ -136,13 +242,14 @@ pub(crate) fn create_from(
         blobs: inventory.blobs.len() as u64,
         bytes: total_bytes(database_size, &inventory)?,
         database_sha256: Some(digest),
+        committed_revisions: revisions(&snapshot_path_db(&path)?)?,
     };
     let mut file = new_file(&stage.path.join("manifest.json"))?;
     file.write_all(&serde_json::to_vec_pretty(&manifest)?)?;
     file.write_all(b"\n")?;
     file.sync_all()?;
     // Read the exact completed files, not just the source/model we copied from.
-    inspect_inner(&stage.path)?;
+    inspect_inner_with(&stage.path, checkpoint)?;
     sync_directory(&stage.path)?;
     checkpoint(Phase::Manifest)?;
     let path = stage.publish(checkpoint)?;
@@ -154,19 +261,25 @@ fn restore_with(
     destination: &Path,
     checkpoint: &mut impl FnMut(Phase) -> Result<()>,
 ) -> Result<VerifiedBackup> {
-    let (backup, inventory) = inspect_inner(source)?;
+    let (backup, inventory) = inspect_inner_with(source, checkpoint)?;
     let stage = Stage::new(destination)?;
     let database = backup.path.join(DATABASE);
     // Old manifests have no database digest. Capture one before copying anyway,
     // then verify the copied snapshot so concurrent source changes cannot slip in.
-    let (size, digest) = hash_file(&database)?;
+    let (size, digest) = hash_file_with(&database, checkpoint)?;
     if let Some(expected) = &backup.manifest.database_sha256 {
         ensure!(
             expected == &digest,
             "The backup database changed during restoration."
         );
     }
-    copy_verified(&database, &stage.path.join(DATABASE), size, &digest)?;
+    copy_verified_with(
+        &database,
+        &stage.path.join(DATABASE),
+        size,
+        &digest,
+        checkpoint,
+    )?;
     checkpoint(Phase::Snapshot)?;
     copy_blobs(&backup.path, &stage.path, &inventory, checkpoint)?;
     let db = Connection::open(stage.path.join(DATABASE))?;
@@ -179,10 +292,10 @@ fn restore_with(
     );
     verify_search(&db)?;
     db.close().map_err(|(_, e)| e)?;
-    verify_blobs(&stage.path, &actual)?;
+    verify_blobs_with(&stage.path, &actual, checkpoint)?;
     // Checking the FTS index must not alter the restored database bytes.
     ensure!(
-        hash_file(&stage.path.join(DATABASE))? == (size, digest),
+        hash_file_with(&stage.path.join(DATABASE), checkpoint)? == (size, digest),
         "The database changed while it was being verified."
     );
     sync_directory(&stage.path)?;
@@ -194,6 +307,12 @@ fn restore_with(
 }
 
 fn inspect_inner(root: &Path) -> Result<(VerifiedBackup, Inventory)> {
+    inspect_inner_with(root, &mut |_| Ok(()))
+}
+fn inspect_inner_with(
+    root: &Path,
+    checkpoint: &mut impl FnMut(Phase) -> Result<()>,
+) -> Result<(VerifiedBackup, Inventory)> {
     let root = root
         .canonicalize()
         .context("The backup folder is missing.")?;
@@ -222,7 +341,7 @@ fn inspect_inner(root: &Path) -> Result<(VerifiedBackup, Inventory)> {
             "A completed backup must contain a standalone database without SQLite sidecars."
         );
     }
-    let (size, digest) = hash_file(&root.join(DATABASE))?;
+    let (size, digest) = hash_file_with(&root.join(DATABASE), checkpoint)?;
     if let Some(expected) = &manifest.database_sha256 {
         ensure!(
             valid_hash(expected) && expected == &digest,
@@ -236,6 +355,12 @@ fn inspect_inner(root: &Path) -> Result<(VerifiedBackup, Inventory)> {
         "The backup database is not a standalone rollback-journal snapshot."
     );
     let inventory = validate_database(&db)?;
+    if !manifest.committed_revisions.is_empty() {
+        ensure!(
+            manifest.committed_revisions == revisions(&db)?,
+            "The committed revision boundary does not match the backup database."
+        );
+    }
     ensure!(
         inventory.schema == manifest.schema_version,
         "The manifest and database schema versions disagree."
@@ -246,7 +371,7 @@ fn inspect_inner(root: &Path) -> Result<(VerifiedBackup, Inventory)> {
             && total_bytes(size, &inventory)? == manifest.bytes,
         "The backup counts or recorded size do not match its contents."
     );
-    verify_blobs(&root, &inventory)?;
+    verify_blobs_with(&root, &inventory, checkpoint)?;
     Ok((
         VerifiedBackup {
             path: root,
@@ -256,9 +381,13 @@ fn inspect_inner(root: &Path) -> Result<(VerifiedBackup, Inventory)> {
     ))
 }
 
-fn verify_blobs(root: &Path, inventory: &Inventory) -> Result<()> {
+fn verify_blobs_with(
+    root: &Path,
+    inventory: &Inventory,
+    checkpoint: &mut impl FnMut(Phase) -> Result<()>,
+) -> Result<()> {
     for (hash, size) in &inventory.blobs {
-        let (actual_size, actual_hash) = hash_file(&blob_path(root, hash)?)?;
+        let (actual_size, actual_hash) = hash_file_with(&blob_path(root, hash)?, checkpoint)?;
         ensure!(
             actual_size == *size && actual_hash == *hash,
             "Attachment {hash} is missing or damaged; the backup is incomplete."
@@ -367,6 +496,16 @@ fn validate_database(db: &Connection) -> Result<Inventory> {
     })
 }
 
+fn revisions(db: &Connection) -> Result<BTreeMap<String, i64>> {
+    let mut statement = db.prepare("SELECT id,revision FROM notes ORDER BY id")?;
+    Ok(statement
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?)
+}
+fn snapshot_path_db(path: &Path) -> Result<Connection> {
+    immutable_database(path)
+}
+
 fn verify_search(db: &Connection) -> Result<()> {
     // FTS5 compares the index against its external-content table when rank=1.
     // This command verifies; it does not rebuild or change the index.
@@ -428,7 +567,13 @@ fn copy_blobs(
         if shards.insert(shard.clone()) {
             fs::create_dir(&shard)?;
         }
-        copy_verified(&blob_path(source, hash)?, &shard.join(hash), *size, hash)?;
+        copy_verified_with(
+            &blob_path(source, hash)?,
+            &shard.join(hash),
+            *size,
+            hash,
+            checkpoint,
+        )?;
         checkpoint(Phase::Blob)?;
     }
     for shard in shards {
@@ -477,14 +622,27 @@ fn new_file(path: &Path) -> Result<File> {
         .open(path)?)
 }
 
+#[cfg(test)]
 fn hash_file(path: &Path) -> Result<(u64, String)> {
+    hash_file_with(path, &mut |_| Ok(()))
+}
+fn hash_file_with(
+    path: &Path,
+    checkpoint: &mut impl FnMut(Phase) -> Result<()>,
+) -> Result<(u64, String)> {
     let mut file = regular(path)?;
     let size = file.metadata()?.len();
-    let digest = stream(&mut file, None, size)?;
+    let digest = stream(&mut file, None, size, checkpoint)?;
     Ok((size, digest))
 }
 
-fn copy_verified(source: &Path, destination: &Path, size: u64, digest: &str) -> Result<()> {
+fn copy_verified_with(
+    source: &Path,
+    destination: &Path,
+    size: u64,
+    digest: &str,
+    checkpoint: &mut impl FnMut(Phase) -> Result<()>,
+) -> Result<()> {
     let mut input = regular(source)?;
     ensure!(
         input.metadata()?.len() == size,
@@ -493,7 +651,7 @@ fn copy_verified(source: &Path, destination: &Path, size: u64, digest: &str) -> 
     );
     let mut output = new_file(destination)?;
     ensure!(
-        stream(&mut input, Some(&mut output), size)? == digest,
+        stream(&mut input, Some(&mut output), size, checkpoint)? == digest,
         "{} failed its SHA-256 check.",
         source.display()
     );
@@ -501,11 +659,21 @@ fn copy_verified(source: &Path, destination: &Path, size: u64, digest: &str) -> 
     Ok(())
 }
 
-fn stream(input: &mut File, mut output: Option<&mut File>, size: u64) -> Result<String> {
+fn stream(
+    input: &mut File,
+    mut output: Option<&mut File>,
+    size: u64,
+    checkpoint: &mut impl FnMut(Phase) -> Result<()>,
+) -> Result<String> {
     let mut digest = Sha256::new();
     let mut buffer = [0u8; 64 * 1024];
     let mut remaining = size;
     while remaining > 0 {
+        checkpoint(if output.is_some() {
+            Phase::CopyChunk
+        } else {
+            Phase::VerifyChunk
+        })?;
         let length = remaining.min(buffer.len() as u64) as usize;
         let read = input.read(&mut buffer[..length])?;
         ensure!(read > 0, "A backup file shrank while it was being read.");
@@ -536,13 +704,13 @@ fn sync_directory(path: &Path) -> Result<()> {
         .with_context(|| format!("Could not durably sync {}.", path.display()))
 }
 
-struct Stage {
-    path: PathBuf,
+pub(super) struct Stage {
+    pub(super) path: PathBuf,
     destination: PathBuf,
     published: bool,
 }
 impl Stage {
-    fn new(destination: &Path) -> Result<Self> {
+    pub(super) fn new(destination: &Path) -> Result<Self> {
         use std::os::unix::fs::DirBuilderExt;
         let name = destination
             .file_name()
@@ -567,7 +735,10 @@ impl Stage {
             published: false,
         })
     }
-    fn publish(mut self, checkpoint: &mut impl FnMut(Phase) -> Result<()>) -> Result<PathBuf> {
+    pub(super) fn publish(
+        mut self,
+        checkpoint: &mut impl FnMut(Phase) -> Result<()>,
+    ) -> Result<PathBuf> {
         sync_directory(&self.path)?;
         checkpoint(Phase::BeforePublish)?;
         rename_new(&self.path, &self.destination)?;

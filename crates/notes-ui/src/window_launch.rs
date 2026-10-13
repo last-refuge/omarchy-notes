@@ -230,8 +230,9 @@ fn dispatch(shell: &Entity<Shell>, request: Request, cx: &mut App) {
             }
             Intent::Note { id } => {
                 if !s.take_quick_into_main(&id, w, cx) { return Err("Finish the current insertion or composition before moving this Quick Note into Notes.".into()); }
-                s.library.scope = Scope::All; s.library.query.clear(); s.library.refresh();
+                s.library.scope = Scope::All; s.library.query.clear();
                 s.search.update(cx, |s, cx| s.clear_silently(w, cx));
+                s.queue_library_query(false, cx);
                 s.command(Command::Select(id.clone()), w, cx);
                 Ok(Some(id))
             }

@@ -96,6 +96,16 @@ pub struct Imported {
     pub warnings: Vec<String>,
 }
 pub fn import(text: &str) -> Result<Imported> {
+    let imported = convert(text, false)?;
+    Ok(Imported {
+        document: imported.document,
+        warnings: imported.warnings,
+    })
+}
+pub(crate) fn import_file_resources(text: &str) -> Result<crate::file_import::Imported> {
+    convert(text, true)
+}
+fn convert(text: &str, resources: bool) -> Result<crate::file_import::Imported> {
     ensure!(
         text.len() <= MAX_HTML,
         "HTML exceeds the 4 MiB paste limit."
@@ -118,6 +128,8 @@ pub fn import(text: &str) -> Result<Imported> {
     let mut out = Converter {
         nodes: &tree.nodes,
         warnings: vec![],
+        resource_mode: resources,
+        resources: vec![],
     };
     let mut blocks = vec![];
     out.children(0, &mut blocks, &Span::text(""), None, 0);
@@ -127,19 +139,87 @@ pub fn import(text: &str) -> Result<Imported> {
     }
     let document = Document::from_blocks(blocks);
     document.validate()?;
-    Ok(Imported {
+    Ok(crate::file_import::Imported {
         document,
         warnings: out.warnings,
+        resources: out.resources,
     })
 }
 struct Converter<'a> {
     nodes: &'a [Node],
     warnings: Vec<String>,
+    resource_mode: bool,
+    resources: Vec<crate::file_import::Resource>,
 }
 impl Converter<'_> {
     fn warn(&mut self, message: &str) {
         if !self.warnings.iter().any(|w| w == message) {
             self.warnings.push(message.into());
+        }
+    }
+    fn warn_file_features(&mut self, index: usize) {
+        if !self.resource_mode {
+            return;
+        }
+        let name = self.nodes[index].name.clone();
+        let name = name.as_str();
+        if !matches!(
+            name,
+            "" | "html"
+                | "body"
+                | "div"
+                | "span"
+                | "p"
+                | "h1"
+                | "h2"
+                | "h3"
+                | "h4"
+                | "h5"
+                | "h6"
+                | "li"
+                | "pre"
+                | "br"
+                | "img"
+                | "a"
+                | "ul"
+                | "ol"
+                | "table"
+                | "thead"
+                | "tbody"
+                | "tfoot"
+                | "tr"
+                | "td"
+                | "th"
+                | "blockquote"
+                | "input"
+                | "b"
+                | "strong"
+                | "i"
+                | "em"
+                | "u"
+                | "s"
+                | "del"
+                | "strike"
+                | "mark"
+                | "code"
+        ) {
+            self.warn("Unsupported HTML formatting or structure was kept as plain content.");
+        }
+        let node = &self.nodes[index];
+        if node.attrs.keys().any(|key| {
+            key != "style"
+                && !matches!(
+                    (node.name.as_str(), key.as_str()),
+                    ("a", "href")
+                        | ("img", "src" | "alt")
+                        | ("td" | "th", "rowspan" | "colspan")
+                        | ("input", "type" | "checked" | "disabled")
+                )
+        }) {
+            self.warn("Some HTML attributes or formatting were not preserved.");
+        }
+        if matches!(name, "h4" | "h5" | "h6") {
+            self.warn("Heading levels four to six were kept as level-three headings.");
         }
     }
     fn children(
@@ -162,6 +242,7 @@ impl Converter<'_> {
         list: Option<&str>,
         indent: usize,
     ) {
+        self.warn_file_features(i);
         let node = &self.nodes[i];
         let name = node.name.as_str();
         if matches!(
@@ -218,8 +299,12 @@ impl Converter<'_> {
                         }
                     }
                     "background-color" if value != "transparent" => {
-                        style.set_mark("highlight", true)
+                        style.set_mark("highlight", true);
+                        if self.resource_mode {
+                            self.warn("Background colors were kept as the app's highlight style.");
+                        }
                     }
+                    _ if self.resource_mode => self.warn("Some CSS formatting was not preserved."),
                     _ => {}
                 }
             }
@@ -229,12 +314,24 @@ impl Converter<'_> {
         {
             if safe_link(href) {
                 style.0["href"] = json!(href);
+            } else if self.resource_mode {
+                let token = format!("note://{}", new_id());
+                self.resources.push(crate::file_import::Resource {
+                    token: token.clone(),
+                    target: href.clone(),
+                    label: String::new(),
+                    image: false,
+                });
+                style.0["href"] = json!(token);
             } else {
                 self.warn("An unsupported link was removed.");
             }
         }
         match name {
             "ul" | "ol" => {
+                if self.resource_mode && list.is_some() && indent >= 16 {
+                    self.warn("List nesting beyond sixteen levels was kept at level sixteen.");
+                }
                 let kind = if name == "ol" { "ordered" } else { "bullet" };
                 self.children(
                     i,
@@ -296,14 +393,25 @@ impl Converter<'_> {
                 self.text(out, &style, "\n");
             }
             "img" => {
-                self.warn("HTML images were not downloaded. Paste the image or attach its file separately.");
                 let alt = node
                     .attrs
                     .get("alt")
                     .filter(|s| !s.is_empty())
                     .map_or("Image", String::as_str)
                     .to_owned();
-                self.text(out, &style, &format!("[{alt}]"));
+                if self.resource_mode {
+                    let token = format!("__OMARCHY_IMPORT_{}__", new_id());
+                    self.resources.push(crate::file_import::Resource {
+                        token: token.clone(),
+                        target: node.attrs.get("src").cloned().unwrap_or_default(),
+                        label: alt,
+                        image: true,
+                    });
+                    self.text(out, &style, &token);
+                } else {
+                    self.warn("HTML images were not downloaded. Paste the image or attach its file separately.");
+                    self.text(out, &style, &format!("[{alt}]"));
+                }
             }
             "input" => {
                 if node.attrs.get("type").is_some_and(|t| t == "checkbox")
@@ -354,6 +462,10 @@ impl Converter<'_> {
             for c in self.nodes[r].children.clone() {
                 if !matches!(self.nodes[c].name.as_str(), "td" | "th") {
                     continue;
+                }
+                self.warn_file_features(c);
+                if self.resource_mode && self.nodes[c].attrs.contains_key("style") {
+                    self.warn("Table-cell CSS formatting was not preserved.");
                 }
                 while occupied.contains(&(row, col)) {
                     col += 1;

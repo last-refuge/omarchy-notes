@@ -392,8 +392,11 @@ in the earlier attribution run, before large edits. It reached 675.74 MiB
 after large edits, compared with 461.20 MiB earlier. The higher initial
 resident footprint makes runtime font/allocator/cache conditions a lead;
 their contribution was not measured. Continuous Changed callbacks reset the
-700 ms autosave delay, so current-note autosave overlap is not established.
-The report contains no per-save timestamps. Late batches and broader region
+700 ms autosave debounce, but the writer also forces a save after three seconds
+of dirty state. The measured large loop totaled 3.02455 seconds, so a late
+max-delay save and its queued clone/writer work are plausible contributors;
+the report contains no per-save timestamps and does not establish overlap.
+Late batches and broader region
 costs require further attribution; the data does not justify assigning one
 confirmed cause or relaxing the budget.
 

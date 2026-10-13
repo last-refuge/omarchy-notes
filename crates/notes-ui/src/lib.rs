@@ -15,7 +15,13 @@ mod theme;
 use gpui::{prelude::*, *};
 use notes_core::launch::Intent;
 #[cfg(feature = "visual-tests")]
+pub use shell::library_query_check;
+#[cfg(feature = "visual-tests")]
+pub use shell::library_recovery_check;
+#[cfg(feature = "visual-tests")]
 pub use shell::organization_check;
+#[cfg(feature = "visual-tests")]
+pub use shell::portability_check;
 #[cfg(feature = "visual-tests")]
 pub use shell::quick_note_check;
 #[cfg(feature = "visual-tests")]
@@ -138,7 +144,7 @@ fn run_inner(
                             cx,
                         ))),
                         titlebar: None,
-                        app_id: Some("org.omarchy.Notes.Preview".into()),
+                        app_id: Some("org.omarchy.Notes.Rust".into()),
                         window_background: WindowBackgroundAppearance::Opaque,
                         window_min_size: Some(size(px(420.), px(420.))),
                         ..Default::default()
@@ -160,7 +166,7 @@ fn run_inner(
                     WindowOptions {
                         window_bounds: Some(WindowBounds::Windowed(bounds)),
                         titlebar: None,
-                        app_id: Some("org.omarchy.Notes.Preview".into()),
+                        app_id: Some("org.omarchy.Notes.Rust".into()),
                         window_background: WindowBackgroundAppearance::Opaque,
                         window_min_size: Some(size(px(420.), px(420.))),
                         ..Default::default()
