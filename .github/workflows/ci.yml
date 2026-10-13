@@ -63,7 +63,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Install installer test tools
-        run: pacman -Syu --noconfirm bash curl python shellcheck sudo util-linux
+        run: pacman -Syu --noconfirm bash curl python ripgrep shellcheck sudo util-linux
       - uses: actions/checkout@v4
       - name: Create unprivileged test user
         run: |
