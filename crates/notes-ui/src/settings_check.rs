@@ -85,7 +85,11 @@ pub fn settings_check(directory: &Path) -> anyhow::Result<()> {
     })?;
     draw(&mut cx, h)?;
     let editor = h.update(&mut cx, |s, _, _| {
-        s.live.as_ref().unwrap().notes[&note.id].editor.clone()
+        s.live.as_ref().unwrap().notes[&note.id]
+            .editor
+            .as_ref()
+            .unwrap()
+            .clone()
     })?;
     h.update(&mut cx, |_, w, cx| {
         editor.update(cx, |e, cx| {
@@ -225,7 +229,11 @@ pub fn settings_check(directory: &Path) -> anyhow::Result<()> {
     cx.run_until_parked();
     let quick = h.update(&mut cx, |s, _, cx| {
         let (quick, id) = s.windows.quick.as_ref().unwrap();
-        let e = s.live.as_ref().unwrap().notes[id].editor.read(cx);
+        let e = s.live.as_ref().unwrap().notes[id]
+            .editor
+            .as_ref()
+            .unwrap()
+            .read(cx);
         assert_eq!(e.typography.size, 26);
         assert_eq!(e.typography.font, NoteFont::Sans);
         *quick

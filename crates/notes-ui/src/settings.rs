@@ -125,9 +125,9 @@ impl Shell {
         };
         if let Some(live) = &self.live {
             for session in live.notes.values() {
-                session
-                    .editor
-                    .update(cx, |e, cx| e.set_typography(typography, cx));
+                if let Some(editor) = session.active_editor() {
+                    editor.update(cx, |e, cx| e.set_typography(typography, cx));
+                }
             }
         }
         self.appearance = self.preferences.appearance();
@@ -157,7 +157,7 @@ impl Shell {
             .selected
             .as_ref()
             .and_then(|id| self.live.as_ref()?.notes.get(id))
-            .is_some_and(|s| s.editor.read(cx).input_is_composing(cx))
+            .is_some_and(|s| s.input_is_composing(cx))
         {
             return;
         }

@@ -20,7 +20,11 @@ fn quick(
     cx.update(|cx| {
         shell.update(cx, |s, cx| {
             let (h, id) = s.windows.quick.clone().unwrap();
-            let editor = s.live.as_ref().unwrap().notes[&id].editor.clone();
+            let editor = s.live.as_ref().unwrap().notes[&id]
+                .editor
+                .as_ref()
+                .unwrap()
+                .clone();
             assert_eq!(s.real_status(&id, cx), "Ready when you are");
             (h, id, editor)
         })
@@ -66,9 +70,12 @@ fn text(
     draw(cx, h)
 }
 fn saved(s: &Shell, cx: &App) -> bool {
-    s.live.as_ref().unwrap().notes.values().all(|n| {
-        n.pending.is_none() && n.revision == n.saved && !n.editor.read(cx).has_pending_work()
-    })
+    s.live
+        .as_ref()
+        .unwrap()
+        .notes
+        .values()
+        .all(|n| n.pending.is_none() && n.revision == n.saved && !n.has_pending_work(cx))
 }
 
 pub fn quick_note_check(directory: &Path) -> anyhow::Result<()> {
@@ -175,7 +182,10 @@ pub fn quick_note_check(directory: &Path) -> anyhow::Result<()> {
             "Search reset must not navigate away after handoff"
         );
         assert!(s.windows.notice.is_none());
-        assert_eq!(s.live.as_ref().unwrap().notes[&id].editor, editor);
+        assert_eq!(
+            s.live.as_ref().unwrap().notes[&id].editor.as_ref().unwrap(),
+            &editor
+        );
         assert_eq!(editor.read(cx).model.document, document);
         assert_eq!(editor.read(cx).model.selection, selection);
     });
@@ -221,6 +231,8 @@ pub fn quick_note_check(directory: &Path) -> anyhow::Result<()> {
     wait(&mut cx, &shell, |s, cx| {
         !s.live.as_ref().unwrap().notes[&media_id]
             .editor
+            .as_ref()
+            .unwrap()
             .read(cx)
             .has_pending_work()
     })?;

@@ -31,9 +31,15 @@ def stop(process):
 
 
 def run():
+    if not __debug__:
+        raise RuntimeError("Native ownership guards require Python assertions; do not use -O or PYTHONOPTIMIZE")
     import gi
     gi.require_version("Atspi", "2.0")
     from gi.repository import Atspi, Gio, GLib
+    diagnostic_output = os.environ.get("NOTES_NATIVE_QA_OUTPUT")
+    diagnostic_output = Path(diagnostic_output) if diagnostic_output else None
+    if diagnostic_output:
+        diagnostic_output.mkdir(parents=True, exist_ok=False)
 
     def wait(predicate, description, timeout=12):
         deadline = time.monotonic() + timeout
@@ -65,6 +71,8 @@ def run():
             content = "Accessible notes\ne\u0301 👩‍👩‍👧‍👦 中文 العربية\nFinal paragraph"
             blocks = [{"id": f"text-{i}", "type": "paragraph", "spans": [{"text": t}]} for i, t in enumerate(content.split("\n"))]
             blocks[0]["spans"][0]["marks"] = ["bold", "italic", "underline"]
+            blocks[0].update({"type": "heading", "level": 1})
+            blocks[2]["spans"][0]["href"] = "note://00000000-0000-4000-8000-000000000001"
             blocks += [{"id": "native-check", "type": "list", "list": "check", "checked": False, "spans": [{"text": "Review accessibility"}]}]
             blocks += media
             blocks += [{"id": f"offscreen-{i}", "type": "paragraph", "spans": [{"text": f"Offscreen paragraph {i}"}]} for i in range(20)]
@@ -73,7 +81,10 @@ def run():
                 db.execute("UPDATE notes SET deleted_at = 1 WHERE id != ?", (original["id"],))
                 db.execute("UPDATE notes SET title = ?, body = ?, plain_text = ? WHERE id = ?", ("Accessible notes", json.dumps({"schema": 1, "blocks": blocks}), expected, original["id"]))
             with (root / "app.log").open("w") as log:
-                process = subprocess.Popen([str(BINARY), "--data-dir", str(library), "--reference"], stdout=log, stderr=log)
+                app_env = dict(os.environ)
+                if os.environ.get("NOTES_NATIVE_QA_TRACE"):
+                    app_env["WAYLAND_DEBUG"] = "client"
+                process = subprocess.Popen([str(BINARY), "--data-dir", str(library), "--reference"], env=app_env, stdout=log, stderr=log)
             address = None
 
             def compositor(kind):
@@ -135,9 +146,6 @@ def run():
             def descendants(node):
                 if node is None:
                     return  # A menu can remove a child between the two queries.
-                # The installed AT-SPI client rejects this adapter's cache-event
-                # signatures. Query live properties rather than stale node names.
-                node.clear_cache()
                 yield node
                 for i in range(node.get_child_count()):
                     yield from descendants(node.get_child_at_index(i))
@@ -153,10 +161,41 @@ def run():
             assert Atspi.Text.get_text_attribute_value(text, 0, "weight") == "700"
             assert Atspi.Text.get_text_attribute_value(text, 0, "style") == "italic"
             assert Atspi.Text.get_text_attribute_value(text, 0, "underline") == "single"
+            heading = wait(lambda: next((n for n in descendants(editor) if n.get_role() == Atspi.Role.HEADING and n.get_name() == "Accessible notes"), None), "named heading semantics")
+            assert heading.get_role() == Atspi.Role.HEADING
+            link = wait(lambda: next((n for n in descendants(editor) if n.get_role() == Atspi.Role.LINK), None), "inline link semantics")
+            assert link.get_name() == "Final paragraph"
+            assert "Action" in link.get_interfaces()
+            assert any(n.get_role() == Atspi.Role.LIST for n in descendants(editor))
             rect = Atspi.Text.get_character_extents(text, 0, Atspi.CoordType.WINDOW)
             assert rect.width > 0 and rect.height > 0 and rect.x >= 0 and rect.y >= 0
             offset = Atspi.Text.get_offset_at_point(text, rect.x + rect.width // 2, rect.y + rect.height // 2, Atspi.CoordType.WINDOW)
             assert offset == 0, offset
+            def undo_diagnostics(label):
+                active = compositor("activewindow")
+                selections = [Atspi.Text.get_selection(text, i) for i in range(Atspi.Text.get_n_selections(text))]
+                nodes = list(descendants(app))
+                buttons = {name: [{"enabled": n.get_state_set().contains(Atspi.StateType.ENABLED),
+                                  "sensitive": n.get_state_set().contains(Atspi.StateType.SENSITIVE)}
+                                 for n in nodes if n.get_name() == name]
+                           for name in ("Undo", "Redo")}
+                state = {"label": label, "text": Atspi.Text.get_text(text, 0, -1),
+                         "caret": Atspi.Text.get_caret_offset(text),
+                         "selections": [[s.start_offset, s.end_offset] for s in selections],
+                         "focused_owned_nodes": [(n.get_role_name(), n.get_name()) for n in nodes
+                                                 if n.get_state_set().contains(Atspi.StateType.FOCUSED)],
+                         "owned_window_active": active.get("pid") == process.pid and active.get("address") == address,
+                         "active_pid": active.get("pid"), "owned_pid": process.pid,
+                         "undo_redo_accessible_states": buttons, "app_exit_status": process.poll(),
+                         "cached_save_status_names": [n.get_name() for n in nodes
+                                                       if n.get_role_name() in ("status", "status bar")],
+                         "owned_composition_protocol_events": [line for line in (root / "app.log").read_text().splitlines()
+                                                               if "text_input" in line and ("preedit_string(" in line or "commit_string(" in line)],
+                         "operation": "named Undo action" if os.environ.get("NOTES_NATIVE_QA_FOCUS") == "undo-button" else "Ctrl-Z"}
+                print("Undo diagnostics:", json.dumps(state, ensure_ascii=False), flush=True)
+                if diagnostic_output:
+                    (diagnostic_output / (label + ".json")).write_text(json.dumps(state, indent=2, ensure_ascii=False) + "\n")
+                    shutil.copyfile(root / "app.log", diagnostic_output / (label + "-app.log"))
             first = expected.index("👩")
             last = first + len("👩‍👩‍👧‍👦")
             guard()
@@ -169,9 +208,33 @@ def run():
             subprocess.run(["wtype", "--", "X"], check=True, timeout=3)
             guard()
             changed = expected[:first] + "X" + expected[last:]
-            wait(lambda: Atspi.Text.get_text(text, 0, -1) == changed, "edit at accessible selection")
-            key("z")
-            wait(lambda: Atspi.Text.get_text(text, 0, -1) == expected, "undo preserves rich document")
+            try:
+                wait(lambda: Atspi.Text.get_text(text, 0, -1) == changed, "edit at accessible selection")
+            except AssertionError:
+                undo_diagnostics("failed-native-edit")
+                raise
+            if os.environ.get("NOTES_NATIVE_QA_FOCUS") == "edit":
+                undo_diagnostics("after-native-edit")
+                print("PASS: focused cached-client native Unicode replacement; full suite not run.", flush=True)
+                return
+            undo_diagnostics("before-native-undo")
+            if os.environ.get("NOTES_NATIVE_QA_FOCUS") == "undo-button":
+                undo_button = find("Undo")
+                assert undo_button is not None
+                guard()
+                assert Atspi.Action.do_action(undo_button.get_action_iface(), 0)
+                guard()
+            else:
+                key("z")
+            try:
+                wait(lambda: Atspi.Text.get_text(text, 0, -1) == expected, "undo preserves rich document")
+            except AssertionError:
+                undo_diagnostics("failed-native-undo")
+                raise
+            undo_diagnostics("after-native-undo")
+            if os.environ.get("NOTES_NATIVE_QA_FOCUS") in ("undo", "undo-button"):
+                print("PASS: focused cached-client native Unicode replacement/undo; full suite not run.", flush=True)
+                return
             check = wait(lambda: find("Review accessibility"), "checkbox name")
             assert not check.get_state_set().contains(Atspi.StateType.CHECKED)
             guard()
@@ -247,9 +310,18 @@ def run():
 
             click("Insert a 2 by 2 table")
             wait(lambda: table_shape(2, 2), "inserted native table")
+            wait(lambda: any(n.get_role() == Atspi.Role.TABLE for n in descendants(find("Note content"))), "native table semantics")
+            assert any(n.get_role() == Atspi.Role.TABLE_CELL for n in descendants(find("Note content")))
             for word in ("One", "Two", "Three", "Four"):
                 type_text(word)
+                provider = find("Note content").get_text_iface()
+                # The synthetic table's cells are separated by one newline in
+                # AT-SPI text. A completed wtype process only queues Tab; await
+                # the actual next-cell caret before the next input oracle reads.
+                next_cell = Atspi.Text.get_caret_offset(provider) + 1
                 key("Tab", ctrl=False)
+                wait(lambda: Atspi.Text.get_caret_offset(provider) == next_cell,
+                     "native Tab acknowledged at next table cell")
             wait(lambda: table_shape(3, 2), "Tab appends row")
             click("Table options")
             wait(lambda: find("Row below"), "table options loaded")
@@ -265,7 +337,19 @@ def run():
             click("Table options"); click("Remove table")
             wait(lambda: not table_shape(3, 3), "table removal")
             undo_table(3, 3, "undo table removal")
+            provider = find("Note content").get_text_iface()
+            # insert_table already created this fixture's trailing paragraph;
+            # leave_table moves into it without changing text. First await Undo's
+            # restored in-table caret so an old end caret cannot satisfy the ack.
+            before_leave = Atspi.Text.get_text(provider, 0, -1)
+            expected_boundary = len(before_leave)
+            wait(lambda: Atspi.Text.get_caret_offset(provider) < expected_boundary,
+                 "native table undo caret restored inside table")
             key("Return", shift=True)
+            wait(lambda: Atspi.Text.get_text(provider, 0, -1) == before_leave
+                 and Atspi.Text.get_caret_offset(provider) == expected_boundary
+                 and Atspi.Text.get_n_selections(provider) == 0,
+                 "native leave-table caret acknowledged at trailing paragraph")
             type_text("After the table.")
             key("s")
 
@@ -471,6 +555,8 @@ def run():
 
 
 if __name__ == "__main__":
+    if not __debug__:
+        raise RuntimeError("Native ownership guards require Python assertions; do not use -O or PYTHONOPTIMIZE")
     if sys.argv[1:] == ["--private-bus"]:
         run()
     else:

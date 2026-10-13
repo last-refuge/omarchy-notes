@@ -88,7 +88,7 @@ pub fn media_check(directory: &std::path::Path) -> anyhow::Result<()> {
         s.live.as_ref().unwrap().creating.is_none()
     })?;
     let (id,editor)=h.update(&mut cx,|s,w,cx| {
-        let id=s.library.selected.clone().unwrap(); let editor=s.live.as_ref().unwrap().notes[&id].editor.clone();
+        let id=s.library.selected.clone().unwrap(); let editor=s.live.as_ref().unwrap().notes[&id].editor.as_ref().unwrap().clone();
         editor.update(cx,|e,cx| {
             e.edit(|e| { e.insert("Small details. Better days.",0)?; e.enter(false)?; e.insert("A little faster, a little clearer. Keep the picture and the details together.",0)?; e.enter(false) },w,cx);
             e.queue_import(Import::Files{paths:vec![png.clone(),pdf.clone()],images:None},cx);
@@ -257,7 +257,11 @@ pub fn media_check(directory: &std::path::Path) -> anyhow::Result<()> {
         })?;
         let editor = h.update(&mut cx, |s, w, cx| {
             s.command(Command::Select(id.clone()), w, cx);
-            s.live.as_ref().unwrap().notes[&id].editor.clone()
+            s.live.as_ref().unwrap().notes[&id]
+                .editor
+                .as_ref()
+                .unwrap()
+                .clone()
         })?;
         h.update(&mut cx, |_, _, cx| {
             editor.update(cx, |e, cx| {

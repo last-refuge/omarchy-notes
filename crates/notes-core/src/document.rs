@@ -20,12 +20,40 @@ pub const MARKS: [&str; 6] = [
     "code",
 ];
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Document {
     pub schema: u32,
     pub blocks: Vec<Block>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+impl Clone for Document {
+    fn clone(&self) -> Self {
+        Self {
+            schema: self.schema,
+            blocks: self.blocks.clone(),
+            extra: self.extra.clone(),
+        }
+    }
+
+    /// Refresh an owned draft mirror without reallocating unchanged roots.
+    /// Compare complete blocks, including nested cells and unknown properties;
+    /// topology changes still copy every differing position exactly.
+    fn clone_from(&mut self, source: &Self) {
+        self.schema = source.schema;
+        if self.extra != source.extra {
+            self.extra.clone_from(&source.extra);
+        }
+        for (destination, source) in self.blocks.iter_mut().zip(&source.blocks) {
+            if destination != source {
+                *destination = source.clone();
+            }
+        }
+        self.blocks.truncate(source.blocks.len());
+        let copied = self.blocks.len();
+        self.blocks.extend_from_slice(&source.blocks[copied..]);
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -352,28 +380,41 @@ impl Document {
             .join("\n")
     }
     pub fn title(&self) -> String {
-        self.plain_text()
-            .lines()
-            .map(str::trim)
-            .find(|s| !s.is_empty())
-            .map(|s| take_utf16(s, 200))
-            .unwrap_or_default()
+        for block in self.leaves() {
+            let text = block.plain_text();
+            if let Some(line) = text.lines().map(str::trim).find(|s| !s.is_empty()) {
+                return take_utf16(line, 200);
+            }
+        }
+        String::new()
     }
     pub fn snippet(&self) -> String {
-        let text = self.plain_text();
-        let mut lines = text.lines().filter(|l| !l.trim().is_empty());
-        lines.next();
-        let value = lines
-            .collect::<Vec<_>>()
-            .join(" ")
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" ");
-        if value.encode_utf16().count() > 160 {
-            format!("{}…", take_utf16(&value, 159))
-        } else {
-            value
+        let mut skipped_title = false;
+        let mut value = String::with_capacity(164);
+        let mut units = 0;
+        for block in self.leaves() {
+            let text = block.plain_text();
+            for line in text.lines().filter(|l| !l.trim().is_empty()) {
+                if !skipped_title {
+                    skipped_title = true;
+                    continue;
+                }
+                for word in line.split_whitespace() {
+                    if !value.is_empty() {
+                        value.push(' ');
+                        units += 1;
+                    }
+                    for ch in word.chars() {
+                        value.push(ch);
+                        units += ch.len_utf16();
+                        if units > 160 {
+                            return format!("{}…", take_utf16(&value, 159));
+                        }
+                    }
+                }
+            }
         }
+        value
     }
     pub fn references(&self, key: &str) -> Vec<String> {
         let mut out = vec![];
@@ -445,6 +486,83 @@ fn take_utf16(s: &str, max: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn draft_mirror_preserves_nested_properties_topology_and_independent_ownership() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../../tests/fixtures/qt-v1/documents.json"))
+                .unwrap();
+        let mut source = fixture
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|note| Document::from_json(&note["body"].to_string()).unwrap())
+            .find(|document| document.blocks.iter().any(|block| block.kind == "table"))
+            .unwrap();
+        let mut mirror = source.clone();
+        source.schema = 2;
+        source
+            .extra
+            .insert("future".into(), json!({"unknown": [null, true, "😀"]}));
+        let table = source
+            .blocks
+            .iter_mut()
+            .find(|block| block.kind == "table")
+            .unwrap();
+        table.attrs.insert("future".into(), json!({"keep": 3}));
+        let cell = &mut table.cells[0];
+        cell.attrs.insert("future".into(), json!(["preserve", 2]));
+        cell.blocks[0]
+            .spans
+            .push(Span(json!({"text": "é", "future": {"value": 7}})));
+        mirror.clone_from(&source);
+        assert_eq!(
+            serde_json::to_value(&mirror).unwrap(),
+            serde_json::to_value(&source).unwrap()
+        );
+
+        source.blocks.insert(0, Block::paragraph("Inserted"));
+        mirror.clone_from(&source);
+        assert_eq!(mirror, source);
+        source.blocks.rotate_left(1);
+        mirror.clone_from(&source);
+        assert_eq!(mirror, source);
+        source.blocks.pop();
+        mirror.clone_from(&source);
+        assert_eq!(mirror, source);
+        source.extra.clear();
+        mirror.clone_from(&source);
+        assert_eq!(mirror, source);
+
+        let before = source.clone();
+        mirror.blocks[0]
+            .attrs
+            .insert("mirror-only".into(), json!(true));
+        assert_eq!(source, before);
+        source.blocks[0]
+            .attrs
+            .insert("source-only".into(), json!(true));
+        assert!(!mirror.blocks[0].attrs.contains_key("source-only"));
+    }
+    #[test]
+    fn summaries_preserve_line_and_utf16_limits() {
+        let d = Document::from_blocks(vec![
+            Block::paragraph(" \n"),
+            Block::paragraph("  Hello \nworld"),
+            Block::paragraph(" \tnext\n line "),
+        ]);
+        assert_eq!(d.title(), "Hello");
+        assert_eq!(d.snippet(), "world next line");
+        let mut d = Document::from_blocks(vec![
+            Block::paragraph(&"😀".repeat(101)),
+            Block::paragraph(&"😀".repeat(80)),
+        ]);
+        assert_eq!(d.title(), "😀".repeat(100));
+        assert_eq!(d.snippet(), "😀".repeat(80));
+        d.blocks.push(Block::paragraph(" \n \t"));
+        assert_eq!(d.snippet(), "😀".repeat(80));
+        d.blocks.push(Block::paragraph("more"));
+        assert_eq!(d.snippet(), format!("{}…", "😀".repeat(79)));
+    }
     #[test]
     fn qt_fixture_round_trips_without_losing_structure_or_properties() {
         let fixture: Value =

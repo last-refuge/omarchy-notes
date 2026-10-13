@@ -73,7 +73,11 @@ pub fn table_check(directory: &std::path::Path) -> anyhow::Result<()> {
     settle(&mut cx, h)?;
     let (id, editor) = h.update(&mut cx, |s, w, cx| {
         let id = s.library.selected.clone().unwrap();
-        let editor = s.live.as_ref().unwrap().notes[&id].editor.clone();
+        let editor = s.live.as_ref().unwrap().notes[&id]
+            .editor
+            .as_ref()
+            .unwrap()
+            .clone();
         editor.update(cx, |s, cx| {
             s.edit(
                 |e| {
@@ -180,7 +184,11 @@ pub fn table_check(directory: &std::path::Path) -> anyhow::Result<()> {
         })?;
         h.update(&mut cx, |s, w, cx| {
             s.command(Command::Select(merged.clone()), w, cx);
-            let editor = s.live.as_ref().unwrap().notes[&merged].editor.clone();
+            let editor = s.live.as_ref().unwrap().notes[&merged]
+                .editor
+                .as_ref()
+                .unwrap()
+                .clone();
             editor.update(cx, |s, cx| {
                 s.edit(
                     |e| {
@@ -219,7 +227,10 @@ pub fn table_check(directory: &std::path::Path) -> anyhow::Result<()> {
         }
         super::super::visual_keys(&mut cx, h.into(), "escape")?;
         h.update(&mut cx, |s, w, cx| {
-            let editor = &s.live.as_ref().unwrap().notes[&merged].editor;
+            let editor = s.live.as_ref().unwrap().notes[&merged]
+                .editor
+                .as_ref()
+                .unwrap();
             assert!(editor.read(cx).focus.is_focused(w));
         })?;
         // The writer sees the same schema after the open/close and menu cycle.

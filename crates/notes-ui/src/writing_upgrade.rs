@@ -37,11 +37,7 @@ impl Shell {
         };
         match command {
             Command::UpgradePanel => {
-                if live
-                    .notes
-                    .values()
-                    .any(|s| s.editor.read(cx).model.marked.is_some())
-                {
+                if live.notes.values().any(|s| s.input_is_composing(cx)) {
                     return;
                 }
                 if live.upgrade.destination.is_none() {
@@ -72,8 +68,9 @@ impl Shell {
                         .selected
                         .as_ref()
                         .and_then(|id| live.notes.get(id))
+                        .and_then(|s| s.active_editor())
                     {
-                        session.editor.read(cx).focus.clone().focus(w, cx);
+                        session.read(cx).focus.clone().focus(w, cx);
                     }
                 }
             }
@@ -111,11 +108,7 @@ impl Shell {
             Command::UpgradeStart
                 if live.upgrade.open && !live.upgrade.busy() && live.schema < 3 =>
             {
-                if live
-                    .notes
-                    .values()
-                    .any(|s| s.editor.read(cx).model.marked.is_some())
-                {
+                if live.notes.values().any(|s| s.input_is_composing(cx)) {
                     live.upgrade.message =
                         Some("Finish composing text before enabling quotes.".into());
                     cx.notify();

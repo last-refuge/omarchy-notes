@@ -125,16 +125,38 @@ impl<S: Snapshot> Element for Input<S> {
 // AccessKit stores a character's UTF-8 length in u8. An exceptionally large
 // grapheme falls back to scalar boundaries; never truncate a byte length.
 pub(crate) fn units(text: &str) -> Vec<(usize, &str)> {
-    text.grapheme_indices(true)
-        .flat_map(|(start, grapheme)| {
-            if grapheme.len() <= u8::MAX as usize {
-                vec![(start, grapheme)]
-            } else {
-                grapheme
-                    .char_indices()
-                    .map(|(offset, ch)| (start + offset, &grapheme[offset..offset + ch.len_utf8()]))
-                    .collect()
+    let mut parts = Vec::new();
+    for (start, grapheme) in text.grapheme_indices(true) {
+        if grapheme.len() <= u8::MAX as usize {
+            parts.push((start, grapheme));
+        } else {
+            for (offset, ch) in grapheme.char_indices() {
+                parts.push((start + offset, &grapheme[offset..offset + ch.len_utf8()]));
             }
-        })
-        .collect()
+        }
+    }
+    parts
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[::core::prelude::v1::test]
+    fn accessible_units_preserve_graphemes_and_oversized_combining_text() {
+        let ordinary = "é 👩‍👩‍👧‍👦 🇯🇵 中文";
+        let oversized = format!("a{}", "\u{301}".repeat(300));
+        let text = format!("{ordinary} {oversized}");
+        let parts = units(&text);
+        assert_eq!(
+            parts.iter().map(|(_, part)| *part).collect::<String>(),
+            text
+        );
+        assert!(parts.iter().all(|(offset, part)| {
+            part.len() <= u8::MAX as usize && &text[*offset..*offset + part.len()] == *part
+        }));
+        assert!(parts.iter().any(|(_, part)| *part == "👩‍👩‍👧‍👦"));
+        assert!(parts.iter().any(|(_, part)| *part == "é"));
+        assert!(parts.iter().any(|(_, part)| *part == "🇯🇵"));
+    }
 }

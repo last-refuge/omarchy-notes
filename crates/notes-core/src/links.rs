@@ -65,9 +65,8 @@ pub fn related_notes(
     catalog: &[LinkNote],
 ) -> Vec<RelatedNote> {
     use std::collections::{HashMap, HashSet};
-    let index: HashMap<_, _> = catalog.iter().map(|n| (n.id.as_str(), n)).collect();
     let mut seen = HashSet::new();
-    document
+    let links: Vec<_> = document
         .leaves()
         .into_iter()
         .flat_map(|b| &b.spans)
@@ -82,8 +81,18 @@ pub fn related_notes(
             if id == own_id || !seen.insert(id.clone()) {
                 return None;
             }
+            Some((id, span))
+        })
+        .collect();
+    if links.is_empty() {
+        return vec![];
+    }
+    let index: HashMap<_, _> = catalog.iter().map(|n| (n.id.as_str(), n)).collect();
+    links
+        .into_iter()
+        .map(|(id, span)| {
             let note = index.get(id.as_str());
-            Some(RelatedNote {
+            RelatedNote {
                 id,
                 title: note.map_or_else(
                     || {
@@ -98,7 +107,7 @@ pub fn related_notes(
                 ),
                 folder: note.map_or(String::new(), |n| n.folder.clone()),
                 missing: note.is_none(),
-            })
+            }
         })
         .collect()
 }

@@ -1,6 +1,16 @@
 //! Native rich text surface: one model supplies editing, shaping and hit testing.
 #[path = "editor_accessibility.rs"]
 mod accessibility;
+#[cfg(feature = "visual-tests")]
+#[path = "layout_cache_check.rs"]
+mod layout_cache_check;
+#[path = "editor_layout.rs"]
+mod shaped;
+#[cfg(feature = "visual-tests")]
+pub use layout_cache_check::layout_cache_check;
+#[cfg(test)]
+use shaped::make_layout;
+use shaped::{GeometryCache, ShapeCache, make_layout_cached};
 #[path = "editor_links.rs"]
 mod links;
 #[path = "editor_media.rs"]
@@ -22,7 +32,7 @@ use notes_core::{
     text_field::TextField,
 };
 use notes_editor::Editor;
-use std::{ops::Range, rc::Rc};
+use std::{cell::Cell, ops::Range, rc::Rc};
 use unicode_segmentation::UnicodeSegmentation;
 
 actions!(
@@ -56,6 +66,10 @@ actions!(
         End,
         SelectHome,
         SelectEnd,
+        DocumentHome,
+        DocumentEnd,
+        SelectDocumentHome,
+        SelectDocumentEnd,
         SelectAll,
         Enter,
         SoftBreak,
@@ -111,6 +125,7 @@ pub fn bind_keys(cx: &mut App) {
     // Linux reports shifted punctuation as the symbol with Shift consumed.
     keys!("ctrl-&"=>Numbered,"ctrl-*"=>Bullet);
     keys!("ctrl-shift-q"=>Quote);
+    keys!("ctrl-home"=>DocumentHome,"ctrl-end"=>DocumentEnd,"ctrl-shift-home"=>SelectDocumentHome,"ctrl-shift-end"=>SelectDocumentEnd);
     keys!("ctrl-shift-k"=>LinkAddress,"ctrl-l"=>LinkNotePicker);
     cx.bind_keys([
         KeyBinding::new("ctrl-shift-r", FocusRelated, Some("NoteTools")),
@@ -144,6 +159,26 @@ pub fn bind_keys(cx: &mut App) {
 pub struct Changed;
 /// Composition changes update save status without creating a durable edit.
 pub struct InputState;
+/// Lightweight state retained when a saved, inactive editor leaves the cache.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct EditorViewState {
+    pub selection: notes_editor::Selection,
+    pub typing: notes_editor::TypingState,
+    pub scroll: Point<Pixels>,
+    pub reading: Option<ReadingAnchor>,
+}
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ReadingSignature {
+    width: Pixels,
+    typography: WritingStyle,
+}
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ReadingAnchor {
+    pub position: notes_editor::Position,
+    pub offset: Pixels,
+    signature: ReadingSignature,
+    scroll: Point<Pixels>,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct WritingStyle {
     pub font: notes_core::preferences::NoteFont,
@@ -156,6 +191,47 @@ impl Default for WritingStyle {
             size: 19,
         }
     }
+}
+#[cfg(feature = "performance-diagnostics")]
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct RegionStats {
+    pub calls: u64,
+    pub total_ns: u64,
+    pub max_ns: u64,
+}
+#[cfg(feature = "performance-diagnostics")]
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct EditorRegions {
+    pub edit: RegionStats,
+    pub render: RegionStats,
+    pub layout: RegionStats,
+    pub prepaint: RegionStats,
+    pub paint: RegionStats,
+    pub a11y_active: bool,
+}
+#[cfg(feature = "performance-diagnostics")]
+enum ProfileRegion {
+    Edit,
+    Render,
+    Layout,
+    Prepaint,
+    Paint,
+}
+#[cfg(feature = "performance-diagnostics")]
+fn record_region(regions: &Cell<EditorRegions>, kind: ProfileRegion, started: std::time::Instant) {
+    let elapsed = started.elapsed().as_nanos().min(u64::MAX as u128) as u64;
+    let mut regions_value = regions.get();
+    let region = match kind {
+        ProfileRegion::Edit => &mut regions_value.edit,
+        ProfileRegion::Render => &mut regions_value.render,
+        ProfileRegion::Layout => &mut regions_value.layout,
+        ProfileRegion::Prepaint => &mut regions_value.prepaint,
+        ProfileRegion::Paint => &mut regions_value.paint,
+    };
+    region.calls = region.calls.saturating_add(1);
+    region.total_ns = region.total_ns.saturating_add(elapsed);
+    region.max_ns = region.max_ns.max(elapsed);
+    regions.set(regions_value);
 }
 pub struct RichEditor {
     pub model: Editor,
@@ -178,11 +254,21 @@ pub struct RichEditor {
     pub theme: Theme,
     pub(crate) typography: WritingStyle,
     typography_anchor: Option<(usize, Pixels, bool)>,
+    reading_restore: Option<ReadingAnchor>,
+    last_reading: Option<ReadingAnchor>,
+    last_reading_signature: Option<ReadingSignature>,
+    layout_scroll: Point<Pixels>,
     coordinates_dirty: bool,
     pub error: Option<String>,
     pub library_id: String,
     layout: Option<Rc<Layout>>,
+    shape_cache: ShapeCache,
+    geometry_cache: GeometryCache,
+    #[cfg(feature = "performance-diagnostics")]
+    profiling: Rc<Cell<EditorRegions>>,
+    painted_lines: Rc<Cell<usize>>,
     bounds: Bounds<Pixels>,
+    input_viewport: Bounds<Pixels>,
     scroll: ScrollHandle,
     dragging: bool,
     goal_x: Option<Pixels>,
@@ -191,9 +277,132 @@ pub struct RichEditor {
 impl EventEmitter<Changed> for RichEditor {}
 impl EventEmitter<InputState> for RichEditor {}
 impl RichEditor {
+    fn ensure_layout(&mut self, width: Pixels, window: &Window) {
+        #[cfg(feature = "performance-diagnostics")]
+        let started = std::time::Instant::now();
+        if self.layout.is_none() {
+            self.geometry_cache.clear();
+        }
+        if self
+            .layout
+            .as_ref()
+            .is_none_or(|layout| layout.width != width)
+        {
+            self.layout = Some(self.geometry_cache.get(width, || {
+                make_layout_cached(
+                    &self.model.document,
+                    width,
+                    self.theme,
+                    self.typography,
+                    window,
+                    &mut self.shape_cache,
+                )
+            }));
+        }
+        #[cfg(feature = "performance-diagnostics")]
+        record_region(&self.profiling, ProfileRegion::Layout, started);
+    }
+    #[cfg(feature = "performance-diagnostics")]
+    pub(crate) fn performance_regions(&self) -> EditorRegions {
+        self.profiling.get()
+    }
+    #[cfg(feature = "visual-tests")]
+    pub(crate) fn layout_diagnostics(&self) -> shaped::LayoutDiagnostics {
+        let mut stats = self.shape_cache.diagnostics();
+        self.geometry_cache.diagnostics(&mut stats);
+        stats.painted_lines = self.painted_lines.get();
+        stats.total_lines = self.layout.as_ref().map_or(0, |layout| layout.lines.len());
+        stats
+    }
+    pub(crate) fn view_state(&self) -> EditorViewState {
+        EditorViewState {
+            selection: self.model.selection.clone(),
+            typing: self.model.typing_state(),
+            scroll: self.scroll.offset(),
+            reading: self
+                .reading_restore
+                .clone()
+                .or_else(|| self.capture_reading()),
+        }
+    }
+    fn capture_reading(&self) -> Option<ReadingAnchor> {
+        if let Some(layout) = &self.layout {
+            let signature = ReadingSignature {
+                width: layout.width,
+                typography: self.typography,
+            };
+            if self.last_reading_signature == Some(signature) {
+                let viewport = self.scroll.bounds();
+                let scroll = self.scroll.offset();
+                let top = viewport.top() - (self.bounds.top() + scroll.y - self.layout_scroll.y);
+                // Prefer the first visible text row rather than the preceding
+                // paragraph when the viewport starts in paragraph spacing.
+                let line = layout
+                    .lines
+                    .iter()
+                    .filter(|line| {
+                        line.origin.y + line.line.size(line.height).height > top
+                            && line.origin.y < top + viewport.size.height
+                    })
+                    .min_by(|a, b| {
+                        a.origin
+                            .y
+                            .partial_cmp(&b.origin.y)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    });
+                let index = line.map_or_else(
+                    || layout.index(point(px(0.), top.max(px(0.)))),
+                    |line| {
+                        line.start
+                            + line
+                                .line
+                                .closest_index_for_position(
+                                    point(px(0.), (top - line.origin.y).max(px(0.))),
+                                    line.height,
+                                )
+                                .unwrap_or_else(|index| index)
+                                .min(line.line.len())
+                    },
+                );
+                let (point, _) = layout.caret(index);
+                return Some(ReadingAnchor {
+                    position: self.model.position(index),
+                    offset: point.y - top,
+                    signature,
+                    scroll,
+                });
+            }
+        }
+        // A hidden editor may receive new typography and be evicted before it
+        // reflows. Its last actual geometry still defines the reading anchor.
+        self.last_reading.clone().or_else(|| {
+            let (index, offset, _) = self.typography_anchor?;
+            Some(ReadingAnchor {
+                position: self.model.position(index),
+                offset,
+                signature: self.last_reading_signature?,
+                scroll: self.scroll.offset(),
+            })
+        })
+    }
+    pub(crate) fn restore_view_state(&mut self, state: EditorViewState, cx: &mut Context<Self>) {
+        self.reading_restore = state.reading.filter(|anchor| anchor.scroll == state.scroll);
+        // An explicit pixel-offset override remains authoritative, including
+        // diagnostic scrolling. Resolve unchanged-geometry restores by pixels.
+        self.typography_anchor = None;
+        self.model.selection = state.selection;
+        self.model.restore_typing_state(state.typing);
+        self.scroll.set_offset(state.scroll);
+        self.reveal = false;
+        self.coordinates_dirty = true;
+        cx.notify();
+    }
     pub(crate) fn set_typography(&mut self, style: WritingStyle, cx: &mut Context<Self>) {
         if self.typography == style {
             return;
+        }
+        if let Some(reading) = self.capture_reading() {
+            self.last_reading = Some(reading);
         }
         if self.typography_anchor.is_none()
             && let Some(layout) = &self.layout
@@ -257,6 +466,10 @@ impl RichEditor {
             model: Editor::new(document),
             typography: WritingStyle::default(),
             typography_anchor: None,
+            reading_restore: None,
+            last_reading: None,
+            last_reading_signature: None,
+            layout_scroll: Point::default(),
             coordinates_dirty: false,
             links: links::State::new(theme, window, cx),
             selection_tools: selection::State::new(cx),
@@ -278,7 +491,13 @@ impl RichEditor {
             error: None,
             library_id,
             layout: None,
+            shape_cache: ShapeCache::default(),
+            geometry_cache: GeometryCache::default(),
+            #[cfg(feature = "performance-diagnostics")]
+            profiling: Rc::new(Cell::new(EditorRegions::default())),
+            painted_lines: Rc::new(Cell::new(0)),
             bounds: Bounds::default(),
+            input_viewport: Bounds::default(),
             scroll: ScrollHandle::new(),
             dragging: false,
             goal_x: None,
@@ -304,6 +523,8 @@ impl RichEditor {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        #[cfg(feature = "performance-diagnostics")]
+        let started = std::time::Instant::now();
         self.table_notice = None;
         let before = self.model.revision;
         let selection_before = self.model.selection.clone();
@@ -326,6 +547,8 @@ impl RichEditor {
         self.refresh_media(window, cx);
         window.invalidate_character_coordinates();
         cx.notify();
+        #[cfg(feature = "performance-diagnostics")]
+        record_region(&self.profiling, ProfileRegion::Edit, started);
     }
     fn move_to(&mut self, byte: usize, extend: bool, window: &mut Window, cx: &mut Context<Self>) {
         let previous = self.model.selection.clone();
@@ -336,6 +559,37 @@ impl RichEditor {
         self.reveal = true;
         window.invalidate_character_coordinates();
         cx.notify();
+    }
+    fn document_edge(
+        &mut self,
+        end: bool,
+        extend: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.model.marked.is_some() {
+            cx.propagate();
+            return;
+        }
+        let index = if end {
+            self.model
+                .document
+                .leaves()
+                .iter()
+                .enumerate()
+                .map(|(index, block)| {
+                    usize::from(index > 0)
+                        + block
+                            .spans
+                            .iter()
+                            .map(|span| span.content().len())
+                            .sum::<usize>()
+                })
+                .sum()
+        } else {
+            0
+        };
+        self.move_to(index, extend, window, cx);
     }
     fn point_index(&self, point: Point<Pixels>) -> usize {
         self.layout
@@ -630,8 +884,10 @@ impl EntityInputHandler for RichEditor {
 
 impl Render for RichEditor {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        #[cfg(feature = "performance-diagnostics")]
+        let started = std::time::Instant::now();
         let theme = self.theme;
-        div().flex().flex_col().size_full().min_h_0().overflow_hidden().key_context("NoteTools")
+        let element = div().flex().flex_col().size_full().min_h_0().overflow_hidden().bg(theme.editor).key_context("NoteTools")
             .on_action(cx.listener(|s,_:&FocusRelated,w,cx|s.focus_related(w,cx)))
             .on_action(cx.listener(|s,_:&SelectionTools,w,cx|s.focus_selection_tools(w,cx)))
             .on_action(cx.listener(|s,_:&FindInNote,w,cx|s.open_find(w,cx)))
@@ -676,6 +932,10 @@ impl Render for RichEditor {
                     .on_action(cx.listener(|s,_:&End,w,cx|s.line_edge(true,false,w,cx)))
                     .on_action(cx.listener(|s,_:&SelectHome,w,cx|s.line_edge(false,true,w,cx)))
                     .on_action(cx.listener(|s,_:&SelectEnd,w,cx|s.line_edge(true,true,w,cx)))
+                    .on_action(cx.listener(|s,_:&DocumentHome,w,cx|s.document_edge(false,false,w,cx)))
+                    .on_action(cx.listener(|s,_:&DocumentEnd,w,cx|s.document_edge(true,false,w,cx)))
+                    .on_action(cx.listener(|s,_:&SelectDocumentHome,w,cx|s.document_edge(false,true,w,cx)))
+                    .on_action(cx.listener(|s,_:&SelectDocumentEnd,w,cx|s.document_edge(true,true,w,cx)))
                     .on_action(cx.listener(|s,_:&SelectAll,w,cx|s.edit(|e|{e.select_all();Ok(())},w,cx)))
                     .on_action(cx.listener(|s,_:&Enter,w,cx|{if s.model.marked.is_none(){s.edit(|e|e.enter(false),w,cx);}}))
                     .on_action(cx.listener(|s,_:&SoftBreak,w,cx|s.edit(|e|e.enter(true),w,cx)))
@@ -731,16 +991,21 @@ impl Render for RichEditor {
                     .on_mouse_up_out(MouseButton::Left,cx.listener(|s,_,_,cx|{s.dragging=false;cx.notify();}))
                     .child(TextSurface {editor:cx.entity()}), cx.entity()))
                 .child(self.related_notes(window,cx)))
-            .child(selection::Surface {editor:cx.entity()})
+            .child(selection::Surface {editor:cx.entity()});
+        #[cfg(feature = "performance-diagnostics")]
+        record_region(&self.profiling, ProfileRegion::Render, started);
+        element
     }
 }
 
+#[derive(Clone)]
 struct Line {
-    line: WrappedLine,
+    line: Rc<WrappedLine>,
     origin: Point<Pixels>,
     height: Pixels,
     start: usize,
 }
+#[derive(Clone)]
 struct Object {
     key: String,
     start: usize,
@@ -751,6 +1016,7 @@ struct Object {
 struct Layout {
     objects: Vec<Object>,
     width: Pixels,
+    text_len: usize,
     height: Pixels,
     lines: Vec<Line>,
     checks: Vec<(String, Bounds<Pixels>, bool)>,
@@ -822,331 +1088,6 @@ impl Layout {
         })
     }
 }
-fn make_layout(
-    document: &Document,
-    width: Pixels,
-    theme: Theme,
-    typography: WritingStyle,
-    window: &Window,
-) -> Layout {
-    let mut layout = Layout {
-        width,
-        objects: vec![],
-        height: px(0.),
-        lines: vec![],
-        checks: vec![],
-        borders: vec![],
-        quotes: vec![],
-        labels: vec![],
-    };
-    fn layout_blocks(
-        blocks: &[Block],
-        origin: Point<Pixels>,
-        width: Pixels,
-        global: &mut usize,
-        out: &mut Layout,
-        style: (Theme, WritingStyle),
-        w: &Window,
-    ) -> Pixels {
-        let (theme, typography) = style;
-        let x = origin.x;
-        let mut y = origin.y;
-        let mut ordered = [0usize; 17];
-        for block in blocks {
-            if block.kind == "list" {
-                let indent = block.number("indent", 0).min(16);
-                ordered[indent] = if block.string("list") == "ordered" {
-                    ordered[indent] + 1
-                } else {
-                    0
-                };
-                ordered[indent + 1..].fill(0);
-            } else {
-                ordered.fill(0);
-            }
-            if block.kind == "table" {
-                let columns = block.number("columns", 1);
-                let rows = block.number("rows", 1);
-                let cell_w = width / columns as f32;
-                let mut row_heights = vec![px(42.); rows];
-                let mut cells = vec![];
-                for cell in &block.cells {
-                    let start = (
-                        out.lines.len(),
-                        out.checks.len(),
-                        out.borders.len(),
-                        out.labels.len(),
-                        out.objects.len(),
-                    );
-                    let col_span = cell
-                        .attrs
-                        .get("colSpan")
-                        .and_then(serde_json::Value::as_u64)
-                        .unwrap_or(1) as usize;
-                    let row_span = cell
-                        .attrs
-                        .get("rowSpan")
-                        .and_then(serde_json::Value::as_u64)
-                        .unwrap_or(1) as usize;
-                    let cell_x = x + cell_w * cell.col as f32;
-                    let h = layout_blocks(
-                        &cell.blocks,
-                        point(cell_x + px(12.), px(12.)),
-                        (cell_w * col_span as f32 - px(24.)).max(px(20.)),
-                        global,
-                        out,
-                        style,
-                        w,
-                    ) + px(4.);
-                    for height in &mut row_heights[cell.row..cell.row + row_span] {
-                        *height = (*height).max(h / row_span as f32);
-                    }
-                    cells.push((
-                        cell.row,
-                        col_span,
-                        row_span,
-                        cell_x,
-                        start,
-                        (
-                            out.lines.len(),
-                            out.checks.len(),
-                            out.borders.len(),
-                            out.labels.len(),
-                            out.objects.len(),
-                        ),
-                    ));
-                }
-                for (row, col_span, row_span, cell_x, start, end) in cells {
-                    let top = y + row_heights[..row].iter().copied().sum::<Pixels>();
-                    for l in &mut out.lines[start.0..end.0] {
-                        l.origin.y += top;
-                    }
-                    for (_, b, _) in &mut out.checks[start.1..end.1] {
-                        b.origin.y += top;
-                    }
-                    for object in &mut out.objects[start.4..end.4] {
-                        object.bounds.origin.y += top;
-                    }
-                    for b in &mut out.borders[start.2..end.2] {
-                        b.origin.y += top;
-                    }
-                    for (_, p) in &mut out.labels[start.3..end.3] {
-                        p.y += top;
-                    }
-                    out.borders.push(Bounds::new(
-                        point(cell_x, top),
-                        size(
-                            cell_w * col_span as f32,
-                            row_heights[row..row + row_span].iter().copied().sum(),
-                        ),
-                    ));
-                }
-                y += row_heights.iter().copied().sum::<Pixels>() + px(22.);
-                continue;
-            }
-            let quote_top = y;
-            let indent = if block.kind == "quote" {
-                px(24.)
-            } else if block.kind == "list" {
-                px(30. + block.number("indent", 0) as f32 * 22.)
-            } else {
-                px(0.)
-            };
-            let size = (if block.kind == "heading" {
-                match block.number("level", 1) {
-                    1 => 32.,
-                    2 => 26.,
-                    _ => 22.,
-                }
-            } else {
-                19.
-            }) * typography.size as f32
-                / 19.;
-            let height = px(size * 1.55);
-            if block.kind == "list" {
-                if block.string("list") == "check" {
-                    out.checks.push((
-                        block.id.clone(),
-                        Bounds::new(
-                            point(x + indent - px(28.), y + px(6.)),
-                            size_fn(px(19.), px(19.)),
-                        ),
-                        block.checked(),
-                    ));
-                } else {
-                    out.labels.push((
-                        if block.string("list") == "ordered" {
-                            format!("{}.", ordered[block.number("indent", 0).min(16)])
-                        } else {
-                            "•".into()
-                        },
-                        point(x + indent - px(24.), y),
-                    ));
-                }
-            }
-            let mut segments: Vec<Vec<notes_core::document::Span>> = vec![];
-            let mut text_spans = vec![];
-            for span in &block.spans {
-                if span.is_text() {
-                    text_spans.push(span.clone());
-                } else {
-                    if !text_spans.is_empty() {
-                        segments.push(std::mem::take(&mut text_spans));
-                    }
-                    segments.push(vec![span.clone()]);
-                }
-            }
-            if !text_spans.is_empty() || segments.is_empty() {
-                segments.push(text_spans);
-            }
-            for spans in segments {
-                if spans.first().is_some_and(|s| !s.is_text()) {
-                    let span = &spans[0];
-                    let is_image = span.0.get("image").is_some();
-                    let key = if is_image {
-                        format!("image:{}", span.0["image"].as_str().unwrap_or(""))
-                    } else {
-                        format!("attachment:{}", span.0["attachment"].as_str().unwrap_or(""))
-                    };
-                    let available = (width - indent).max(px(40.));
-                    let (w, h) = if is_image {
-                        let native_w = span
-                            .0
-                            .get("width")
-                            .and_then(|v| v.as_f64())
-                            .unwrap_or(640.)
-                            .clamp(1., 12000.) as f32;
-                        let native_h = span
-                            .0
-                            .get("height")
-                            .and_then(|v| v.as_f64())
-                            .unwrap_or(360.)
-                            .clamp(1., 12000.) as f32;
-                        let scale = (f32::from(available) / native_w)
-                            .min(360. / native_h)
-                            .min(1.);
-                        (
-                            px(native_w * scale).max(px(40.)),
-                            px(native_h * scale).max(px(40.)),
-                        )
-                    } else {
-                        (available.min(px(520.)), px(74.))
-                    };
-                    y += px(8.);
-                    out.objects.push(Object {
-                        key,
-                        start: *global,
-                        bounds: Bounds::new(point(x + indent, y), size_fn(w, h)),
-                        image: is_image,
-                        label: span
-                            .0
-                            .get("alt")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or(if is_image { "Image" } else { "Attachment" })
-                            .to_owned(),
-                    });
-                    y += h + px(12.);
-                    *global += 3;
-                    continue;
-                }
-                let text: String = spans.iter().map(|s| s.content()).collect();
-                let mut runs = vec![];
-                for span in &spans {
-                    let mut font = font(if span.mark("code") {
-                        "monospace"
-                    } else {
-                        typography.font.family()
-                    });
-                    if span.mark("bold") || block.kind == "heading" {
-                        font.weight = FontWeight::BOLD;
-                    }
-                    if span.mark("italic") {
-                        font.style = FontStyle::Italic;
-                    }
-                    let link = span.0.get("href").is_some();
-                    runs.push(TextRun {
-                        len: span.content().len(),
-                        font,
-                        color: if link { theme.accent } else { theme.text },
-                        background_color: span.mark("highlight").then_some(theme.selected),
-                        underline: (span.mark("underline") || link).then_some(UnderlineStyle {
-                            thickness: px(1.),
-                            color: None,
-                            wavy: false,
-                        }),
-                        strikethrough: span.mark("strikethrough").then_some(StrikethroughStyle {
-                            thickness: px(1.),
-                            color: None,
-                        }),
-                    });
-                }
-                let display = if text.is_empty() {
-                    " ".to_owned()
-                } else {
-                    text.clone()
-                };
-                if runs.is_empty() {
-                    runs.push(TextRun {
-                        len: display.len(),
-                        font: font(typography.font.family()),
-                        color: theme.text,
-                        background_color: None,
-                        underline: None,
-                        strikethrough: None,
-                    });
-                }
-                let lines = w
-                    .text_system()
-                    .shape_text(
-                        display.into(),
-                        px(size),
-                        &runs,
-                        Some((width - indent).max(px(20.))),
-                        None,
-                    )
-                    .unwrap_or_default();
-                let mut local = 0;
-                for line in lines {
-                    let h = line.size(height).height;
-                    let len = line.len();
-                    out.lines.push(Line {
-                        line,
-                        origin: point(x + indent, y),
-                        height,
-                        start: *global + local,
-                    });
-                    y += h;
-                    local += len + 1;
-                }
-                *global += text.len();
-            }
-            *global += 1;
-            if block.kind == "quote" {
-                out.quotes.push(Bounds::new(
-                    point(x + px(2.), quote_top + px(3.)),
-                    size_fn(px(2.), (y - quote_top - px(6.)).max(px(18.))),
-                ));
-            }
-            y += if block.kind == "list" {
-                px(4.)
-            } else {
-                px(16.)
-            };
-        }
-        y
-    }
-    layout.height = layout_blocks(
-        &document.blocks,
-        point(px(0.), px(0.)),
-        width,
-        &mut 0,
-        &mut layout,
-        (theme, typography),
-        window,
-    )
-    .max(px(220.));
-    layout
-}
 fn size_fn(w: Pixels, h: Pixels) -> Size<Pixels> {
     size(w, h)
 }
@@ -1189,15 +1130,7 @@ impl Element for TextSurface {
                     })
                     .max(px(20.));
                 editor.update(cx, |s, _| {
-                    if s.layout.as_ref().is_none_or(|l| l.width != width) {
-                        s.layout = Some(Rc::new(make_layout(
-                            &s.model.document,
-                            width,
-                            s.theme,
-                            s.typography,
-                            window,
-                        )));
-                    }
+                    s.ensure_layout(width, window);
                     size(width, s.layout.as_ref().unwrap().height)
                 })
             }),
@@ -1214,22 +1147,34 @@ impl Element for TextSurface {
         cx: &mut App,
     ) -> Rc<Layout> {
         self.editor.update(cx, |s, cx| {
-            if s.layout
-                .as_ref()
-                .is_none_or(|l| l.width != bounds.size.width)
-            {
-                s.layout = Some(Rc::new(make_layout(
-                    &s.model.document,
-                    bounds.size.width,
-                    s.theme,
-                    s.typography,
-                    window,
-                )));
-            }
+            s.ensure_layout(bounds.size.width, window);
+            #[cfg(feature = "performance-diagnostics")]
+            let started = std::time::Instant::now();
             if s.bounds != bounds || s.coordinates_dirty {
                 s.bounds = bounds;
                 s.coordinates_dirty = false;
                 window.invalidate_character_coordinates();
+            }
+            let viewport = s.scroll.bounds();
+            if s.input_viewport != viewport {
+                if s.model.marked.is_some() && s.input_viewport.size.height > px(0.) {
+                    s.reveal = true;
+                }
+                s.input_viewport = viewport;
+                window.invalidate_character_coordinates();
+            }
+            s.layout_scroll = s.scroll.offset();
+            let signature = ReadingSignature {
+                width: bounds.size.width,
+                typography: s.typography,
+            };
+            s.last_reading_signature = Some(signature);
+            if let Some(anchor) = s.reading_restore.take()
+                && anchor.signature != signature
+                && s.model.document.block(&anchor.position.block).is_some()
+            {
+                let index = s.model.global(&anchor.position);
+                s.typography_anchor = Some((index, anchor.offset, false));
             }
             if let Some((index, mut offset, caret)) = s.typography_anchor.take() {
                 let (position, height) = s.layout.as_ref().unwrap().caret(index);
@@ -1265,6 +1210,9 @@ impl Element for TextSurface {
                     cx.notify();
                 }
             }
+            s.last_reading = s.capture_reading();
+            #[cfg(feature = "performance-diagnostics")]
+            record_region(&s.profiling, ProfileRegion::Prepaint, started);
             s.layout.clone().unwrap()
         })
     }
@@ -1278,7 +1226,17 @@ impl Element for TextSurface {
         window: &mut Window,
         cx: &mut App,
     ) {
+        #[cfg(feature = "performance-diagnostics")]
+        let started = std::time::Instant::now();
         let s = self.editor.read(cx);
+        #[cfg(feature = "performance-diagnostics")]
+        let profiling = s.profiling.clone();
+        #[cfg(feature = "performance-diagnostics")]
+        {
+            let mut regions = profiling.get();
+            regions.a11y_active = window.is_a11y_active();
+            profiling.set(regions);
+        }
         let theme = s.theme;
         let focus = s.focus.clone();
         let range = s.model.range();
@@ -1290,9 +1248,12 @@ impl Element for TextSurface {
         let active_find = s.find_open && s.find.selected() == Some(&range);
         let head = s.model.global(&s.model.selection.head);
         let marked = s.model.marked.clone();
-        let text_len = s.model.text().len();
-        let empty = s.model.text().is_empty();
+        let text_len = layout.text_len;
+        let empty = text_len == 0;
+        let mask = window.content_mask().bounds;
+        let mut painted_lines = 0;
         let media = s.media.items.clone();
+        let painted_counter = s.painted_lines.clone();
         window.handle_input(
             &focus,
             ElementInputHandler::new(bounds, self.editor.clone()),
@@ -1300,6 +1261,9 @@ impl Element for TextSurface {
         );
         for object in &layout.objects {
             let b = Bounds::new(bounds.origin + object.bounds.origin, object.bounds.size);
+            if !b.intersects(&mask) {
+                continue;
+            }
             let item = media.get(&object.key);
             let selected = range.start <= object.start && range.end >= object.start + 3;
             let border = if selected { theme.accent } else { theme.border };
@@ -1390,9 +1354,15 @@ impl Element for TextSurface {
         }
         for b in &layout.borders {
             let b = Bounds::new(bounds.origin + b.origin, b.size);
+            if !b.intersects(&mask) {
+                continue;
+            }
             window.paint_quad(outline(b, theme.border, BorderStyle::Solid));
         }
         for b in &layout.quotes {
+            if !Bounds::new(bounds.origin + b.origin, b.size).intersects(&mask) {
+                continue;
+            }
             window.paint_quad(
                 fill(Bounds::new(bounds.origin + b.origin, b.size), theme.accent)
                     .corner_radii(px(1.)),
@@ -1400,6 +1370,10 @@ impl Element for TextSurface {
         }
         for line in &layout.lines {
             let origin = bounds.origin + line.origin;
+            if !Bounds::new(origin, line.line.size(line.height)).intersects(&mask) {
+                continue;
+            }
+            painted_lines += 1;
             let _ =
                 line.line
                     .paint_background(origin, line.height, TextAlign::Left, None, window, cx);
@@ -1478,6 +1452,9 @@ impl Element for TextSurface {
         }
         for (_, b, checked) in &layout.checks {
             let b = Bounds::new(bounds.origin + b.origin, b.size);
+            if !b.intersects(&mask) {
+                continue;
+            }
             window.paint_quad(outline(
                 b,
                 if *checked { theme.accent } else { theme.muted },
@@ -1495,8 +1472,12 @@ impl Element for TextSurface {
             }
         }
         for (label, p) in &layout.labels {
+            if !Bounds::new(bounds.origin + *p, size(px(100.), px(26.))).intersects(&mask) {
+                continue;
+            }
             paint_label(label, bounds.origin + *p, theme.muted, window, cx);
         }
+        painted_counter.set(painted_lines);
         if empty {
             paint_label(
                 "A thought, a sentence, a small detail…",
@@ -1516,6 +1497,8 @@ impl Element for TextSurface {
                 theme.accent,
             ));
         }
+        #[cfg(feature = "performance-diagnostics")]
+        record_region(&profiling, ProfileRegion::Paint, started);
     }
 }
 fn px_point(x: f32, y: f32) -> Point<Pixels> {

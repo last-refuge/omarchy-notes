@@ -90,7 +90,11 @@ pub fn writing_tools_check(directory: &std::path::Path) -> anyhow::Result<()> {
     })?;
     let editor = h.update(&mut cx, |s, w, cx| {
         s.command(Command::Select(note.id.clone()), w, cx);
-        s.live.as_ref().unwrap().notes[&note.id].editor.clone()
+        s.live.as_ref().unwrap().notes[&note.id]
+            .editor
+            .as_ref()
+            .unwrap()
+            .clone()
     })?;
     h.update(&mut cx, |_, w, cx| {
         editor.update(cx, |s, cx| {
@@ -224,7 +228,11 @@ pub fn writing_tools_check(directory: &std::path::Path) -> anyhow::Result<()> {
         }
         super::super::visual_keys(&mut cx, h.into(), "escape")?;
         h.update(&mut cx, |s, w, cx| {
-            let e = s.live.as_ref().unwrap().notes[&note.id].editor.read(cx);
+            let e = s.live.as_ref().unwrap().notes[&note.id]
+                .editor
+                .as_ref()
+                .unwrap()
+                .read(cx);
             assert_eq!(e.model.revision, 0, "search must never create saved edits");
             assert_eq!(e.model.document, expected);
             assert!(e.focus.is_focused(w));

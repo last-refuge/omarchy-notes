@@ -99,7 +99,11 @@ pub fn window_launch_check() -> anyhow::Result<()> {
                 let s = shell.read(cx);
                 assert_eq!(s.live.as_ref().unwrap().notes.len(), 1);
                 assert!(s.live.as_ref().unwrap().notes[&note].note.revision > 0);
-                s.live.as_ref().unwrap().notes[&note].editor.clone()
+                s.live.as_ref().unwrap().notes[&note]
+                    .editor
+                    .as_ref()
+                    .unwrap()
+                    .clone()
             });
             h.update(&mut cx, |_, w, cx| {
                 editor.update(cx, |e, cx| {
@@ -176,7 +180,11 @@ pub fn window_launch_check() -> anyhow::Result<()> {
                 (
                     q,
                     id.clone(),
-                    s.live.as_ref().unwrap().notes[&id].editor.clone(),
+                    s.live.as_ref().unwrap().notes[&id]
+                        .editor
+                        .as_ref()
+                        .unwrap()
+                        .clone(),
                 )
             });
             q.update(&mut cx, |_, w, cx| {
@@ -221,8 +229,11 @@ pub fn window_launch_check() -> anyhow::Result<()> {
                 assert!(s.windows.quick.is_none());
                 assert_eq!(s.library.selected.as_ref(), Some(&quick_id));
                 assert_eq!(
-                    s.live.as_ref().unwrap().notes[&quick_id].editor,
-                    quick_editor
+                    s.live.as_ref().unwrap().notes[&quick_id]
+                        .editor
+                        .as_ref()
+                        .unwrap(),
+                    &quick_editor
                 );
             });
             // Close main while Quick keeps the controller alive. Missing targets

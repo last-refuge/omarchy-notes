@@ -310,7 +310,7 @@ impl Shell {
                     .selected
                     .as_ref()
                     .and_then(|id| self.live.as_ref()?.notes.get(id))
-                    .is_some_and(|s| s.editor.read(cx).input_is_composing(cx))
+                    .is_some_and(|s| s.input_is_composing(cx))
                 {
                     return;
                 }
@@ -380,7 +380,7 @@ impl Shell {
                     Mode::MoveNote { id } => live
                         .notes
                         .get(id)
-                        .map(|note| note.editor.read(cx).focus.clone()),
+                        .and_then(|note| note.active_editor().map(|e| e.read(cx).focus.clone())),
                     // Generic toolbar/nav controls are unmounted while this
                     // page is open, so their automatically created handles
                     // cannot be restored. Retain only entity-owned handles.
@@ -389,7 +389,7 @@ impl Shell {
                         .selected
                         .as_ref()
                         .and_then(|id| live.notes.get(id))
-                        .map(|note| note.editor.read(cx).focus.clone())
+                        .and_then(|note| note.active_editor().map(|e| e.read(cx).focus.clone()))
                         .filter(|focus| focus.is_focused(w))
                         .or_else(|| {
                             self.search

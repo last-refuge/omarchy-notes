@@ -81,7 +81,13 @@ impl RichEditor {
         if self.links.own_id != own_id || self.links.catalog != catalog {
             self.links.own_id = own_id;
             self.links.catalog = catalog;
-            self.links.filter();
+            if self.links.open {
+                self.links.filter();
+            } else {
+                // Opening the panel filters its current catalog. Avoid scanning
+                // the full notebook for every title edit while it is closed.
+                self.links.filtered.clear();
+            }
             self.refresh_related();
             cx.notify();
         }

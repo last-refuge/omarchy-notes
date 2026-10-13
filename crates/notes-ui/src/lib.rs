@@ -1,4 +1,10 @@
 //! Native GPUI preview, isolated from production libraries.
+#[cfg(feature = "visual-tests")]
+pub use rich_editor::layout_cache_check;
+#[cfg(feature = "visual-tests")]
+pub use shell::bounded_editor_check;
+#[cfg(feature = "performance-diagnostics")]
+pub use shell::performance_check;
 mod accessible_input;
 mod assets;
 mod rich_editor;

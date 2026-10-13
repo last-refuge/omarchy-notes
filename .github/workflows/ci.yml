@@ -25,6 +25,7 @@ jobs:
         run: |
           runuser -u builder -- cargo fmt --all --check
           runuser -u builder -- cargo test --workspace --locked
+          runuser -u builder -- cargo test -p accesskit_unix --lib --locked
           runuser -u builder -- cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: Check Qt-free PDF structure and content
         env:

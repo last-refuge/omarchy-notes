@@ -27,6 +27,10 @@ pub struct Selection {
     pub anchor: Position,
     pub head: Position,
 }
+/// Exact formatting context for subsequent typing, including explicit caret
+/// choices and style properties unknown to this editor.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TypingState(Span);
 #[derive(Clone)]
 struct Snapshot {
     document: Document,
@@ -82,28 +86,44 @@ impl Editor {
         self.marked = None;
     }
     fn record(&mut self, before: Snapshot, coalesce: bool) {
-        let ids: Vec<_> = self
-            .document
-            .leaves()
-            .iter()
-            .map(|b| b.id.clone())
-            .collect();
-        for id in ids {
-            let block = self.document.block_mut(&id).unwrap();
-            let mut merged: Vec<Span> = vec![];
-            for span in std::mem::take(&mut block.spans) {
-                if let Some(last) = merged.last_mut()
-                    && span.is_text()
-                    && last.is_text()
-                    && span.with_text("") == last.with_text("")
-                {
-                    *last = last.with_text(&format!("{}{}", last.content(), span.content()));
-                } else {
-                    merged.push(span);
-                }
+        fn normalize(blocks: &mut [Block]) {
+            fn same_style(a: &Span, b: &Span) -> bool {
+                let (Some(a), Some(b)) = (a.0.as_object(), b.0.as_object()) else {
+                    return false;
+                };
+                a.len() == b.len()
+                    && a.iter()
+                        .filter(|(key, _)| key.as_str() != "text")
+                        .eq(b.iter().filter(|(key, _)| key.as_str() != "text"))
             }
-            block.spans = merged;
+            for block in blocks {
+                if block.kind == "table" {
+                    for cell in &mut block.cells {
+                        normalize(&mut cell.blocks);
+                    }
+                    continue;
+                }
+                let mut merged: Vec<Span> = vec![];
+                for span in std::mem::take(&mut block.spans) {
+                    if let Some(last) = merged.last_mut()
+                        && span.is_text()
+                        && last.is_text()
+                        && same_style(&span, last)
+                    {
+                        if let Some(serde_json::Value::String(text)) = last.0.get_mut("text") {
+                            text.push_str(span.content());
+                        } else {
+                            *last =
+                                last.with_text(&format!("{}{}", last.content(), span.content()));
+                        }
+                    } else {
+                        merged.push(span);
+                    }
+                }
+                block.spans = merged;
+            }
         }
+        normalize(&mut self.document.blocks);
         if self.document == before.document {
             return;
         }
@@ -131,25 +151,29 @@ impl Editor {
             if block.id == position.block {
                 return start + clip(&block.text(), position.offset);
             }
-            start += block.text().len() + 1;
+            start += block.spans.iter().map(|s| s.content().len()).sum::<usize>() + 1;
         }
         0
     }
     pub fn position(&self, mut offset: usize) -> Position {
         let leaves = self.document.leaves();
         for (i, b) in leaves.iter().enumerate() {
-            let text = b.text();
-            if offset <= text.len() || i == leaves.len() - 1 {
+            let len = b.spans.iter().map(|s| s.content().len()).sum::<usize>();
+            if offset <= len || i == leaves.len() - 1 {
                 return Position {
                     block: b.id.clone(),
-                    offset: clip(&text, offset),
+                    offset: clip(&b.text(), offset),
                 };
             }
-            offset -= text.len() + 1;
+            offset -= len + 1;
         }
         unreachable!("editor always has a leaf")
     }
     pub fn range(&self) -> Range<usize> {
+        if self.selection.anchor == self.selection.head {
+            let at = self.global(&self.selection.head);
+            return at..at;
+        }
         let (a, b) = (
             self.global(&self.selection.anchor),
             self.global(&self.selection.head),
@@ -441,6 +465,12 @@ impl Editor {
         Some(state.unwrap_or(false))
     }
     pub fn style_active(&self, style: &str) -> bool {
+        if self.selection.anchor == self.selection.head {
+            return self
+                .document
+                .block(&self.selection.head.block)
+                .is_some_and(|b| block_style(b, style));
+        }
         let range = self.range();
         let mut offset = 0;
         let mut found = false;
@@ -573,6 +603,15 @@ impl Editor {
     pub fn history_usage(&self) -> HistoryUsage {
         self.history.usage()
     }
+    pub fn typing_state(&self) -> TypingState {
+        TypingState(self.typing.clone())
+    }
+    /// Restore after restoring the matching document selection. This ends the
+    /// previous typing group without changing the document, history or preedit.
+    pub fn restore_typing_state(&mut self, state: TypingState) {
+        self.typing = state.0;
+        self.last_typing = None;
+    }
     pub fn input(
         &mut self,
         utf16: Option<Range<usize>>,
@@ -581,9 +620,11 @@ impl Editor {
     ) -> Result<()> {
         let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
         let text = normalized.as_str();
-        let plain = self.text();
         let range = utf16
-            .map(|r| TextField::byte_in(&plain, r.start)..TextField::byte_in(&plain, r.end))
+            .map(|r| {
+                let plain = self.text();
+                TextField::byte_in(&plain, r.start)..TextField::byte_in(&plain, r.end)
+            })
             .or_else(|| self.marked.clone())
             .unwrap_or_else(|| self.range());
         let before = self.composition.clone().unwrap_or_else(|| self.snapshot());
@@ -791,6 +832,119 @@ fn block_style(block: &Block, style: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn typing_state_recreation_keeps_inherited_and_explicit_boundary_styles() {
+        let span = Span(json!({
+            "text": "Styled words",
+            "marks": ["bold", "italic"],
+            "future-style": {"color": "warm", "version": 3}
+        }));
+        let mut block = Block::paragraph("");
+        block.spans.push(span.clone());
+        let document = Document {
+            blocks: vec![block],
+            ..Default::default()
+        };
+        for boundary in [false, true] {
+            let mut original = Editor::new(document.clone());
+            original.select(if boundary { original.text().len() } else { 3 }, false);
+            if boundary {
+                original.mark("bold").unwrap();
+                assert_eq!(
+                    original.document, document,
+                    "a boundary toggle is not a body edit"
+                );
+                assert!(!original.mark_active("bold"));
+            }
+            let saved = original.typing_state();
+            let mut reopened = Editor::new(document.clone());
+            reopened.selection = original.selection.clone();
+            let history = reopened.history_usage();
+            reopened.restore_typing_state(saved.clone());
+            assert_eq!(reopened.typing_state(), saved);
+            assert_eq!(reopened.document, document);
+            assert_eq!(reopened.revision, 0);
+            assert_eq!(reopened.history_usage(), history);
+            assert!(reopened.marked.is_none());
+            reopened.insert("X", 0).unwrap();
+            let inserted = reopened.document.blocks[0]
+                .spans
+                .iter()
+                .find(|s| s.content().contains('X'))
+                .unwrap();
+            assert_eq!(inserted.mark("bold"), !boundary);
+            assert!(inserted.mark("italic"));
+            assert_eq!(inserted.0["future-style"], span.0["future-style"]);
+            reopened.undo();
+            assert_eq!(reopened.document, document);
+        }
+    }
+    #[test]
+    fn typing_state_recreation_keeps_empty_caret_choices() {
+        let mut original = Editor::new(Document::default());
+        original.mark("bold").unwrap();
+        original.mark("italic").unwrap();
+        let mut reopened = Editor::new(original.document.clone());
+        reopened.selection = original.selection.clone();
+        reopened.restore_typing_state(original.typing_state());
+        assert_eq!(reopened.revision, 0);
+        assert!(!reopened.can_undo());
+        reopened.input(None, "First words", None).unwrap();
+        let inserted = &reopened.document.blocks[0].spans[0];
+        assert!(inserted.mark("bold") && inserted.mark("italic"));
+    }
+    #[test]
+    fn typing_restore_ends_coalescence_without_changing_history_or_composition() {
+        let mut e = Editor::new(Document::default());
+        e.insert("a", 100).unwrap();
+        let state = e.typing_state();
+        let before = (
+            e.document.clone(),
+            e.selection.clone(),
+            e.revision,
+            e.history_usage(),
+        );
+        e.restore_typing_state(state.clone());
+        assert_eq!(
+            (
+                e.document.clone(),
+                e.selection.clone(),
+                e.revision,
+                e.history_usage()
+            ),
+            before
+        );
+        e.insert("b", 101).unwrap();
+        e.undo();
+        assert_eq!(e.text(), "a", "restoration begins a new typing group");
+        e.input(None, "に", Some(None)).unwrap();
+        let before = (
+            e.document.clone(),
+            e.selection.clone(),
+            e.revision,
+            e.history_usage(),
+            e.marked.clone(),
+            e.committed().clone(),
+        );
+        e.restore_typing_state(state);
+        assert_eq!(
+            (
+                e.document.clone(),
+                e.selection.clone(),
+                e.revision,
+                e.history_usage(),
+                e.marked.clone(),
+                e.committed().clone()
+            ),
+            before
+        );
+        e.cancel_composition();
+        assert_eq!(
+            e.text(),
+            "a",
+            "restoration leaves the composition rollback intact"
+        );
+    }
     #[test]
     fn rich_cross_block_edit_undo_and_stable_ids() {
         let mut e = Editor::new(Document::default());

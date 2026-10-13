@@ -94,8 +94,9 @@ impl Shell {
             .selected
             .as_ref()
             .and_then(|id| self.live.as_ref()?.notes.get(id))
+            .and_then(|s| s.active_editor())
         {
-            session.editor.read(cx).focus.clone().focus(window, cx);
+            session.read(cx).focus.clone().focus(window, cx);
         }
     }
     fn pdf_snapshot(
@@ -108,7 +109,13 @@ impl Shell {
         }
         let id = self.library.selected.as_ref()?;
         let session = live.notes.get(id)?;
-        let editor = session.editor.read(cx);
+        if session.has_unobserved_edit(cx) {
+            live.pdf.message = Some("Your latest edit is still being prepared. Try exporting again in a moment; your draft is retained.".into());
+            live.pdf.failed = true;
+            cx.notify();
+            return None;
+        }
+        let editor = session.active_editor()?.read(cx);
         if editor.model.marked.is_some() || editor.has_pending_work() {
             live.pdf.message =
                 Some("Finish inserting files or composing text, then export your note.".into());
@@ -562,7 +569,11 @@ mod tests {
         });
         assert!(app.did_prompt_for_new_path());
         window.update(|s, w, cx| {
-            let editor = s.live.as_ref().unwrap().notes[&note.id].editor.clone();
+            let editor = s.live.as_ref().unwrap().notes[&note.id]
+                .editor
+                .as_ref()
+                .unwrap()
+                .clone();
             editor.update(cx, |e, cx| {
                 e.edit(
                     |e| {
@@ -643,7 +654,11 @@ mod tests {
         window.read(|s, _| assert!(!s.live.as_ref().unwrap().pdf.busy()));
         assert!(!path.exists());
         window.update(|s, w, cx| {
-            let editor = s.live.as_ref().unwrap().notes[&note.id].editor.clone();
+            let editor = s.live.as_ref().unwrap().notes[&note.id]
+                .editor
+                .as_ref()
+                .unwrap()
+                .clone();
             editor.update(cx, |e, cx| {
                 e.replace_and_mark_text_in_range(None, "日本", None, w, cx)
             });

@@ -80,7 +80,11 @@ pub fn quote_check(directory: &std::path::Path) -> anyhow::Result<()> {
         })?;
         let editor = h.update(&mut cx, |s, w, cx| {
             s.command(Command::Select(source.id.clone()), w, cx);
-            s.live.as_ref().unwrap().notes[&source.id].editor.clone()
+            s.live.as_ref().unwrap().notes[&source.id]
+                .editor
+                .as_ref()
+                .unwrap()
+                .clone()
         })?;
         h.update(&mut cx, |_, w, cx| {
             editor.update(cx, |e, cx| {

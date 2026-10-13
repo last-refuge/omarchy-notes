@@ -76,7 +76,8 @@ impl QuickView {
         w: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let shell = cx.new(|cx| Shell::new_live(appearance, root, worker, library, w, cx));
+        let shell =
+            cx.new(|cx| Shell::new_live_window(appearance, root, worker, library, false, w, cx));
         shell.update(cx, |s, _| s.windows.main = None);
         Self::new(shell, w, cx)
     }
@@ -102,12 +103,13 @@ impl QuickView {
             s.windows.opening = false;
             s.windows.closing = false;
             s.windows.notice = None;
+            let editor = s.ensure_editor(&id, w, cx).unwrap();
             s.sync_link_catalog(cx);
-            let editor = s.live.as_ref().unwrap().notes[&id].editor.clone();
             editor.update(cx, |e, cx| {
                 e.activate_media(w, cx);
                 w.focus(&e.focus, cx);
             });
+            s.trim_idle_editors(cx);
             cx.notify();
         });
         w.set_window_title("Quick Note — Omarchy Notes");
@@ -217,7 +219,7 @@ impl Render for QuickView {
             .quick
             .as_ref()
             .and_then(|q| s.live.as_ref()?.notes.get(&q.1));
-        let editor = note.map(|n| n.editor.clone());
+        let editor = note.and_then(|n| n.active_editor().cloned());
         let status = note
             .map(|n| s.real_status(&n.note.id, cx))
             .unwrap_or_default();
@@ -414,6 +416,7 @@ impl Shell {
                         s.library.query.clear();
                         s.search.update(cx, |f, cx| f.clear_silently(w, cx));
                         s.library.refresh();
+                        s.list.reset(s.library.visible.len());
                         s.command(Command::Select(id), w, cx);
                     }
                 });
@@ -436,7 +439,10 @@ impl Shell {
         let quick = *quick;
         let live = self.live.as_mut().unwrap();
         let session = live.notes.get_mut(id).unwrap();
-        if !session.editor.update(cx, |e, cx| e.rebind_window(w, cx)) {
+        let Some(editor) = session.active_editor() else {
+            return false;
+        };
+        if !editor.update(cx, |e, cx| e.rebind_window(w, cx)) {
             self.windows.notice = Some("Finish the current insertion or text composition before moving this note. Your draft is still in Quick Note.".into());
             cx.notify();
             return false;
@@ -466,7 +472,7 @@ impl Shell {
     fn close_quick(&mut self, _: &mut Window, cx: &mut Context<Self>) -> bool {
         if let Some((_, id)) = &self.windows.quick {
             let s = self.live.as_mut().unwrap().notes.get_mut(id).unwrap();
-            if s.editor.read(cx).input_is_composing(cx) {
+            if s.input_is_composing(cx) {
                 self.windows.notice =
                     Some("Finish composing text before closing. Your draft stays here.".into());
                 cx.notify();
@@ -497,8 +503,9 @@ impl Shell {
         if self.preferences.busy()
             || session.pending.is_some()
             || session.revision != session.saved
-            || session.editor.read(cx).input_is_composing(cx)
-            || session.editor.read(cx).has_pending_work()
+            || session.has_unobserved_edit(cx)
+            || session.input_is_composing(cx)
+            || session.has_pending_work(cx)
         {
             return;
         }
@@ -516,6 +523,18 @@ impl Shell {
     pub(super) fn request_media(&mut self, id: &str, event: &MediaRequest, cx: &mut Context<Self>) {
         let live = self.live.as_mut().unwrap();
         let session = live.notes.get_mut(id).unwrap();
+        if session.has_unobserved_edit(cx) {
+            let id = id.to_string();
+            let event = MediaRequest {
+                operation: event.operation,
+                content: event.content.clone(),
+            };
+            let shell = cx.weak_entity();
+            cx.defer(move |cx| {
+                let _ = shell.update(cx, |s, cx| s.request_media(&id, &event, cx));
+            });
+            return;
+        }
         // A first media insertion needs a durable parent. FIFO on the sole writer
         // ensures creation precedes import; failure leaves both draft and undo intact.
         if session.note.revision == 0 && session.pending.is_none() {
@@ -568,7 +587,9 @@ impl Shell {
     ) {
         if let Some(s) = self.live.as_ref().and_then(|l| l.notes.get(id)) {
             let owner = s.owner;
-            let editor = s.editor.clone();
+            let Some(editor) = s.active_editor().cloned() else {
+                return;
+            };
             cx.defer(move |cx| {
                 let _ = owner.update(cx, |_, w, cx| {
                     editor.update(cx, |e, cx| e.import_result(operation, result, w, cx))
@@ -580,8 +601,15 @@ impl Shell {
         if self.windows.quick.as_ref().is_some_and(|q| q.1 == source) {
             if self.live.as_ref().unwrap().notes.contains_key(target) {
                 self.open_main(Some(target.into()), cx);
-            } else if let Some(s) = self.live.as_ref().unwrap().notes.get(source) {
-                s.editor.update(cx, |e, cx| { e.error = Some("This note isn’t available in this library. You can edit or remove the link.".into()); cx.notify(); });
+            } else if let Some(editor) = self
+                .live
+                .as_ref()
+                .unwrap()
+                .notes
+                .get(source)
+                .and_then(|s| s.active_editor())
+            {
+                editor.update(cx, |e, cx| { e.error = Some("This note isn’t available in this library. You can edit or remove the link.".into()); cx.notify(); });
             }
             return;
         }

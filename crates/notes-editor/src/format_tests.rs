@@ -1,4 +1,33 @@
 use super::*;
+#[test]
+fn normalization_keeps_unknown_span_properties_and_undo_structure() {
+    let mut block = Block::paragraph("");
+    block.spans = vec![
+        Span(json!({"text":"one", "future":{"values":[1,null]}})),
+        Span(json!({"text":"two", "future":{"values":[1,null]}})),
+        Span(json!({"text":"three", "future":{"values":[2,null]}})),
+    ];
+    let original = Document::from_blocks(vec![block]);
+    let mut editor = Editor::new(original.clone());
+    editor.select(editor.text().len(), false);
+    editor.insert("!", 0).unwrap();
+    assert_eq!(editor.document.blocks[0].spans.len(), 2);
+    assert_eq!(editor.document.blocks[0].spans[0].content(), "onetwo");
+    assert_eq!(
+        editor.document.blocks[0].spans[0].0["future"],
+        json!({"values":[1,null]})
+    );
+    assert_eq!(editor.document.blocks[0].spans[1].content(), "three!");
+    assert_eq!(
+        editor.document.blocks[0].spans[1].0["future"],
+        json!({"values":[2,null]})
+    );
+    let edited = editor.document.clone();
+    editor.undo();
+    assert_eq!(editor.document, original);
+    editor.redo();
+    assert_eq!(editor.document, edited);
+}
 
 #[test]
 fn mixed_marks_become_consistent_and_undo_retains_other_metadata() {

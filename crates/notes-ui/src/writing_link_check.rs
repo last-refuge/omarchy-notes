@@ -90,7 +90,11 @@ pub fn link_check(directory: &std::path::Path) -> anyhow::Result<()> {
     })?;
     let editor = h.update(&mut cx, |s, w, cx| {
         s.command(Command::Select(source.id.clone()), w, cx);
-        s.live.as_ref().unwrap().notes[&source.id].editor.clone()
+        s.live.as_ref().unwrap().notes[&source.id]
+            .editor
+            .as_ref()
+            .unwrap()
+            .clone()
     })?;
     // A selection spanning text with existing emphasis keeps both words and marks.
     h.update(&mut cx, |_, w, cx| {
@@ -273,7 +277,11 @@ pub fn link_check(directory: &std::path::Path) -> anyhow::Result<()> {
             .save(directory.join(format!("link-address-{name}.png")))?;
         super::super::visual_keys(&mut cx, h.into(), "escape")?;
         h.update(&mut cx, |s, w, cx| {
-            let e = s.live.as_ref().unwrap().notes[&source.id].editor.read(cx);
+            let e = s.live.as_ref().unwrap().notes[&source.id]
+                .editor
+                .as_ref()
+                .unwrap()
+                .read(cx);
             assert_eq!(e.model.document, expected);
             assert_eq!(e.model.revision, 0);
             w.remove_window();

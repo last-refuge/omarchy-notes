@@ -17,6 +17,7 @@ struct Run {
     positions: Vec<f32>,
     widths: Vec<f32>,
     words: Vec<u8>,
+    href: Option<String>,
     id: NodeId,
 }
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
@@ -39,8 +40,8 @@ impl InlineStyle {
             link: span.0.get("href").is_some(),
         }
     }
-    fn write(self, node: &mut Node, color: accesskit::Color) {
-        node.set_font_family(if self.code { "monospace" } else { "Noto Serif" });
+    fn write(self, node: &mut Node, color: accesskit::Color, family: &str) {
+        node.set_font_family(if self.code { "monospace" } else { family });
         node.set_font_weight(if self.bold { 700. } else { 400. });
         if self.italic {
             node.set_italic();
@@ -61,6 +62,8 @@ impl InlineStyle {
 }
 struct Control {
     key: String,
+    block: String,
+    run: Option<usize>,
     node: Node,
     action: ControlAction,
     id: NodeId,
@@ -69,6 +72,13 @@ struct Control {
 enum ControlAction {
     Check(String),
     Media(usize),
+    Link(String),
+}
+struct Structure {
+    key: String,
+    node: Node,
+    children: Vec<String>,
+    block: Option<String>,
 }
 struct Snapshot {
     revision: u64,
@@ -77,6 +87,9 @@ struct Snapshot {
     head: usize,
     runs: Vec<Run>,
     controls: Vec<Control>,
+    structures: Vec<Structure>,
+    roots: Vec<String>,
+    family: &'static str,
 }
 pub(super) fn input(content: Content, editor: Entity<RichEditor>) -> impl IntoElement {
     let capture = editor.clone();
@@ -166,6 +179,110 @@ fn physical(bounds: Bounds<Pixels>, origin: Point<Pixels>, scale: f32) -> Rect {
         f64::from(f32::from(p.y + bounds.size.height) * scale),
     )
 }
+// Keep the same stored cell/block traversal order as Editor::text. Reordering
+// table cells for presentation would change the accessible text offsets.
+fn document_structure(blocks: &[Block], out: &mut Vec<Structure>) -> Vec<String> {
+    let mut roots = vec![];
+    let mut list: Option<(String, String, usize, usize)> = None;
+    for block in blocks {
+        let key = format!("block:{}", block.id);
+        let mut node = Node::new(match block.kind.as_str() {
+            "heading" => Role::Heading,
+            "list" => Role::ListItem,
+            "quote" => Role::Blockquote,
+            "table" => Role::Table,
+            _ => Role::Paragraph,
+        });
+        let mut children = vec![];
+        match block.kind.as_str() {
+            "heading" => {
+                node.set_level(block.number("level", 1));
+                node.set_label(block.plain_text());
+            }
+            "list" => {
+                node.set_level(block.number("indent", 0) + 1);
+                if block.string("list") != "check" {
+                    node.set_label(block.plain_text());
+                }
+            }
+            "quote" => node.set_label(block.plain_text()),
+            "table" => {
+                node.set_row_count(block.number("rows", 1));
+                node.set_column_count(block.number("columns", 1));
+                node.set_label(format!(
+                    "Table, {} rows by {} columns",
+                    block.number("rows", 1),
+                    block.number("columns", 1)
+                ));
+                for (index, cell) in block.cells.iter().enumerate() {
+                    let cell_key = format!("cell:{}:{index}", block.id);
+                    let cell_children = document_structure(&cell.blocks, out);
+                    let mut cell_node = Node::new(Role::Cell);
+                    cell_node.set_row_index(cell.row);
+                    cell_node.set_column_index(cell.col);
+                    cell_node.set_label(format!("Row {}, column {}", cell.row + 1, cell.col + 1));
+                    cell_node.set_row_span(
+                        cell.attrs
+                            .get("rowSpan")
+                            .and_then(serde_json::Value::as_u64)
+                            .unwrap_or(1) as usize,
+                    );
+                    cell_node.set_column_span(
+                        cell.attrs
+                            .get("colSpan")
+                            .and_then(serde_json::Value::as_u64)
+                            .unwrap_or(1) as usize,
+                    );
+                    out.push(Structure {
+                        key: cell_key.clone(),
+                        node: cell_node,
+                        children: cell_children,
+                        block: None,
+                    });
+                    children.push(cell_key);
+                }
+            }
+            _ => {}
+        }
+        out.push(Structure {
+            key: key.clone(),
+            node,
+            children,
+            block: (block.kind != "table").then(|| block.id.clone()),
+        });
+        if block.kind == "list" {
+            let kind = block.string("list");
+            let indent = block.number("indent", 0);
+            if let Some((_, previous_kind, previous_indent, index)) = &list
+                && previous_kind == kind
+                && *previous_indent == indent
+            {
+                out[*index].children.push(key);
+            } else {
+                let list_key = format!("list:{}", block.id);
+                let mut node = Node::new(Role::List);
+                node.set_description(match kind {
+                    "ordered" => "Numbered list",
+                    "check" => "Checklist",
+                    _ => "Bullet list",
+                });
+                let index = out.len();
+                out.push(Structure {
+                    key: list_key.clone(),
+                    node,
+                    children: vec![key],
+                    block: None,
+                });
+                roots.push(list_key.clone());
+                list = Some((list_key, kind.into(), indent, index));
+            }
+        } else {
+            list = None;
+            roots.push(key);
+        }
+    }
+    roots
+}
 impl Snapshot {
     fn capture(s: &RichEditor, w: &Window) -> Self {
         let layout = s.layout.as_ref().expect("text prepaint builds layout");
@@ -201,6 +318,7 @@ impl Snapshot {
                     (
                         span_end,
                         InlineStyle::from_span(span, block.kind == "heading"),
+                        span.0.get("href").and_then(serde_json::Value::as_str),
                     )
                 })
                 .collect();
@@ -210,10 +328,10 @@ impl Snapshot {
             }
             for (offset, value) in parts {
                 let byte = start + offset;
-                let style = styles
-                    .get(styles.partition_point(|(end, _)| *end <= offset))
+                let (style, href) = styles
+                    .get(styles.partition_point(|(end, _, _)| *end <= offset))
                     .or_else(|| styles.last())
-                    .map(|(_, style)| *style)
+                    .map(|(_, style, href)| (*style, href.map(str::to_owned)))
                     .unwrap_or_default();
                 let line_index = lines.partition_point(|l| l.start <= byte).saturating_sub(1);
                 let (bounds, rtl) = if let Some(object) = objects.get(&byte) {
@@ -253,6 +371,7 @@ impl Snapshot {
                         || r.bounds.y1 != rect.y1
                         || r.rtl != rtl
                         || r.style != style
+                        || r.href != href
                         || r.offsets.len() > 255
                         || r.value.ends_with('\n')
                         || value == "\u{fffc}"
@@ -282,6 +401,7 @@ impl Snapshot {
                         positions: vec![],
                         widths: vec![],
                         words: vec![],
+                        href,
                         id: NodeId(0),
                     });
                 }
@@ -330,6 +450,8 @@ impl Snapshot {
             node.add_action(AccessibleAction::Click);
             controls.push(Control {
                 key: format!("check:{id}"),
+                block: id.clone(),
+                run: None,
                 node,
                 action: ControlAction::Check(id.clone()),
                 id: NodeId(0),
@@ -360,11 +482,32 @@ impl Snapshot {
             node.add_action(AccessibleAction::Click);
             controls.push(Control {
                 key: format!("media:{}", object.start),
+                block: s.model.position(object.start).block,
+                run: None,
                 node,
                 action: ControlAction::Media(object.start),
                 id: NodeId(0),
             });
         }
+        for (index, run) in runs.iter().enumerate() {
+            if let Some(href) = &run.href {
+                let mut node = Node::new(Role::Link);
+                node.set_label(run.value.trim_end_matches('\n'));
+                node.set_url(href.clone());
+                node.set_bounds(run.bounds);
+                node.add_action(AccessibleAction::Click);
+                controls.push(Control {
+                    key: format!("link:{}:{}", run.key.0, run.key.1),
+                    block: run.key.0.clone(),
+                    run: Some(index),
+                    node,
+                    action: ControlAction::Link(href.clone()),
+                    id: NodeId(0),
+                });
+            }
+        }
+        let mut structures = vec![];
+        let roots = document_structure(&s.model.document.blocks, &mut structures);
         Self {
             revision: s.model.revision,
             selection: s.model.selection.clone(),
@@ -372,6 +515,9 @@ impl Snapshot {
             head: s.model.global(&s.model.selection.head),
             runs,
             controls,
+            structures,
+            roots,
+            family: s.typography.font.family(),
         }
     }
 }
@@ -382,6 +528,15 @@ impl accessible_input::Snapshot for Snapshot {
         for run in &mut snapshot.runs {
             run.id = builder.synthetic_node_id(("text", &run.key));
         }
+        for control in &mut snapshot.controls {
+            control.id = builder.synthetic_node_id(&control.key);
+        }
+        let links: BTreeMap<_, _> = snapshot
+            .controls
+            .iter()
+            .filter_map(|c| c.run.map(|r| (r, c.id)))
+            .collect();
+        let mut block_children: BTreeMap<String, Vec<NodeId>> = BTreeMap::new();
         for (index, run) in snapshot.runs.iter().enumerate() {
             let mut node = Node::new(Role::TextRun);
             node.set_value(run.value.clone());
@@ -400,7 +555,7 @@ impl accessible_input::Snapshot for Snapshot {
                 TextDirection::LeftToRight
             });
             node.set_bounds(run.bounds);
-            run.style.write(&mut node, run.color);
+            run.style.write(&mut node, run.color, snapshot.family);
             let same_line =
                 |other: &&Run| other.key.0 == run.key.0 && other.bounds.y0 == run.bounds.y0;
             if let Some(previous) = index
@@ -414,11 +569,44 @@ impl accessible_input::Snapshot for Snapshot {
                 node.set_next_on_line(next.id);
             }
             builder.push_child(run.id, node);
+            block_children
+                .entry(run.key.0.clone())
+                .or_default()
+                .push(links.get(&index).copied().unwrap_or(run.id));
         }
         for control in &mut snapshot.controls {
-            control.id = builder.synthetic_node_id(&control.key);
+            if let Some(run) = control.run {
+                control.node.set_children([snapshot.runs[run].id]);
+            } else {
+                block_children
+                    .entry(control.block.clone())
+                    .or_default()
+                    .push(control.id);
+            }
             builder.push_child(control.id, control.node.clone());
         }
+        for structure in &snapshot.structures {
+            let mut node = structure.node.clone();
+            let children = if let Some(block) = &structure.block {
+                block_children.remove(block).unwrap_or_default()
+            } else {
+                structure
+                    .children
+                    .iter()
+                    .map(|key| builder.synthetic_node_id(key))
+                    .collect()
+            };
+            node.set_children(children);
+            builder.push_child(builder.synthetic_node_id(&structure.key), node);
+        }
+        // push_child registers all nodes at the input. Replace its direct child
+        // list with the document roots to form one tree without duplicate text.
+        let roots: Vec<_> = snapshot
+            .roots
+            .iter()
+            .map(|key| builder.synthetic_node_id(key))
+            .collect();
+        builder.parent_node().set_children(roots);
         builder.parent_node().set_text_selection(TextSelection {
             anchor: snapshot.position(snapshot.anchor),
             focus: snapshot.position(snapshot.head),
@@ -453,6 +641,7 @@ impl Snapshot {
                             s.move_to(*start, false, w, cx);
                             s.move_to(*start + 3, true, w, cx);
                         }
+                        ControlAction::Link(href) => s.follow_href(href, cx),
                     }
                     w.focus(&s.focus, cx);
                 });
@@ -464,6 +653,67 @@ impl Snapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[::core::prelude::v1::test]
+    fn semantic_structure_preserves_merged_cell_order_and_list_groups() {
+        let mut document =
+            Document::from_json(include_str!("../../../tests/fixtures/qt-merged-table.json"))
+                .unwrap();
+        let mut heading = Block::paragraph("A heading");
+        heading.set_kind("h2");
+        let mut bullet = Block::paragraph("First item");
+        bullet.set_kind("bullet");
+        let mut next = Block::paragraph("Second item");
+        next.set_kind("bullet");
+        let mut quote = Block::paragraph("Quoted words");
+        quote.set_kind("quote");
+        document
+            .blocks
+            .extend([heading.clone(), bullet.clone(), next.clone(), quote]);
+        let mut structures = vec![];
+        let roots = document_structure(&document.blocks, &mut structures);
+        fn visit(key: &str, structures: &[Structure], leaves: &mut Vec<String>) {
+            let node = structures.iter().find(|s| s.key == key).unwrap();
+            if let Some(block) = &node.block {
+                leaves.push(block.clone());
+            }
+            for child in &node.children {
+                visit(child, structures, leaves);
+            }
+        }
+        let mut leaves = vec![];
+        for root in &roots {
+            visit(root, &structures, &mut leaves);
+        }
+        assert_eq!(
+            leaves,
+            document
+                .leaves()
+                .iter()
+                .map(|b| b.id.clone())
+                .collect::<Vec<_>>()
+        );
+        let h = structures
+            .iter()
+            .find(|s| s.block.as_deref() == Some(&heading.id))
+            .unwrap();
+        assert_eq!(h.node.role(), Role::Heading);
+        assert_eq!(h.node.level(), Some(2));
+        assert_eq!(h.node.label(), Some("A heading"));
+        let list = structures
+            .iter()
+            .find(|s| {
+                s.node.role() == Role::List && s.children.contains(&format!("block:{}", bullet.id))
+            })
+            .unwrap();
+        assert_eq!(
+            list.children,
+            [format!("block:{}", bullet.id), format!("block:{}", next.id)]
+        );
+        assert!(structures.iter().any(|s| s.node.role() == Role::Blockquote));
+        assert!(structures.iter().any(|s| s.node.role() == Role::Table));
+        assert!(structures.iter().any(|s| s.node.role() == Role::Cell
+            && (s.node.row_span().unwrap_or(1) > 1 || s.node.column_span().unwrap_or(1) > 1)));
+    }
     #[::core::prelude::v1::test]
     fn grapheme_lengths_never_overflow_and_reassemble_exactly() {
         for text in [

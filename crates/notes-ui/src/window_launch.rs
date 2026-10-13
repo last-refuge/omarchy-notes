@@ -188,7 +188,7 @@ fn dispatch(shell: &Entity<Shell>, request: Request, cx: &mut App) {
         .selected
         .as_ref()
         .and_then(|id| shell.read(cx).live.as_ref()?.notes.get(id))
-        .is_some_and(|s| s.editor.read(cx).input_is_composing(cx));
+        .is_some_and(|s| s.input_is_composing(cx));
     if changing_note && composing {
         shell.update(cx, |s, cx| s.finish_launch(request, Err("Finish the current text composition before opening another note. Your draft is unchanged.".into()), cx));
         return;

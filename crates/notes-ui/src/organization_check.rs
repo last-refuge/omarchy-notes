@@ -193,7 +193,11 @@ pub fn organization_check(directory: &Path) -> anyhow::Result<()> {
         s.command(Command::Select(note.id.clone()), w, cx);
     })?;
     let editor = h.update(&mut cx, |s, _, _| {
-        s.live.as_ref().unwrap().notes[&note.id].editor.clone()
+        s.live.as_ref().unwrap().notes[&note.id]
+            .editor
+            .as_ref()
+            .unwrap()
+            .clone()
     })?;
     h.update(&mut cx, |_, w, cx| {
         editor.update(cx, |e, cx| {

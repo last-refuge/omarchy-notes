@@ -1,7 +1,15 @@
 # Omarchy Notes — focused Rust v1.0 release push
 
 Date: 13 October 2026  
-Status: planned; implementation has not been completed against these gates
+Status: implementation in progress; R0 checkpoint `10f392b` is backed up on the
+remote, R1 is active, and the stable release gates remain incomplete. See the
+[release evidence](rust-v1-release-evidence.md).
+
+Execution update, 13 October 2026: the owner requested focused, quick checks
+after each implementation increment and comprehensive testing on the final
+candidate. Preserve every frozen feature and stable acceptance gate below;
+carry remaining native/performance/visual matrix checks forward explicitly
+instead of delaying missing user workflows through repeated harness refinement.
 
 ## Outcome
 
@@ -30,8 +38,10 @@ workspace tests, 13 GPU workflows, native folder/editor/Quick Note checks and Qt
 storage interoperability. Those results are the starting baseline, not proof of
 v1 readiness. Real IME/Orca, full performance and release acceptance remain open.
 
-The Rust workspace is still version `0.1.0` and its implementation is uncommitted.
-The last commit is `5063e7c` (11 October 2026, installer/documentation). The Qt
+At the start of this push the Rust workspace was version `0.1.0` and its
+implementation was uncommitted, based on `5063e7c` (11 October 2026,
+installer/documentation). R0 now preserves that implementation as `10f392b`;
+the version stays a preview until the stable gates pass. The Qt
 package already uses `1.0.0`; do not overwrite its release/tag or imply that a
 smaller Rust feature set is a transparent upgrade.
 
@@ -318,8 +328,8 @@ result/artifact and unresolved defect. Use **measured**, **observed**, **failed*
 or **unverified**; a required unverified item blocks release. Keep test logs and
 shareable screenshots free of production notes and unrelated desktop content.
 
-- [ ] V1-01 — R0 checkpoint is committed, reproducible and backed up on the remote.
-- [ ] V1-02 — Scope, platform, edition identity and preview transition are fixed.
+- [x] V1-01 — R0 checkpoint is committed, reproducible and backed up on the remote.
+- [x] V1-02 — Scope, platform, edition identity and preview transition are fixed.
 - [ ] V1-03 — Existing writing/capture/media workflows and real IME/Orca pass.
 - [ ] V1-04 — Keyboard organization, FTS search and trash/recovery pass end to end.
 - [ ] V1-05 — Import/export, in-app backup/restore and library switching pass.

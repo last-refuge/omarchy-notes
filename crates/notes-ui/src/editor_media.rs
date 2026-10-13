@@ -62,7 +62,7 @@ impl RichEditor {
         if !self.media.active {
             return;
         }
-        let doc = self.model.committed().clone();
+        let doc = self.model.committed();
         let stamp = format!(
             "{:?}{:?}",
             doc.references("image"),
@@ -71,6 +71,7 @@ impl RichEditor {
         if stamp == self.media.stamp {
             return;
         }
+        let doc = doc.clone();
         self.media.stamp = stamp;
         self.media.generation += 1;
         let generation = self.media.generation;

@@ -166,6 +166,12 @@ impl Library {
                     Scope::Folder(name) => &note.folder == name,
                     Scope::FolderId(id) => &note.folder_id == id,
                 };
+                if !in_scope {
+                    return false;
+                }
+                if words.is_empty() {
+                    return true;
+                }
                 let text = format!(
                     "{} {} {}",
                     note.title,
@@ -177,7 +183,7 @@ impl Library {
                         .join(" ")
                 )
                 .to_lowercase();
-                in_scope && words.iter().all(|word| text.contains(word))
+                words.iter().all(|word| text.contains(word))
             })
             .map(|(i, _)| i)
             .collect();

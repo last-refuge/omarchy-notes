@@ -1,9 +1,14 @@
+#[cfg(feature = "performance-diagnostics")]
+#[path = "performance.rs"]
+mod performance;
 use crate::{
     search::{SearchEvent, SearchField},
     theme::{self, Appearance, Theme},
 };
 use gpui::{prelude::*, *};
 use notes_core::preview::{Block, Library, Scope};
+#[cfg(feature = "performance-diagnostics")]
+pub use performance::performance_check;
 use std::{collections::HashMap, time::Duration};
 #[path = "organization.rs"]
 mod organization;
@@ -24,8 +29,8 @@ pub(crate) use quick::QuickView;
 pub use quick::quick_note_check;
 #[cfg(feature = "visual-tests")]
 pub use writing::{
-    context_check, link_check, media_check, pdf_ui_check, quote_check, table_check, writing_check,
-    writing_tools_check,
+    bounded_editor_check, context_check, link_check, media_check, pdf_ui_check, quote_check,
+    table_check, writing_check, writing_tools_check,
 };
 
 actions!(
@@ -307,9 +312,9 @@ impl Shell {
         });
         if let Some(live) = &self.live {
             for session in live.notes.values() {
-                session
-                    .editor
-                    .update(cx, |e, cx| e.set_theme(self.theme, cx));
+                if let Some(editor) = session.active_editor() {
+                    editor.update(cx, |e, cx| e.set_theme(self.theme, cx));
+                }
             }
         }
         cx.notify();
@@ -361,8 +366,13 @@ impl Shell {
                 self.activate_selected_media(window, cx);
                 self.reading = true;
                 self.settings_open = false;
-                if let Some(session) = self.live.as_ref().and_then(|l| l.notes.get(&id)) {
-                    window.focus(&session.editor.read(cx).focus.clone(), cx);
+                if let Some(editor) = self
+                    .live
+                    .as_ref()
+                    .and_then(|l| l.notes.get(&id))
+                    .and_then(|s| s.active_editor())
+                {
+                    window.focus(&editor.read(cx).focus.clone(), cx);
                 } else {
                     window.focus(&self.focus, cx);
                 }

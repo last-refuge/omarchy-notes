@@ -1,4 +1,9 @@
 #[cfg(feature = "visual-tests")]
+#[path = "bounded_editor_check.rs"]
+mod bounded_editor_check;
+#[cfg(feature = "visual-tests")]
+pub use bounded_editor_check::bounded_editor_check;
+#[cfg(feature = "visual-tests")]
 #[path = "writing_context_check.rs"]
 mod context_check;
 #[cfg(feature = "visual-tests")]
@@ -36,14 +41,19 @@ pub use media_check::media_check;
 pub use quote_check::quote_check;
 // Per-note editing sessions and revision-guarded background persistence.
 use super::*;
-use crate::rich_editor::{Changed, InputState, LinkNote, MediaRequest, OpenNote, RichEditor};
+use crate::rich_editor::{
+    Changed, EditorViewState, InputState, LinkNote, MediaRequest, OpenNote, RichEditor,
+};
 use notes_core::document::Document;
 use notes_storage::{Event, Folder, Note, Request, SaveError, Worker};
 use std::{path::PathBuf, time::Instant};
 
 pub(super) struct Session {
     pub note: Note,
-    pub editor: Entity<RichEditor>,
+    pub editor: Option<Entity<RichEditor>>,
+    view_state: Option<EditorViewState>,
+    last_opened: u64,
+    model_revision: u64,
     pub(super) revision: u64,
     pub(super) saved: u64,
     pub(super) pending: Option<(u64, u64)>,
@@ -53,6 +63,41 @@ pub(super) struct Session {
     pub(super) needs_upgrade: bool,
     pub(super) owner: AnyWindowHandle,
     _subscriptions: Vec<Subscription>,
+}
+
+// Keep four recently visited clean editors, plus visible and unsafe sessions.
+// This bounds cross-note undo retention without discarding any unsaved model.
+const IDLE_EDITOR_LIMIT: usize = 4;
+impl Session {
+    pub(super) fn active_editor(&self) -> Option<&Entity<RichEditor>> {
+        self.editor.as_ref()
+    }
+    pub(super) fn input_is_composing(&self, cx: &App) -> bool {
+        self.active_editor()
+            .is_some_and(|e| e.read(cx).input_is_composing(cx))
+    }
+    pub(super) fn has_pending_work(&self, cx: &App) -> bool {
+        self.active_editor()
+            .is_some_and(|e| e.read(cx).has_pending_work())
+    }
+    /// Editor events settle after an entity update; until then the stored draft
+    /// and its local revision are not a valid snapshot of the editor model.
+    pub(super) fn has_unobserved_edit(&self, cx: &App) -> bool {
+        self.active_editor()
+            .is_some_and(|e| e.read(cx).model.revision != self.model_revision)
+    }
+    fn safe_to_evict(&self, cx: &App) -> bool {
+        self.revision == self.saved
+            && self.pending.is_none()
+            && self.error.is_none()
+            && !self.needs_upgrade
+            && !self.input_is_composing(cx)
+            && !self.has_pending_work(cx)
+            && !self.has_unobserved_edit(cx)
+            && self
+                .active_editor()
+                .is_some_and(|e| e.read(cx).error.is_none())
+    }
 }
 
 /// Real GPU rendering and routed keyboard input against a disposable SQLite library.
@@ -164,7 +209,7 @@ pub fn writing_check(directory: &std::path::Path) -> anyhow::Result<()> {
     let first = handle.update(&mut cx, |s, _, cx| {
         let id = s.library.selected.clone().unwrap();
         let session = &s.live.as_ref().unwrap().notes[&id];
-        let model = &session.editor.read(cx).model;
+        let model = &session.editor.as_ref().unwrap().read(cx).model;
         assert_eq!(model.document.blocks.len(), 4);
         assert_eq!(model.document.blocks[0].kind, "heading");
         assert!(
@@ -185,7 +230,11 @@ pub fn writing_check(directory: &std::path::Path) -> anyhow::Result<()> {
     })?;
     // Platform composition must not create a paragraph or acknowledge pre-edit text.
     handle.update(&mut cx, |s, w, cx| {
-        let editor = s.live.as_ref().unwrap().notes[&first].editor.clone();
+        let editor = s.live.as_ref().unwrap().notes[&first]
+            .editor
+            .as_ref()
+            .unwrap()
+            .clone();
         editor.update(cx, |e, cx| {
             e.replace_and_mark_text_in_range(None, "日本", Some(2..2), w, cx)
         });
@@ -194,7 +243,11 @@ pub fn writing_check(directory: &std::path::Path) -> anyhow::Result<()> {
     super::visual_keys(&mut cx, handle.into(), "enter")?;
     handle.update(&mut cx, |s, w, cx| {
         assert_eq!(s.real_status(&first, cx), "Composing…");
-        let editor = s.live.as_ref().unwrap().notes[&first].editor.clone();
+        let editor = s.live.as_ref().unwrap().notes[&first]
+            .editor
+            .as_ref()
+            .unwrap()
+            .clone();
         editor.update(cx, |e, cx| {
             assert_eq!(e.model.document.blocks.len(), 4);
             assert!(!e.model.committed().plain_text().contains("日本"));
@@ -208,6 +261,8 @@ pub fn writing_check(directory: &std::path::Path) -> anyhow::Result<()> {
     let copied = handle.update(&mut cx, |s, _, cx| {
         s.live.as_ref().unwrap().notes[&first]
             .editor
+            .as_ref()
+            .unwrap()
             .read(cx)
             .model
             .document
@@ -215,7 +270,12 @@ pub fn writing_check(directory: &std::path::Path) -> anyhow::Result<()> {
     })?;
     super::visual_keys(&mut cx, handle.into(), "end ctrl-v")?;
     handle.update(&mut cx, |s, _, cx| {
-        let model = &s.live.as_ref().unwrap().notes[&first].editor.read(cx).model;
+        let model = &s.live.as_ref().unwrap().notes[&first]
+            .editor
+            .as_ref()
+            .unwrap()
+            .read(cx)
+            .model;
         assert!(model.document.blocks.len() > copied.blocks.len());
         model.document.validate().unwrap();
     })?;
@@ -388,7 +448,11 @@ pub fn writing_check(directory: &std::path::Path) -> anyhow::Result<()> {
         })?;
         handle.update(&mut cx, |s, w, cx| {
             s.command(Command::Select(id.clone()), w, cx);
-            let editor = s.live.as_ref().unwrap().notes[&id].editor.clone();
+            let editor = s.live.as_ref().unwrap().notes[&id]
+                .editor
+                .as_ref()
+                .unwrap()
+                .clone();
             editor.update(cx, |e, cx| {
                 e.edit(
                     |e| {
@@ -428,7 +492,18 @@ pub fn writing_check(directory: &std::path::Path) -> anyhow::Result<()> {
     );
     Ok(())
 }
+#[cfg(feature = "performance-diagnostics")]
+#[derive(Default)]
+pub(super) struct DerivedTimings {
+    pub changed_calls: u64,
+    pub changed_ns: u64,
+    pub snapshot_ns: u64,
+    pub row_ns: u64,
+    pub catalog_ns: u64,
+}
 pub(super) struct Writing {
+    #[cfg(feature = "performance-diagnostics")]
+    pub derived_timings: DerivedTimings,
     pub schema: u32,
     pub(super) upgrade: upgrade::State,
     pub notes: HashMap<String, Session>,
@@ -443,6 +518,7 @@ pub(super) struct Writing {
     exported: Option<HashMap<String, u64>>,
     pub(super) pdf: pdf::State,
     link_history: Vec<String>,
+    editor_clock: u64,
 }
 impl Shell {
     pub fn new_live(
@@ -453,6 +529,17 @@ impl Shell {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        Self::new_live_window(appearance, _root, worker, library, true, window, cx)
+    }
+    pub(super) fn new_live_window(
+        appearance: Appearance,
+        _root: PathBuf,
+        worker: Worker,
+        library: notes_storage::Library,
+        main: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
         crate::rich_editor::bind_keys(cx);
         let mut s = Self::new(appearance, window, cx);
         s.library.notes.clear();
@@ -460,6 +547,8 @@ impl Shell {
         s.library.refresh();
         s.list.reset(0);
         s.live = Some(Writing {
+            #[cfg(feature = "performance-diagnostics")]
+            derived_timings: DerivedTimings::default(),
             schema: library.schema,
             upgrade: upgrade::State::default(),
             notes: HashMap::new(),
@@ -474,6 +563,7 @@ impl Shell {
             exported: None,
             pdf: pdf::State::default(),
             link_history: vec![],
+            editor_clock: 0,
         });
         s.refresh_folder_rows();
         for note in library.notes {
@@ -481,8 +571,11 @@ impl Shell {
         }
         s.refresh_real_library(cx);
         s.library.selected = s.library.notes.first().map(|n| n.id.clone());
-        s.activate_selected_media(window, cx);
-        s.bind_main(window, cx);
+        if main {
+            s.bind_main(window, cx);
+        } else {
+            s.windows.main = None;
+        }
         let task = cx.spawn(async move |this, cx| {
             loop {
                 cx.background_executor()
@@ -508,35 +601,16 @@ impl Shell {
         s._write_task = Some(task);
         s
     }
-    pub(super) fn attach_note(&mut self, note: Note, window: &mut Window, cx: &mut Context<Self>) {
-        let live = self.live.as_mut().unwrap();
-        let id = note.id.clone();
-        let library_id = live.root.to_string_lossy().to_string();
-        let editor =
-            cx.new(|cx| RichEditor::new(note.body.clone(), self.theme, library_id, window, cx));
-        let typography = crate::rich_editor::WritingStyle {
-            font: self.preferences.session.value.note_font,
-            size: self.preferences.session.value.note_size,
-        };
-        editor.update(cx, |e, cx| e.set_typography(typography, cx));
-        let media_id = id.clone();
-        let media_subscription = cx.subscribe(&editor, move |s, _, event: &MediaRequest, cx| {
-            s.request_media(&media_id, event, cx);
-        });
-        let link_source = id.clone();
-        let link_subscription = cx.subscribe(&editor, move |s, _, event: &OpenNote, cx| {
-            s.route_note_link(&link_source, &event.0, cx);
-        });
-        let changed = cx.subscribe(&editor, move |s, _, _: &Changed, cx| {
-            s.real_note_changed(&id, cx)
-        });
-        let input = cx.subscribe(&editor, |_, _, _: &InputState, cx| cx.notify());
+    pub(super) fn attach_note(&mut self, note: Note, window: &mut Window, _: &mut Context<Self>) {
         let now = Instant::now();
-        live.notes.insert(
+        self.live.as_mut().unwrap().notes.insert(
             note.id.clone(),
             Session {
                 note,
-                editor,
+                editor: None,
+                view_state: None,
+                last_opened: 0,
+                model_revision: 0,
                 revision: 0,
                 saved: 0,
                 pending: None,
@@ -545,11 +619,86 @@ impl Shell {
                 error: None,
                 needs_upgrade: false,
                 owner: window.window_handle(),
-                _subscriptions: vec![media_subscription, link_subscription, changed, input],
+                _subscriptions: vec![],
             },
         );
     }
+    /// Ensure an editor before selecting, focusing or rendering it, never in render.
+    pub(super) fn ensure_editor(
+        &mut self,
+        id: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<Entity<RichEditor>> {
+        let live = self.live.as_mut()?;
+        live.editor_clock += 1;
+        let session = live.notes.get_mut(id)?;
+        session.last_opened = live.editor_clock;
+        if let Some(editor) = &session.editor {
+            return Some(editor.clone());
+        }
+        let library_id = live.root.to_string_lossy().to_string();
+        let body = session.note.body.clone();
+        let state = session.view_state.take();
+        let editor = cx.new(|cx| RichEditor::new(body, self.theme, library_id, window, cx));
+        let typography = crate::rich_editor::WritingStyle {
+            font: self.preferences.session.value.note_font,
+            size: self.preferences.session.value.note_size,
+        };
+        editor.update(cx, |e, cx| {
+            e.set_typography(typography, cx);
+            if let Some(state) = state {
+                e.restore_view_state(state, cx);
+            }
+        });
+        let media_id = id.to_string();
+        let media_subscription = cx.subscribe(&editor, move |s, _, event: &MediaRequest, cx| {
+            s.request_media(&media_id, event, cx);
+        });
+        let link_source = id.to_string();
+        let link_subscription = cx.subscribe(&editor, move |s, _, event: &OpenNote, cx| {
+            s.route_note_link(&link_source, &event.0, cx);
+        });
+        let changed_id = id.to_string();
+        let changed = cx.subscribe(&editor, move |s, _, _: &Changed, cx| {
+            s.real_note_changed(&changed_id, cx)
+        });
+        let input = cx.subscribe(&editor, |_, _, _: &InputState, cx| cx.notify());
+        let session = self.live.as_mut()?.notes.get_mut(id)?;
+        session.owner = window.window_handle();
+        session.model_revision = 0;
+        session.editor = Some(editor.clone());
+        session._subscriptions = vec![media_subscription, link_subscription, changed, input];
+        Some(editor)
+    }
+    pub(super) fn trim_idle_editors(&mut self, cx: &mut Context<Self>) {
+        let Some(live) = &mut self.live else {
+            return;
+        };
+        let main = self.windows.main.and(self.library.selected.as_deref());
+        let quick = self.windows.quick.as_ref().map(|q| q.1.as_str());
+        let mut idle: Vec<_> = live
+            .notes
+            .iter()
+            .filter(|(id, s)| {
+                Some(id.as_str()) != main && Some(id.as_str()) != quick && s.safe_to_evict(cx)
+            })
+            .map(|(id, s)| (s.last_opened, id.clone()))
+            .collect();
+        idle.sort();
+        let evict = idle.len().saturating_sub(IDLE_EDITOR_LIMIT);
+        for (_, id) in idle.into_iter().take(evict) {
+            let session = live.notes.get_mut(&id).unwrap();
+            if let Some(editor) = session.editor.take() {
+                session.view_state = Some(editor.read(cx).view_state());
+                editor.update(cx, |e, cx| e.deactivate_media(cx));
+                session._subscriptions.clear();
+            }
+        }
+    }
     pub(super) fn sync_link_catalog(&mut self, cx: &mut Context<Self>) {
+        #[cfg(feature = "performance-diagnostics")]
+        let started = Instant::now();
         let catalog: std::sync::Arc<[LinkNote]> = self
             .library
             .notes
@@ -569,10 +718,14 @@ impl Shell {
                 .live
                 .as_ref()
                 .and_then(|l| l.notes.get(&id))
-                .map(|s| s.editor.clone())
+                .and_then(|s| s.active_editor().cloned())
             {
                 editor.update(cx, |s, cx| s.set_link_catalog(id, catalog.clone(), cx));
             }
+        }
+        #[cfg(feature = "performance-diagnostics")]
+        if let Some(live) = &mut self.live {
+            live.derived_timings.catalog_ns += started.elapsed().as_nanos() as u64;
         }
     }
     pub(super) fn follow_note_link(
@@ -591,8 +744,8 @@ impl Shell {
             return;
         };
         if !live.notes.contains_key(target) {
-            if let Some(session) = live.notes.get(source) {
-                session.editor.update(cx, |s,cx| {s.error=Some("This note isn’t available in this library. It may have been deleted or belong to another notebook. You can edit or remove the link.".into());cx.notify();});
+            if let Some(editor) = live.notes.get(source).and_then(Session::active_editor) {
+                editor.update(cx, |s,cx| {s.error=Some("This note isn’t available in this library. It may have been deleted or belong to another notebook. You can edit or remove the link.".into());cx.notify();});
             }
             return;
         }
@@ -616,27 +769,38 @@ impl Shell {
         }
     }
     pub(super) fn activate_selected_media(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(id) = self.library.selected.clone()
+            && self.windows.quick.as_ref().is_none_or(|q| q.1 != id)
+        {
+            self.ensure_editor(&id, window, cx);
+        }
         self.sync_link_catalog(cx);
         if let Some(live) = &mut self.live {
             for (id, s) in &mut live.notes {
                 if self.windows.quick.as_ref().is_some_and(|q| &q.1 == id) {
                     continue;
                 }
+                let Some(editor) = s.active_editor().cloned() else {
+                    continue;
+                };
                 if Some(id) == self.library.selected.as_ref() {
                     if s.owner != window.window_handle() {
-                        if !s.editor.update(cx, |e, cx| e.rebind_window(window, cx)) {
+                        if !editor.update(cx, |e, cx| e.rebind_window(window, cx)) {
                             continue;
                         }
                         s.owner = window.window_handle();
                     }
-                    s.editor.update(cx, |e, cx| e.activate_media(window, cx));
+                    editor.update(cx, |e, cx| e.activate_media(window, cx));
                 } else {
-                    s.editor.update(cx, |e, cx| e.deactivate_media(cx));
+                    editor.update(cx, |e, cx| e.deactivate_media(cx));
                 }
             }
         }
+        self.trim_idle_editors(cx);
     }
     fn real_note_changed(&mut self, id: &str, cx: &mut Context<Self>) {
+        #[cfg(feature = "performance-diagnostics")]
+        let changed_started = Instant::now();
         if self.windows.quick.as_ref().is_some_and(|q| q.1 == id) {
             self.windows.cancel_quick_close();
         }
@@ -648,7 +812,19 @@ impl Shell {
             }
             s.revision += 1;
             s.last_edit = Instant::now();
-            s.note.body = s.editor.read(cx).model.committed().clone();
+            if let Some(editor) = s.active_editor() {
+                #[cfg(feature = "performance-diagnostics")]
+                let snapshot_started = Instant::now();
+                let model = &editor.read(cx).model;
+                let revision = model.revision;
+                s.note.body.clone_from(model.committed());
+                s.model_revision = revision;
+                #[cfg(feature = "performance-diagnostics")]
+                {
+                    live.derived_timings.snapshot_ns +=
+                        snapshot_started.elapsed().as_nanos() as u64;
+                }
+            }
             if s.needs_upgrade && s.note.body.schema == 1 {
                 s.needs_upgrade = false;
                 s.error = None;
@@ -660,7 +836,12 @@ impl Shell {
             }
             live.closing = false;
         }
-        self.refresh_real_library(cx);
+        self.refresh_real_note(id, false, cx);
+        #[cfg(feature = "performance-diagnostics")]
+        if let Some(live) = &mut self.live {
+            live.derived_timings.changed_calls += 1;
+            live.derived_timings.changed_ns += changed_started.elapsed().as_nanos() as u64;
+        }
         cx.notify();
     }
     pub(super) fn pin_real_note(&mut self, cx: &mut Context<Self>) {
@@ -732,6 +913,126 @@ impl Shell {
         self.sync_link_catalog(cx);
         cx.notify();
     }
+    /// A keystroke changes one note's derived row, not the entire notebook.
+    /// Keep the list's measured rows and reading anchor when its order is stable.
+    fn refresh_real_note(&mut self, id: &str, reorder: bool, cx: &mut Context<Self>) {
+        #[cfg(feature = "performance-diagnostics")]
+        let row_started = Instant::now();
+        let Some(session) = self.live.as_ref().and_then(|l| l.notes.get(id)) else {
+            return;
+        };
+        if session.note.revision == 0 && session.revision == 0 {
+            return;
+        }
+        let title = session.note.body.title();
+        let row = notes_core::preview::Note {
+            id: id.to_owned(),
+            title: if title.is_empty() {
+                "Untitled note".into()
+            } else {
+                title
+            },
+            summary: session.note.body.snippet(),
+            folder: session
+                .note
+                .folder
+                .as_ref()
+                .and_then(|folder| self.organization.paths.get(folder))
+                .map_or("Notes", String::as_str)
+                .into(),
+            folder_id: session.note.folder.clone(),
+            day: "Your notes".into(),
+            time: if session.revision != session.saved {
+                "Unsaved".into()
+            } else {
+                String::new()
+            },
+            pinned: session.note.pinned,
+            blocks: vec![Block::Paragraph {
+                text: session.note.body.plain_text(),
+            }],
+            related: None,
+        };
+        let previous = self.library.visible.clone();
+        // A batch applies all commit dates before refreshing individual rows.
+        // Sorting for an unchanged pinned row can reorder other rows, so their
+        // identities (not only this row's index) determine whether to reset.
+        let previous_order = reorder.then(|| {
+            previous
+                .iter()
+                .map(|&index| self.library.notes[index].id.clone())
+                .collect::<Vec<_>>()
+        });
+        let offset = self.list.logical_scroll_top();
+        let anchor = previous
+            .get(offset.item_ix)
+            .map(|&i| self.library.notes[i].id.clone());
+        let previous_position = self.library.notes.iter().position(|n| n.id == id);
+        let catalog_changed =
+            if let Some(existing) = self.library.notes.iter_mut().find(|n| n.id == id) {
+                let changed = existing.title != row.title || existing.folder != row.folder;
+                *existing = row;
+                changed
+            } else {
+                self.library.notes.push(row);
+                true
+            };
+        if reorder {
+            let live = self.live.as_ref().unwrap();
+            self.library.notes.sort_by(|a, b| {
+                b.pinned
+                    .cmp(&a.pinned)
+                    .then_with(|| {
+                        live.notes
+                            .get(&b.id)
+                            .map(|s| s.note.updated_at)
+                            .cmp(&live.notes.get(&a.id).map(|s| s.note.updated_at))
+                    })
+                    .then(a.id.cmp(&b.id))
+            });
+        }
+        let mut ordering_changed =
+            previous_position != self.library.notes.iter().position(|n| n.id == id);
+        self.library.refresh();
+        ordering_changed |= previous_order.is_some_and(|order| {
+            !order.iter().map(String::as_str).eq(self
+                .library
+                .visible
+                .iter()
+                .map(|&index| self.library.notes[index].id.as_str()))
+        });
+        if !ordering_changed && previous == self.library.visible {
+            if let Some(index) = self
+                .library
+                .visible
+                .iter()
+                .position(|&i| self.library.notes[i].id == id)
+            {
+                self.list.remeasure_items(index..index + 1);
+            }
+        } else {
+            self.list.reset(self.library.visible.len());
+            if let Some(anchor) = anchor
+                && let Some(index) = self
+                    .library
+                    .visible
+                    .iter()
+                    .position(|&i| self.library.notes[i].id == anchor)
+            {
+                self.list.scroll_to(ListOffset {
+                    item_ix: index,
+                    offset_in_item: offset.offset_in_item,
+                });
+            }
+        }
+        if catalog_changed {
+            self.sync_link_catalog(cx);
+        }
+        #[cfg(feature = "performance-diagnostics")]
+        if let Some(live) = &mut self.live {
+            live.derived_timings.row_ns += row_started.elapsed().as_nanos() as u64;
+        }
+    }
     pub(super) fn create_real_note(
         &mut self,
         recover: bool,
@@ -753,7 +1054,12 @@ impl Shell {
             let Some(s) = live.notes.get(id) else {
                 return;
             };
-            if s.editor.read(cx).model.marked.is_some() || s.editor.read(cx).has_pending_work() {
+            if s.has_unobserved_edit(cx) {
+                live.message = Some("Your latest edit is still being prepared. Try saving a copy again in a moment; your draft is retained.".into());
+                cx.notify();
+                return;
+            }
+            if s.input_is_composing(cx) || s.has_pending_work(cx) {
                 live.message = Some(
                     "Finish the current insertion or text composition before saving a copy.".into(),
                 );
@@ -829,9 +1135,9 @@ impl Shell {
                 .filter(|s| Some(s.note.id.as_str()) != quick_id)
                 .any(|s| {
                     s.revision != s.saved
+                        || s.has_unobserved_edit(cx)
                         || s.pending.is_some()
-                        || (s.editor.read(cx).model.marked.is_some()
-                            || s.editor.read(cx).has_pending_work())
+                        || (s.input_is_composing(cx) || s.has_pending_work(cx))
                 });
         if !pending {
             self.remove_main(window, cx);
@@ -862,6 +1168,18 @@ impl Shell {
         };
         let events: Vec<_> = live.worker.events.try_iter().collect();
         let changed = !events.is_empty();
+        let only_note_updates = changed
+            && events
+                .iter()
+                .all(|e| matches!(e, Event::Saved { .. } | Event::Captured { .. }));
+        let saved_rows: Vec<_> = events
+            .iter()
+            .filter_map(|e| match e {
+                Event::Saved { id, .. } => Some(id.clone()),
+                Event::Captured { note } => Some(note.id.clone()),
+                _ => None,
+            })
+            .collect();
         for event in events {
             match event {
                 Event::Organized { operation, result } => {
@@ -871,7 +1189,6 @@ impl Shell {
                     // A background capture must not steal focus, selection or an
                     // existing draft. Only newly committed notes arrive here.
                     self.attach_note(note, window, cx);
-                    self.refresh_real_library(cx);
                 }
                 Event::UpgradeProgress {
                     operation,
@@ -930,7 +1247,9 @@ impl Shell {
                             Err(SaveError::Failed(error))=>s.error=Some(format!("Couldn’t save. Your changes are still here. {error}")),
                         }
                         if s.error.is_some() {
-                            s.editor.update(cx, |e, cx| e.reveal_caret(cx));
+                            if let Some(editor) = s.active_editor() {
+                                editor.update(cx, |e, cx| e.reveal_caret(cx));
+                            }
                             live.closing = false;
                             live.message=Some("Some changes need attention. Retry saving or export your drafts before closing.".into());
                         }
@@ -962,8 +1281,8 @@ impl Shell {
                             if let Some((source, revision)) = source
                                 && live.notes.get(&source).is_some_and(|s| {
                                     s.revision == revision
-                                        && (s.editor.read(cx).model.marked.is_none()
-                                            && !s.editor.read(cx).has_pending_work())
+                                        && !s.has_unobserved_edit(cx)
+                                        && (!s.input_is_composing(cx) && !s.has_pending_work(cx))
                                 })
                             {
                                 live.notes.remove(&source);
@@ -976,9 +1295,12 @@ impl Shell {
                             self.reading = true;
                             self.settings_open = false;
                             self.folders_open = false;
-                            let editor = &self.live.as_ref().unwrap().notes[&id].editor;
-                            window.focus(&editor.read(cx).focus.clone(), cx);
                             self.activate_selected_media(window, cx);
+                            if let Some(editor) =
+                                self.live.as_ref().unwrap().notes[&id].active_editor()
+                            {
+                                window.focus(&editor.read(cx).focus.clone(), cx);
+                            }
                         }
                         Err(error) => {
                             live.closing = false;
@@ -995,8 +1317,8 @@ impl Shell {
             if s.revision == s.saved
                 || s.pending.is_some()
                 || s.error.is_some()
-                || (s.editor.read(cx).model.marked.is_some()
-                    || s.editor.read(cx).has_pending_work())
+                || s.has_unobserved_edit(cx)
+                || (s.input_is_composing(cx) || s.has_pending_work(cx))
             {
                 continue;
             }
@@ -1039,16 +1361,21 @@ impl Shell {
                 .filter(|s| self.windows.quick.as_ref().is_none_or(|q| q.1 != s.note.id))
                 .all(|s| {
                     s.revision == s.saved
+                        && !s.has_unobserved_edit(cx)
                         && s.pending.is_none()
-                        && (s.editor.read(cx).model.marked.is_none()
-                            && !s.editor.read(cx).has_pending_work())
+                        && (!s.input_is_composing(cx) && !s.has_pending_work(cx))
                 })
         {
             self.remove_main(window, cx);
             return;
         }
         self.finish_quick_close(cx);
-        if changed {
+        self.trim_idle_editors(cx);
+        if only_note_updates {
+            for id in saved_rows {
+                self.refresh_real_note(&id, true, cx);
+            }
+        } else if changed {
             self.refresh_real_library(cx);
         }
         if changed || submitted {
@@ -1058,20 +1385,27 @@ impl Shell {
     pub(super) fn real_status(&self, id: &str, cx: &App) -> String {
         let live = self.live.as_ref().unwrap();
         let s = &live.notes[id];
-        if s.editor.read(cx).has_pending_work() {
+        let status = if s.has_pending_work(cx) {
             "Preparing selection…".into()
-        } else if s.editor.read(cx).model.marked.is_some() {
+        } else if s.input_is_composing(cx) {
             "Composing…".into()
         } else if s.error.is_some() {
             "Not saved · draft retained".into()
         } else if s.pending.is_some() {
             "Saving…".into()
-        } else if s.saved != s.revision {
+        } else if s.saved != s.revision || s.has_unobserved_edit(cx) {
             "Unsaved changes".into()
         } else if s.note.revision == 0 {
             "Ready when you are".into()
         } else {
             "Saved on this device".into()
+        };
+        if s.active_editor()
+            .is_some_and(|e| e.read(cx).model.history_usage().limit_reached)
+        {
+            format!("{status} · Undo keeps recent edits within 32 MiB")
+        } else {
+            status
         }
     }
     pub(super) fn real_editor(&self, narrow: bool, height: f32, cx: &mut Context<Self>) -> Div {
@@ -1318,7 +1652,7 @@ impl Shell {
                 .flex_1()
                 .min_h_0()
                 .overflow_hidden()
-                .child(session.editor.clone())
+                .children(session.active_editor().cloned())
                 .when(live.upgrade.open && height < 620., |d| d.hidden()),
         )
         .child(
@@ -1357,8 +1691,8 @@ impl Shell {
                 && l.creating.is_none()
                 && l.notes.values().all(|s| {
                     s.pending.is_none()
-                        && (s.editor.read(cx).model.marked.is_none()
-                            && !s.editor.read(cx).has_pending_work())
+                        && !s.has_unobserved_edit(cx)
+                        && (!s.input_is_composing(cx) && !s.has_pending_work(cx))
                         && (s.saved == s.revision
                             || l.exported
                                 .as_ref()
@@ -1373,9 +1707,16 @@ impl Shell {
         if live.exporting.is_some() {
             return;
         }
-        if live.notes.values().any(|s| {
-            s.editor.read(cx).model.marked.is_some() || s.editor.read(cx).has_pending_work()
-        }) {
+        if live.notes.values().any(|s| s.has_unobserved_edit(cx)) {
+            live.message = Some("Your latest edit is still being prepared. Try exporting again in a moment; your draft is retained.".into());
+            cx.notify();
+            return;
+        }
+        if live
+            .notes
+            .values()
+            .any(|s| s.input_is_composing(cx) || s.has_pending_work(cx))
+        {
             live.message = Some(
                 "Finish the current insertion or text composition before exporting your drafts."
                     .into(),

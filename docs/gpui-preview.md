@@ -44,7 +44,10 @@ Click **+**, choose **Create a note**, or press **Ctrl+N**. The first line start
 as a title; Return moves into body text. Notes autosave after a short pause
 (700 ms, with a 3-second maximum batching interval). **Saved on this device**
 appears only after SQLite commits the current revision. Ctrl+S flushes pending
-edits. Changing notes preserves each note's undo history for this session.
+edits. The current main and Quick Note editors, all unsaved or busy editors, and
+four recently visited saved editors retain undo history. Older saved editors
+leave this cache; reopening them preserves their caret, selection and reading
+offset, but starts a fresh undo history. No unsaved work is evicted.
 
 The initial appearance follows supported Omarchy `colors.toml` settings. **Settings**
 or **Ctrl+,** remembers your palette, writing font/size, pane widths, focus mode
@@ -78,6 +81,7 @@ are bundled.
 | Ctrl+Enter / Ctrl+Shift+E | Open the current link or selected media / save selected media |
 | Ctrl+Shift+K / Ctrl+L | Add or edit an address / choose a note to link |
 | Arrows, Shift+arrows, Home/End | Move/select through wrapped text |
+| Ctrl+Home/End, Ctrl+Shift+Home/End | Move/select to the start or end of the note |
 | Ctrl+K / Ctrl+Shift+F | Focus library search |
 | Ctrl+F / F3 / Shift+F3 | Find in note / next match / previous match |
 | Enter in search | Open the selected result and focus its editor |

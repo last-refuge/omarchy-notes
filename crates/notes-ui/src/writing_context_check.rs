@@ -74,7 +74,11 @@ pub fn context_check(directory: &std::path::Path) -> anyhow::Result<()> {
         })?;
         let editor = h.update(&mut cx, |s, w, cx| {
             s.command(Command::Select(source.id.clone()), w, cx);
-            s.live.as_ref().unwrap().notes[&source.id].editor.clone()
+            s.live.as_ref().unwrap().notes[&source.id]
+                .editor
+                .as_ref()
+                .unwrap()
+                .clone()
         })?;
         h.update(&mut cx, |_, w, cx| {
             editor.update(cx, |s, cx| {
@@ -266,7 +270,11 @@ pub fn context_check(directory: &std::path::Path) -> anyhow::Result<()> {
     })?;
     let editor = h.update(&mut cx, |s, w, cx| {
         s.command(Command::Select(large.id.clone()), w, cx);
-        s.live.as_ref().unwrap().notes[&large.id].editor.clone()
+        s.live.as_ref().unwrap().notes[&large.id]
+            .editor
+            .as_ref()
+            .unwrap()
+            .clone()
     })?;
     super::super::visual_keys(&mut cx, h.into(), "ctrl-shift-r up")?;
     draw(&mut cx, h)?;
