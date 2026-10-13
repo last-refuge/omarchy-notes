@@ -4,6 +4,9 @@ use anyhow::{Result, ensure};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, HashSet};
+#[path = "document_snapshot.rs"]
+mod snapshot;
+pub use snapshot::{DocumentSnapshot, SpanSnapshot};
 
 pub fn new_id() -> String {
     uuid::Uuid::new_v4().to_string()

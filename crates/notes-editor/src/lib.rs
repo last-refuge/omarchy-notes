@@ -1,7 +1,9 @@
 //! Framework-free rich editing. Selection is addressed by stable block identity.
 use anyhow::{Context, Result, bail, ensure};
 mod find;
+mod history;
 mod links;
+pub use history::{HistoryUsage, MAX_HISTORY_BYTES, MAX_HISTORY_STEPS};
 pub use links::Link;
 #[cfg(test)]
 mod format_tests;
@@ -38,8 +40,7 @@ pub struct Editor {
     pub revision: u64,
     pub marked: Option<Range<usize>>,
     typing: Span,
-    undo: Vec<Snapshot>,
-    redo: Vec<Snapshot>,
+    history: history::History,
     composition: Option<Snapshot>,
     last_typing: Option<(u64, usize)>,
 }
@@ -62,8 +63,7 @@ impl Editor {
             revision: 0,
             marked: None,
             typing: Span::text(""),
-            undo: vec![],
-            redo: vec![],
+            history: history::History::default(),
             composition: None,
             last_typing: None,
         }
@@ -107,13 +107,9 @@ impl Editor {
         if self.document == before.document {
             return;
         }
-        if !coalesce {
-            self.undo.push(before);
-            if self.undo.len() > 100 {
-                self.undo.remove(0);
-            }
+        if !self.history.record(before, coalesce) {
+            self.last_typing = None;
         }
-        self.redo.clear();
         self.revision += 1;
     }
     pub fn committed(&self) -> &Document {
@@ -548,8 +544,9 @@ impl Editor {
             self.cancel_composition();
             return;
         }
-        if let Some(s) = self.undo.pop() {
-            self.redo.push(self.snapshot());
+        if self.history.can_undo()
+            && let Some(s) = self.history.undo(self.snapshot())
+        {
             self.restore(s);
             self.revision += 1;
             self.last_typing = None;
@@ -559,12 +556,22 @@ impl Editor {
         if self.marked.is_some() {
             return;
         }
-        if let Some(s) = self.redo.pop() {
-            self.undo.push(self.snapshot());
+        if self.history.can_redo()
+            && let Some(s) = self.history.redo(self.snapshot())
+        {
             self.restore(s);
             self.revision += 1;
             self.last_typing = None;
         }
+    }
+    pub fn can_undo(&self) -> bool {
+        self.composition.is_some() || self.history.can_undo()
+    }
+    pub fn can_redo(&self) -> bool {
+        self.marked.is_none() && self.history.can_redo()
+    }
+    pub fn history_usage(&self) -> HistoryUsage {
+        self.history.usage()
     }
     pub fn input(
         &mut self,
