@@ -1,0 +1,13 @@
+{
+  "fixture": "Qt sample library, not the application backup format",
+  "database_schema": 2,
+  "document_schema": 1,
+  "notes": 3,
+  "blobs": 2,
+  "files": {
+    "blobs/bd/bdec1de53e3c856d6973c7324a5d719d6f6169e01a6f75ae3b4453f419d625e2": "bdec1de53e3c856d6973c7324a5d719d6f6169e01a6f75ae3b4453f419d625e2",
+    "blobs/d7/d7449961543b028f75a5778a6cbcfb8d3b7ea2dfe66da1efc60d9747f4fc4803": "d7449961543b028f75a5778a6cbcfb8d3b7ea2dfe66da1efc60d9747f4fc4803",
+    "documents.json": "0ce5bdf3e84135b0d65f1d5b5d61ab3afd999726f5e11d2a30aea41173d7ce82",
+    "library.sqlite3": "36fc27e865dd62771eb30f6a94742ced6725f7ccf85505f4931034b14ba0cbc0"
+  }
+}

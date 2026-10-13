@@ -1,0 +1,111 @@
+[package]
+name = "notes-ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+visual-tests = ["gpui/test-support", "gpui_platform/test-support", "dep:tempfile"]
+performance-diagnostics = ["visual-tests", "gpui/profiler"]
+
+[[example]]
+name = "performance-check"
+required-features = ["performance-diagnostics"]
+
+[[example]]
+name = "bounded-editor-check"
+required-features = ["visual-tests"]
+
+[[example]]
+name = "layout-cache-check"
+required-features = ["visual-tests"]
+
+[[example]]
+name = "settings-check"
+required-features = ["visual-tests"]
+
+[[example]]
+name = "window-launch-check"
+required-features = ["visual-tests"]
+
+[[example]]
+name = "quick-note-check"
+required-features = ["visual-tests"]
+
+[[example]]
+name = "visual-check"
+required-features = ["visual-tests"]
+
+[[example]]
+name = "writing-check"
+required-features = ["visual-tests"]
+
+[dependencies]
+anyhow.workspace = true
+gpui.workspace = true
+gpui_platform.workspace = true
+log.workspace = true
+raw-window-handle = "0.6"
+notes-core = { path = "../notes-core" }
+notes-editor = { path = "../notes-editor" }
+notes-storage = { path = "../notes-storage" }
+notes-platform = { path = "../notes-platform" }
+notes-export = { path = "../notes-export" }
+serde_json.workspace = true
+unicode-segmentation.workspace = true
+
+notes-exchange = { path = "../notes-exchange" }
+notes-clipboard = { path = "../notes-clipboard" }
+image = { version = "0.25", default-features = false }
+url = "2"
+tempfile = { workspace = true, optional = true }
+
+[[example]]
+name = "media-check"
+required-features = ["visual-tests"]
+
+[[example]]
+name = "library-query-check"
+required-features = ["visual-tests"]
+
+[dev-dependencies]
+env_logger.workspace = true
+tempfile.workspace = true
+gpui = { workspace = true, features = ["test-support"] }
+
+[[example]]
+name = "pdf-ui-check"
+required-features = ["visual-tests"]
+
+[[example]]
+name = "table-check"
+required-features = ["visual-tests"]
+
+[[example]]
+name = "writing-tools-check"
+required-features = ["visual-tests"]
+
+[[example]]
+name = "link-check"
+required-features = ["visual-tests"]
+
+[[example]]
+name = "context-check"
+required-features = ["visual-tests"]
+
+[[example]]
+name = "quote-check"
+required-features = ["visual-tests"]
+
+[[example]]
+name = "organization-check"
+required-features = ["visual-tests"]
+
+[[example]]
+name = "library-recovery-check"
+required-features = ["visual-tests"]
+
+[[example]]
+name = "portability-check"
+required-features = ["visual-tests"]

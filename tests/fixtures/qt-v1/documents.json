@@ -1,0 +1,709 @@
+[
+  {
+    "id": "885c6b0b-9ab8-404c-8a2f-ceab79b52a7f",
+    "title": "Groceries",
+    "body": {
+      "blocks": [
+        {
+          "id": "4123ba6b-58da-41de-8e27-e0752a8a18f1",
+          "level": 1,
+          "spans": [
+            {
+              "text": "Groceries"
+            }
+          ],
+          "type": "heading"
+        },
+        {
+          "checked": true,
+          "id": "b33142e7-fc6e-4279-9a41-704361338f4c",
+          "indent": 0,
+          "list": "check",
+          "spans": [
+            {
+              "text": "Oat milk"
+            }
+          ],
+          "type": "list"
+        },
+        {
+          "checked": false,
+          "id": "4d59c163-300c-4358-b8e7-13690e7afe61",
+          "indent": 0,
+          "list": "check",
+          "spans": [
+            {
+              "text": "Coffee beans"
+            }
+          ],
+          "type": "list"
+        },
+        {
+          "checked": false,
+          "id": "d23cf80a-142b-414a-855d-50447db1665d",
+          "indent": 0,
+          "list": "check",
+          "spans": [
+            {
+              "text": "Lemons (6)"
+            }
+          ],
+          "type": "list"
+        },
+        {
+          "checked": true,
+          "id": "475d5f6e-f360-4e38-8117-a37026d3e581",
+          "indent": 0,
+          "list": "check",
+          "spans": [
+            {
+              "text": "Basil"
+            }
+          ],
+          "type": "list"
+        }
+      ],
+      "schema": 1
+    }
+  },
+  {
+    "id": "d3f14be2-bd3d-49a7-b046-4c7c71f464f8",
+    "title": "Q3 planning — product sync",
+    "body": {
+      "blocks": [
+        {
+          "id": "27241e7b-0186-4c65-ae5e-516f0f176e66",
+          "level": 1,
+          "spans": [
+            {
+              "text": "Q3 planning — product sync"
+            }
+          ],
+          "type": "heading"
+        },
+        {
+          "id": "f3f3f523-f287-4394-9218-588f0bd98774",
+          "spans": [
+            {
+              "text": "Met with Dana, Luis and Priya on 22 September. "
+            },
+            {
+              "marks": [
+                "bold"
+              ],
+              "text": "Decisions"
+            },
+            {
+              "text": " are below; open questions are at the end. #planning #q3"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "id": "e2dfd19a-8f6a-49e5-b546-e0423a43c918",
+          "level": 2,
+          "spans": [
+            {
+              "text": "Decisions"
+            }
+          ],
+          "type": "heading"
+        },
+        {
+          "id": "bc952fd2-eddd-4e1f-99d0-ad24fa99147a",
+          "indent": 0,
+          "list": "bullet",
+          "spans": [
+            {
+              "text": "Ship the offline importer in the October release"
+            }
+          ],
+          "type": "list"
+        },
+        {
+          "id": "27d39e3b-1fb8-4f2a-9f0e-cd64d0a9ea84",
+          "indent": 1,
+          "list": "bullet",
+          "spans": [
+            {
+              "text": "Markdown and plain text first; ENEX later"
+            }
+          ],
+          "type": "list"
+        },
+        {
+          "id": "d0a147d6-b61e-4de8-8bd7-917cfe5a3229",
+          "indent": 1,
+          "list": "bullet",
+          "spans": [
+            {
+              "marks": [
+                "italic"
+              ],
+              "text": "Report anything we can't convert instead of dropping it"
+            }
+          ],
+          "type": "list"
+        },
+        {
+          "id": "655325bb-10cf-4e6f-b119-f3c74998ce39",
+          "indent": 0,
+          "list": "bullet",
+          "spans": [
+            {
+              "text": "Collapse the folder sidebar on narrow tiles"
+            }
+          ],
+          "type": "list"
+        },
+        {
+          "id": "bd51b425-1b86-4cfe-857a-2de0750cff5b",
+          "level": 2,
+          "spans": [
+            {
+              "text": "Action items"
+            }
+          ],
+          "type": "heading"
+        },
+        {
+          "checked": true,
+          "id": "4d5bbea7-a1a4-4c75-b97f-d93acddff413",
+          "indent": 0,
+          "list": "check",
+          "spans": [
+            {
+              "text": "Draft the migration guide"
+            }
+          ],
+          "type": "list"
+        },
+        {
+          "checked": false,
+          "id": "e5ab94b6-020f-4ec8-aaa0-4700f1d66036",
+          "indent": 0,
+          "list": "check",
+          "spans": [
+            {
+              "text": "Benchmark search on the 10,000-note library"
+            }
+          ],
+          "type": "list"
+        },
+        {
+          "checked": true,
+          "id": "0ccddec0-e8ec-4624-bb81-7cc98efc3ab9",
+          "indent": 1,
+          "list": "check",
+          "spans": [
+            {
+              "text": "Use the reference ThinkPad, not a dev box"
+            }
+          ],
+          "type": "list"
+        },
+        {
+          "checked": false,
+          "id": "039a5766-b4d4-4136-9de7-17a0c807b3af",
+          "indent": 1,
+          "list": "check",
+          "spans": [
+            {
+              "text": "Record p95 without typing debounce"
+            }
+          ],
+          "type": "list"
+        },
+        {
+          "checked": false,
+          "id": "77d9bdae-0be0-4aad-9dad-ff76d070fc0f",
+          "indent": 0,
+          "list": "check",
+          "spans": [
+            {
+              "text": "Review the "
+            },
+            {
+              "href": "note://0e267df8-2d8c-4948-9695-66b96f331111",
+              "text": "vendor research"
+            },
+            {
+              "text": " before Friday"
+            }
+          ],
+          "type": "list"
+        },
+        {
+          "id": "3551c3d1-760b-4ce2-b6eb-da84486bd088",
+          "level": 2,
+          "spans": [
+            {
+              "text": "Owners"
+            }
+          ],
+          "type": "heading"
+        },
+        {
+          "cells": [
+            {
+              "blocks": [
+                {
+                  "id": "3aa211c6-a27e-4c86-82f5-439691fc2232",
+                  "spans": [
+                    {
+                      "marks": [
+                        "bold"
+                      ],
+                      "text": "Owner"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "col": 0,
+              "row": 0
+            },
+            {
+              "blocks": [
+                {
+                  "id": "0e756b36-7f9e-476d-9994-f51b7f1780ec",
+                  "spans": [
+                    {
+                      "marks": [
+                        "bold"
+                      ],
+                      "text": "Task"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "col": 1,
+              "row": 0
+            },
+            {
+              "blocks": [
+                {
+                  "id": "162699a8-edaa-456f-b339-51bbc1b62ace",
+                  "spans": [
+                    {
+                      "marks": [
+                        "bold"
+                      ],
+                      "text": "Due"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "col": 2,
+              "row": 0
+            },
+            {
+              "blocks": [
+                {
+                  "id": "4459e066-3d58-4d39-aa07-9e36bcac1d89",
+                  "spans": [
+                    {
+                      "text": "Dana"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "col": 0,
+              "row": 1
+            },
+            {
+              "blocks": [
+                {
+                  "id": "04984417-a9b5-4c40-9d37-270e43e5a731",
+                  "spans": [
+                    {
+                      "text": "Importer error report"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "col": 1,
+              "row": 1
+            },
+            {
+              "blocks": [
+                {
+                  "id": "84c543e4-924e-4841-a182-6c1a67e75190",
+                  "spans": [
+                    {
+                      "text": "3 Oct"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "col": 2,
+              "row": 1
+            },
+            {
+              "blocks": [
+                {
+                  "id": "8489c8d3-74e5-4ab8-883e-64c020107b95",
+                  "spans": [
+                    {
+                      "text": "Luis"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "col": 0,
+              "row": 2
+            },
+            {
+              "blocks": [
+                {
+                  "id": "7807d02e-4e54-4dcc-a9eb-477d1dad0949",
+                  "spans": [
+                    {
+                      "text": "Search benchmark"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "col": 1,
+              "row": 2
+            },
+            {
+              "blocks": [
+                {
+                  "id": "9368900d-2f65-4b17-85cd-b505cda1a0af",
+                  "spans": [
+                    {
+                      "text": "8 Oct"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "col": 2,
+              "row": 2
+            },
+            {
+              "blocks": [
+                {
+                  "id": "fe2838e2-eec8-475e-b7c1-8d810f905baf",
+                  "spans": [
+                    {
+                      "text": "Priya"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "col": 0,
+              "row": 3
+            },
+            {
+              "blocks": [
+                {
+                  "id": "884363fc-54ad-4f96-859a-d385857bfb6a",
+                  "spans": [
+                    {
+                      "text": "Narrow-tile layout 🚀"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "col": 1,
+              "row": 3
+            },
+            {
+              "blocks": [
+                {
+                  "id": "a4e0f676-6d78-438b-aae2-edf923ef5a50",
+                  "spans": [
+                    {
+                      "text": "10 Oct"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "col": 2,
+              "row": 3
+            }
+          ],
+          "columns": 3,
+          "id": "010ae322-ed33-44c2-b154-c76d5065bbbc",
+          "rows": 4,
+          "type": "table"
+        },
+        {
+          "id": "a0da622f-3b93-4ae2-8c8d-51220ed65639",
+          "level": 2,
+          "spans": [
+            {
+              "text": "Attachments"
+            }
+          ],
+          "type": "heading"
+        },
+        {
+          "id": "32d33792-e53b-400e-8c9f-1d68c8d901cc",
+          "spans": [
+            {
+              "text": "Search latency from last sprint:"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "id": "b6a99df3-cd39-45d5-ba0c-a86185dd52e7",
+          "spans": [
+            {
+              "alt": "Bar chart of search latency by week",
+              "height": 360,
+              "image": "bdec1de53e3c856d6973c7324a5d719d6f6169e01a6f75ae3b4453f419d625e2",
+              "width": 800
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "id": "9b87fb3c-a3f5-4bfe-a1d3-0e30a3c5fbf9",
+          "spans": [
+            {
+              "text": "Roadmap draft: "
+            },
+            {
+              "attachment": "38f6d2f5-f68a-44ae-933c-2deb5e79b280"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "id": "794ced49-7b58-476e-96ef-fedabf146f69",
+          "level": 2,
+          "spans": [
+            {
+              "text": "Next week"
+            }
+          ],
+          "type": "heading"
+        },
+        {
+          "id": "a3c4875b-adde-4b50-b8f7-44fa120070ea",
+          "indent": 0,
+          "list": "ordered",
+          "spans": [
+            {
+              "text": "Walk through the importer demo"
+            }
+          ],
+          "type": "list"
+        },
+        {
+          "id": "aa9bea58-329a-46fd-85e6-3ae96c4e5ba2",
+          "indent": 0,
+          "list": "ordered",
+          "spans": [
+            {
+              "text": "Agree the release checklist"
+            }
+          ],
+          "type": "list"
+        },
+        {
+          "id": "9d1b8968-d4d4-494f-bdd9-9b13ce7bed5a",
+          "indent": 1,
+          "list": "ordered",
+          "spans": [
+            {
+              "text": "Accessibility pass"
+            }
+          ],
+          "type": "list"
+        },
+        {
+          "id": "6922dc3f-6bd4-4510-b86b-e0b5a56722ca",
+          "indent": 1,
+          "list": "ordered",
+          "spans": [
+            {
+              "text": "Recovery drills"
+            }
+          ],
+          "type": "list"
+        },
+        {
+          "id": "68987fef-a963-4f43-86fb-56babce19644",
+          "indent": 0,
+          "list": "ordered",
+          "spans": [
+            {
+              "text": "Retro"
+            }
+          ],
+          "type": "list"
+        },
+        {
+          "id": "4b444ad2-8c7b-489a-aaeb-5c5d453153a6",
+          "level": 3,
+          "spans": [
+            {
+              "text": "Open questions"
+            }
+          ],
+          "type": "heading"
+        },
+        {
+          "id": "74eaa2ba-f7e3-4624-9343-62747a958d79",
+          "spans": [
+            {
+              "text": "Do we need "
+            },
+            {
+              "marks": [
+                "highlight"
+              ],
+              "text": "locked notes"
+            },
+            {
+              "text": " in v1? "
+            },
+            {
+              "marks": [
+                "strikethrough"
+              ],
+              "text": "Probably not"
+            },
+            {
+              "text": " — revisit after the beta."
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "id": "06411e0e-8602-4d3e-9be9-9d3e07db83b1",
+          "spans": [
+            {
+              "text": "Try it: "
+            },
+            {
+              "marks": [
+                "code"
+              ],
+              "text": "omarchy-notes --new \"Groceries\""
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "id": "5c9cc451-6f9f-4428-810f-bc9131d69950",
+          "spans": [
+            {
+              "text": "Background reading: "
+            },
+            {
+              "href": "https://sqlite.org/fts5.html",
+              "text": "SQLite FTS5"
+            },
+            {
+              "marks": [
+                "underline"
+              ],
+              "text": " and the Qt rich text docs."
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "id": "349352a9-9fd3-428f-af64-e5ad1e5fec2e",
+          "spans": [
+            {
+              "text": "Localized greeting for the demo:\nمرحبا بالعالم — שלום עולם — 你好"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "schema": 1
+    }
+  },
+  {
+    "id": "0e267df8-2d8c-4948-9695-66b96f331111",
+    "title": "Vendor research",
+    "body": {
+      "blocks": [
+        {
+          "id": "9f388f28-8895-4ffc-8d58-d61a656bd0ef",
+          "level": 1,
+          "spans": [
+            {
+              "text": "Vendor research"
+            }
+          ],
+          "type": "heading"
+        },
+        {
+          "id": "595322f6-4e2a-4ca2-af92-b1d309f56acb",
+          "spans": [
+            {
+              "text": "Shortlist for the sync server, compared on self-hosting, encryption at rest and export."
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "id": "4b1daf67-aa51-4162-bc21-3ec6c7171ef9",
+          "indent": 0,
+          "list": "bullet",
+          "spans": [
+            {
+              "text": "Option A — "
+            },
+            {
+              "marks": [
+                "bold"
+              ],
+              "text": "self-hosted"
+            },
+            {
+              "text": ", Postgres, MIT"
+            }
+          ],
+          "type": "list"
+        },
+        {
+          "id": "eeb8e28e-9dd2-44b2-b7c9-a14747ad13c1",
+          "indent": 0,
+          "list": "bullet",
+          "spans": [
+            {
+              "text": "Option B — managed, per-seat pricing"
+            }
+          ],
+          "type": "list"
+        },
+        {
+          "id": "4b19a6eb-2d6e-40db-994e-d91756f8fb60",
+          "indent": 0,
+          "list": "bullet",
+          "spans": [
+            {
+              "text": "Option C — "
+            },
+            {
+              "href": "https://crdt.tech",
+              "text": "CRDT docs"
+            }
+          ],
+          "type": "list"
+        }
+      ],
+      "schema": 1
+    }
+  }
+]

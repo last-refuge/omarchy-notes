@@ -5,13 +5,65 @@ on:
   pull_request:
 
 jobs:
+  rust-preview:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    timeout-minutes: 30
+    steps:
+      - name: Install native build dependencies
+        run: pacman -Syu --noconfirm base-devel clang cmake git pkgconf rustup python qt6-base sqlite cairo pango noto-fonts noto-fonts-cjk noto-fonts-emoji ttf-liberation poppler qpdf fontconfig freetype2 libxkbcommon libxcb wayland vulkan-headers vulkan-icd-loader
+      - uses: actions/checkout@v4
+      - name: Create unprivileged build user
+        run: |
+          useradd --create-home builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+      - name: Install pinned Rust toolchain
+        run: runuser -u builder -- rustup show
+      - name: Check Rust workspace
+        env:
+          CARGO_BUILD_JOBS: 4
+        run: |
+          runuser -u builder -- cargo fmt --all --check
+          runuser -u builder -- cargo test --workspace --locked
+          runuser -u builder -- cargo test -p accesskit_unix --lib --locked
+          runuser -u builder -- cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - name: Check Qt-free PDF structure and content
+        env:
+          CARGO_BUILD_JOBS: 4
+        run: |
+          runuser -u builder -- cargo build -p notes-export --example pdf-check --locked
+          runuser -u builder -- python tests/test-rust-pdf.py target/debug/examples/pdf-check
+      - name: Check Rust and Qt storage compatibility
+        env:
+          CARGO_BUILD_JOBS: 4
+        run: |
+          runuser -u builder -- cargo build -p omarchy-notes-preview --locked
+          runuser -u builder -- cargo build -p notes-storage --example compatibility-edit --locked
+          runuser -u builder -- python tests/test-rust-compatibility.py target/debug/omarchy-notes-preview target/debug/examples/compatibility-edit
+          runuser -u builder -- cargo build -p notes-storage --example quote-upgrade --locked
+          runuser -u builder -- python tests/test-rust-backups.py target/debug/omarchy-notes-preview --quote-driver target/debug/examples/quote-upgrade
+          runuser -u builder -- cargo build -p notes-storage --example organization-roundtrip --locked
+          runuser -u builder -- python tests/test-rust-organization.py target/debug/examples/organization-roundtrip
+      - name: Check durable capture and instance protocol without a display
+        env:
+          CARGO_BUILD_JOBS: 4
+        run: |
+          runuser -u builder -- cargo build -p notes-platform --example instance-owner --locked
+          runuser -u builder -- python tests/test-rust-capture.py target/debug/omarchy-notes-preview target/debug/examples/instance-owner
+      - name: Check editable table compatibility with Qt
+        env:
+          CARGO_BUILD_JOBS: 4
+        run: |
+          runuser -u builder -- cargo build -p notes-storage --example table-roundtrip --locked
+          runuser -u builder -- python tests/test-rust-tables.py target/debug/examples/table-roundtrip
+
   installer:
     runs-on: ubuntu-latest
     container: archlinux:latest
     timeout-minutes: 5
     steps:
       - name: Install installer test tools
-        run: pacman -Syu --noconfirm bash curl python shellcheck sudo util-linux
+        run: pacman -Syu --noconfirm bash curl python ripgrep shellcheck sudo util-linux
       - uses: actions/checkout@v4
       - name: Create unprivileged test user
         run: |
@@ -23,6 +75,10 @@ jobs:
           shellcheck install.sh tests/test-installer.sh tests/test-installer-package.sh
       - name: Test installer without network or system changes
         run: runuser -u builder -- ./tests/test-installer.sh
+      - name: Check separate Rust identity and immutable preparation
+        run: |
+          pacman -S --noconfirm --needed git
+          runuser -u builder -- python3 tests/test_rust_release.py
 
   build-and-test:
     runs-on: ubuntu-latest
@@ -79,3 +135,34 @@ jobs:
         run: ./tests/check-arch-package.sh build-aur-ci/aur
       - name: Install and verify through the installer in the disposable container
         run: runuser -u builder -- ./tests/test-installer-package.sh build-aur-ci/aur
+
+  rust-arch-candidate:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    timeout-minutes: 90
+    steps:
+      - name: Install Rust packaging tools
+        run: pacman -Syu --noconfirm appstream base-devel clang cmake curl desktop-file-utils git namcap pkgconf python ripgrep rustup shellcheck sudo util-linux
+      - uses: actions/checkout@v4
+      - name: Prepare immutable separate Rust candidate
+        run: |
+          useradd --create-home builder
+          echo 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
+          chmod 440 /etc/sudoers.d/builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          runuser -u builder -- git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          runuser -u builder -- python3 packaging/prepare-release.py --edition rust --candidate --ref HEAD --output build-rust-ci
+      - name: Build from the archived Rust recipe and locked dependencies
+        run: runuser -u builder -- bash -c 'cd build-rust-ci/aur && makepkg --syncdeps --noconfirm --cleanbuild'
+      - name: Validate separate package metadata and files
+        run: ./tests/check-rust-arch-package.sh build-rust-ci/aur
+      - name: Verify actual Rust install, alias, headless capture and retained data on removal
+        run: runuser -u builder -- ./tests/test-rust-installer-package.sh build-rust-ci/aur
+      - name: Retain exact candidate identity
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-candidate-source-identity
+          path: |
+            build-rust-ci/SOURCE_REVISION
+            build-rust-ci/RELEASE_KIND
+            build-rust-ci/SHA256SUMS

@@ -1,0 +1,34 @@
+[workspace]
+members = ["crates/notes-core", "crates/notes-exchange", "crates/notes-clipboard", "crates/notes-editor", "crates/notes-storage", "crates/notes-platform", "crates/notes-export", "crates/notes-ui", "crates/omarchy-notes"]
+resolver = "2"
+exclude = ["vendor/accesskit_unix"]
+
+[workspace.package]
+version = "1.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+anyhow = "1"
+env_logger = "0.11"
+log = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+unicode-segmentation = "1"
+uuid = { version = "1", features = ["v4"] }
+rusqlite = { version = "0.32.1", features = ["bundled", "backup"] }
+tempfile = "3"
+gpui = { git = "https://github.com/zed-industries/zed", rev = "a84689073d296dfd39987bc7dd478e43ef76d83a", default-features = false, features = ["wayland", "x11"] }
+gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "a84689073d296dfd39987bc7dd478e43ef76d83a", default-features = false, features = ["wayland", "x11"] }
+
+[patch.crates-io]
+# Preserve AT-SPI Cache signal struct arguments at the existing framework pin.
+accesskit_unix = { path = "vendor/accesskit_unix" }
+
+[profile.dev]
+debug = 1
+
+[profile.release]
+debug = "line-tables-only"
+

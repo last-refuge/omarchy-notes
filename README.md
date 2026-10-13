@@ -2,31 +2,98 @@
 
 # 📝 Omarchy Notes
 
-**A fast, native notes app for [Omarchy](https://omarchy.org), inspired by Apple Notes.**
+**Local, offline notes for [Omarchy](https://omarchy.org).**
 
-Rich notes with checklists, tables, images and attachments. They live on your machine and match your Omarchy theme.
+Two native editions: **Rust 1.0 with GPUI**, and the existing **Qt edition**.
+Rich notes stay on your machine, with no account required.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Rust 1.0](https://img.shields.io/badge/Rust-1.0.0-2d4f8e?logo=rust)](https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.0.0)
 ![Qt 6.8+](https://img.shields.io/badge/Qt-6.8%2B-41cd52?logo=qt&logoColor=white)
-![C++20](https://img.shields.io/badge/C%2B%2B-20-00599c?logo=cplusplus&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-FTS5-003b57?logo=sqlite&logoColor=white)
 ![Wayland](https://img.shields.io/badge/Wayland-native-ffbc00)
-![Version](https://img.shields.io/badge/version-1.0.0-2d4f8e)
 
-<img src="docs/images/screenshot-dark.png" alt="Omarchy Notes showing a meeting note with headings, nested lists, checklists, a table, a chart image and a PDF attachment, in the Kanagawa theme" width="820">
+<img src="docs/images/rust-v1-writing-dark.png" alt="Omarchy Notes Rust 1.0 writing view in a dark theme" width="820">
+
+[Download Rust 1.0](https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.0.0) · [Qt edition](#qt-edition)
 
 </div>
 
----
+## Rust 1.0
 
-## 👋 What is this?
+The separate Rust edition ships for **x86_64 Arch/Omarchy on Wayland/Hyprland**.
+It includes rich writing, headings, lists, checklists, basic tables, links,
+images and files; autosave and recovery; Quick Note and durable CLI capture;
+nested folders, pins, sorting, prefix search and Recently Deleted.
 
-The idea is simple: Apple Notes' easy note-taking, on Linux. Open it, start typing, and trust it's saved. It's a real desktop app built with Qt, not a web page in a wrapper. It works offline with no account, and it follows whatever Omarchy theme you're using, even when you switch themes while it's open.
+**Settings → Data** provides reviewed Markdown/text file or folder imports,
+Markdown/HTML note exports, library Markdown with assets, complete backups,
+inspection and restore into a new library. Export a note as PDF from the toolbar
+or with **Ctrl+Shift+P**. Portable exports are useful copies; use a library backup
+when you need exact preservation.
 
-> [!TIP]
-> **New here?** Visit the [project page](https://last-refuge.github.io/omarchy-notes/) for a quick tour, or jump straight to [installing](#-install).
+| Workflow | Rust 1.0 | Qt edition |
+|---|---|---|
+| Rich notes, basic tables, images and files | Available; existing merged cells are preserved | Available |
+| Folders, pins, search, sorting and deletion recovery | Available | Available |
+| Quick Note, import/export and library backups | Available | Available |
+| Tags and Smart Folders | Interfaces deferred; existing metadata preserved | Available |
+| Gallery and library-wide attachment browser | Deferred | Available |
+| Automatic Hyprland Quick Note setup | Desktop action or a distinct manual binding | Optional setup command |
 
-## ✨ What you can do today
+Rust is a separate edition, not a complete replacement for Qt. See the
+[Rust release notes](docs/rust-release-notes.md) for scope and recorded follow-up,
+and the [installation and recovery guide](docs/rust-release.md) for details.
+
+### Install Rust 1.0
+
+Download the **published Rust release installer** and inspect it before running:
+
+```bash
+curl -fsSL https://github.com/last-refuge/omarchy-notes/releases/download/rust-v1.0.0/install.sh -o install.sh
+bash install.sh --edition rust --version rust-v1.0.0 --dry-run
+bash install.sh --edition rust --version rust-v1.0.0 --no-quick-note
+```
+
+The installer verifies the release checksum and package identity, then uses
+pacman. Open **Omarchy Notes (Rust)** from your launcher, or run
+`omarchy-notes-rust`. The `omarchy-notes-preview` compatibility launcher forwards
+to Rust; an older manual preview earlier on `PATH` may need moving aside.
+
+Choose **Rust Quick Note** from the desktop launcher's actions, run
+`omarchy-notes-rust --quick-note`, or press **Ctrl+Shift+N** inside Rust.
+**Ctrl+Shift+O** moves Quick Note into the main window. Use a distinct compositor
+binding if you want a global shortcut; Rust does not run Qt's automatic setup.
+
+Rust keeps notes in `~/.local/share/omarchy-notes-gpui/` and preferences in
+`~/.config/omarchy-notes-gpui/` (or the corresponding XDG locations). Qt uses
+separate directories. Removing `omarchy-notes-rust` retains your data.
+Use copies and verified backups when opening Qt libraries. Quotation/schema-3
+libraries require Rust; returning to Qt uses the pre-upgrade backup and excludes
+later Rust edits. Keep the newer library and export or back it up before rollback.
+
+### Rust screenshots
+
+The dark writing view is shown above. These are screenshots of the released
+Rust 1.0 application, using a sample library.
+
+| Light writing | Quick Note |
+|---|---|
+| [![Rust light writing](docs/images/rust-v1-writing-light.png)](docs/images/rust-v1-writing-light.png) | [![Rust Quick Note](docs/images/rust-v1-quick-note.png)](docs/images/rust-v1-quick-note.png) |
+| **Folders** | **Data and backups** |
+| [![Rust folders](docs/images/rust-v1-folders.png)](docs/images/rust-v1-folders.png) | [![Rust data and backups](docs/images/rust-v1-portability.png)](docs/images/rust-v1-portability.png) |
+
+[![Rust Recently Deleted](docs/images/rust-v1-recovery.png)](docs/images/rust-v1-recovery.png)
+
+## Qt edition
+
+Qt remains available as `omarchy-notes`, with its own library and desktop
+identity. It supports tags, Smart Folders, gallery and the attachment browser,
+in addition to the writing workflows below. The installer **defaults to Qt**;
+Rust always requires explicit edition selection.
+
+<details>
+<summary><b>Qt features</b></summary>
 
 - ⚡ **Start typing right away.** Notes save automatically, usually within a second. "Saved" only appears once your note is actually on disk.
 - ✍️ **Format like you'd expect:** title, heading and subheading styles, plus bold, italic, underline, strikethrough, highlight and monospace.
@@ -49,72 +116,48 @@ The idea is simple: Apple Notes' easy note-taking, on Linux. Open it, start typi
 - 🌐 **Every language.** Emoji, right-to-left scripts, CJK and input methods (IME) all work.
 - 🛟 **Hard to lose work.** If a save fails, your text stays on screen with Retry and Export buttons, and the app won't quit until your changes are safe or you choose to discard them.
 
-## 🚀 Install
+</details>
 
-On **Omarchy or Arch Linux**, run the installer as your normal user:
+<details>
+<summary><b>Qt edition screenshots</b></summary>
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/last-refuge/omarchy-notes/master/install.sh | bash
-```
+![Qt dark writing view](docs/images/screenshot-dark.png)
 
-It finds the latest published release, checks the package checksum and identity,
-and installs it through pacman with clear progress. It asks for administrator
-access for package changes and offers optional Quick Note setup on compatible
-Omarchy installations.
+![Qt light writing view](docs/images/screenshot-light.png)
 
-Then press <kbd>Super</kbd> + <kbd>Space</kbd> and search for **Omarchy Notes**.
+![Qt gallery view](docs/images/screenshot-gallery.png)
 
-### Preview the installation or inspect the script
+</details>
 
-Download the script to read it and preview what it will do:
+### Install Qt
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/last-refuge/omarchy-notes/master/install.sh -o install.sh
-less install.sh
-bash install.sh --dry-run
-bash install.sh
-```
-
-If you've already cloned this repository, run `bash install.sh` from its root.
-
-### Installer options
-
-Choose a release, build it from source, or explicitly enable Quick Note:
+The published edition-aware installer supports both apps. Without
+`--edition rust`, it selects Qt; these commands pin the existing Qt release:
 
 ```bash
+curl -fsSL https://github.com/last-refuge/omarchy-notes/releases/download/rust-v1.0.0/install.sh -o install.sh
 bash install.sh --version v1.0.0
-bash install.sh --source
-bash install.sh --quick-note
 ```
 
-| Option | What it does |
-|---|---|
-| `--version TAG` | Install a specific published release, such as `v1.0.0` |
-| `--source` | Build the selected release with makepkg, then install the package through pacman |
-| `--dry-run` | Inspect the release and show the plan without installing or changing configuration |
-| `--quick-note` | Set up the Quick Note key and floating window rule on compatible Omarchy installations |
-| `--no-quick-note` | Skip Quick Note setup |
-| `--yes` | Accept package installation without confirmation; unattended runs need noninteractive sudo access |
-| `--help` | Show installer help |
+After installation, open **Omarchy Notes** from your launcher. To preview, build
+from source, or request Qt's optional Quick Note setup:
 
-`--yes` alone never enables Quick Note. Use `NO_COLOR=1 bash install.sh` for plain
-output. Failures leave a log at the printed path. Binary downloads never switch
-to a source build automatically; choose `--source` when you want to build.
+```bash
+bash install.sh --version v1.0.0 --dry-run
+bash install.sh --version v1.0.0 --source
+bash install.sh --version v1.0.0 --quick-note
+```
 
-Run the installer again to update. Your notes and running window are preserved;
-close and reopen Notes normally after updating. To remove the app while keeping
-your notes:
+`--yes` accepts package installation, but does not enable Quick Note by itself.
+`--no-quick-note` skips setup. `NO_COLOR=1` disables colour and animation.
+Downloads never switch to a source build automatically. Run the installer again
+to update, then close and reopen the app normally. Removing Qt keeps its notes:
 
 ```bash
 sudo pacman -R omarchy-notes
 ```
 
-> [!NOTE]
-> The installer is currently distributed from this repository. Future releases
-> will also include it as a downloadable asset; v1.0.0 has no installer asset.
-> The script can install the existing v1.0.0 package.
-
-### Direct package installation
+### Qt package installation
 
 You can also install the **v1.0.0 x86_64 package** directly:
 
@@ -122,12 +165,9 @@ You can also install the **v1.0.0 x86_64 package** directly:
 sudo pacman -U https://github.com/last-refuge/omarchy-notes/releases/download/v1.0.0/omarchy-notes-1.0.0-1-x86_64.pkg.tar.zst
 ```
 
-> [!NOTE]
-> **Coming soon to the AUR.** The AUR has paused new account sign-ups while it deals with a wave of automated registrations. Omarchy Notes will be published there as soon as registration reopens, and then `yay -S omarchy-notes` will work too. Until then, the package above is the same one the AUR recipe builds.
+### Building Qt from source
 
-### Building from source
-
-For a release package on Arch, use `bash install.sh --source`. To build a user-local
+For a Qt release package on Arch, use `bash install.sh --version v1.0.0 --source`. To build a user-local
 copy yourself, follow the steps below. Other Linux systems need equivalent build
 tools, Qt 6.8 or newer, and SQLite.
 
@@ -154,7 +194,7 @@ That puts `omarchy-notes` in `~/.local/bin` and adds it to your app launcher.
 
 To update later, `git pull` and run the last two `cmake` commands again. Your notes aren't touched.
 
-### ⚡ Quick Note on a key (optional)
+### Qt Quick Note on a key (optional)
 
 Let the app set it up. It checks your existing bindings (and Omarchy's) first, never overwrites a key that's taken, and backs up anything it changes:
 
@@ -174,7 +214,7 @@ To make the Quick Note window float, add this to `~/.config/hypr/hyprland.lua`:
 o.window({ class = "^org\\.omarchy\\.Notes$", title = "^Quick Note$" }, { tag = "+floating-window" })
 ```
 
-## 🗂️ Where your notes live
+### Qt data and backups
 
 Everything is stored in `~/.local/share/omarchy-notes/`: an SQLite database for your notes, plus a folder of attached files. Reinstalling or removing the app never touches it.
 
@@ -204,7 +244,7 @@ omarchy-notes --data-dir /tmp/notes-playground --samples
 
 </details>
 
-## ⌨️ Keyboard shortcuts
+### Qt keyboard shortcuts
 
 | | Shortcut |
 |---|---|
@@ -223,7 +263,7 @@ omarchy-notes --data-dir /tmp/notes-playground --samples
 | Attach a file · Link to a note | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>A</kbd> · <kbd>Ctrl</kbd> <kbd>L</kbd> |
 | Follow a link or #tag · Open an attachment | <kbd>Ctrl</kbd> + click · double-click (or <kbd>Ctrl</kbd> <kbd>Enter</kbd> next to it) |
 
-## 🗺️ Roadmap
+### Qt roadmap
 
 | | Milestone | What it brings |
 |---|---|---|
@@ -233,11 +273,20 @@ omarchy-notes --data-dir /tmp/notes-playground --samples
 | ✅ | **1.0** | Arch package, accessibility polish, performance targets met ([numbers](docs/performance.md)) |
 | 💭 | **After 1.0** | Locked notes, OCR, audio, sync between devices, sharing |
 
-The full plan is in [`llm-docs/omarchy-notes-plan.md`](llm-docs/omarchy-notes-plan.md), with a visual version in [`llm-docs/roadmap.html`](llm-docs/roadmap.html) (download it and open it in a browser). Big technical decisions are written up in [`docs/decisions/`](docs/decisions/).
+The Qt plan is in [`llm-docs/omarchy-notes-plan.md`](llm-docs/omarchy-notes-plan.md), with a visual version in [`llm-docs/roadmap.html`](llm-docs/roadmap.html) (download it and open it in a browser). Big technical decisions are written up in [`docs/decisions/`](docs/decisions/).
 
 ## 🛠️ Hacking on it
 
-Build a debug version and run the tests:
+For Rust development, see the [Rust build guide](docs/rust-release.md) and the
+[`crates/`](crates/) workspace. The Cargo package retains its historical name;
+the application executable is `omarchy-notes-rust`.
+
+```bash
+cargo run --release --locked -p omarchy-notes-preview --bin omarchy-notes-rust
+cargo test --workspace --locked
+```
+
+For Qt development, build a debug version and run the tests:
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
@@ -245,10 +294,11 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-The editor tests drive the real app off-screen and save screenshots to `build/screenshots/`, which is handy for checking what changed visually. `tests/bench_library` measures the performance targets, and [docs/arch-release.md](docs/arch-release.md) explains how releases are made.
+The Qt editor tests drive the real app off-screen and save screenshots to `build/screenshots/`, which is handy for checking what changed visually. `tests/bench_library` measures the performance targets, and [docs/arch-release.md](docs/arch-release.md) explains how releases are made.
 
 | Folder | What's inside |
 |---|---|
+| [`crates`](crates) | Rust core, editor, UI, platform, storage and import/export libraries. |
 | [`src/core`](src/core) | The engine: the note format, saving to SQLite, attachment storage and theme colours. There's no UI code in here. |
 | [`src/app`](src/app) | The app itself: the editor logic and the Qt Quick (QML) interface. |
 | [`tests`](tests) | Round-trip, storage (including a "kill it mid-save" durability test), theme contrast, end-to-end editor and launch tests, plus packaging checks. |

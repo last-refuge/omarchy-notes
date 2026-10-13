@@ -1,0 +1,8 @@
+{
+  "schema": 2,
+  "blocks": [
+    {"id": "quote-heading", "type": "heading", "level": 1, "spans": [{"text": "Make room for a thought"}]},
+    {"id": "quote-example", "type": "quote", "spans": [{"text": "Attention is a form of care.", "marks": ["italic"]}]},
+    {"id": "quote-ending", "type": "paragraph", "spans": [{"text": "A sentence to come back to."}]}
+  ]
+}

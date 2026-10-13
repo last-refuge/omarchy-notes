@@ -1,0 +1,85 @@
+.TH OMARCHY-NOTES-RUST 1 "October 2026" "omarchy-notes-rust 1.0.0" "User Commands"
+.SH NAME
+omarchy-notes-rust \- private local notes, separate Rust edition
+.SH SYNOPSIS
+.B omarchy-notes-rust
+.RI [ options ]
+.SH DESCRIPTION
+The Rust edition is separately installable from the supported Qt edition.
+Version 1.0.0 is the first separate Rust release.
+Its library and preferences retain the preview locations. The installed
+.B omarchy-notes-preview
+compatibility launcher executes the Rust application with unchanged arguments.
+.SH OPTIONS
+.TP
+.B \-\-new
+Create a note in this library's main window.
+.TP
+.BI \-\-note " UUID"
+Open a specific note.
+.TP
+.B \-\-quick-note
+Open or activate Quick Note.
+.TP
+.BI \-\-data-dir " PATH"
+Open a compatible library at PATH. Use a copy and verified backup for Qt libraries.
+.TP
+.BI \-\-capture " TEXT"
+Save durable capture text. A dash reads standard input. Works without a display.
+.TP
+.BI \-\-request-id " UUID"
+Retry the same capture with its original request identity and text.
+.TP
+.BI \-\-capture-status " UUID"
+Check a capture receipt without changing the library.
+.TP
+.BI \-\-backup " NEW-DIRECTORY"
+Create a verified lossless backup. Close the running library owner first.
+.TP
+.BI \-\-inspect-backup " DIRECTORY"
+Verify a completed backup without changing it.
+.TP
+.BI \-\-restore " DIRECTORY"
+Restore to a new destination supplied by \-\-data-dir. Existing libraries remain intact.
+.TP
+.B \-\-reference, \-\-light
+Select graphite or warm paper appearance for this launch.
+.TP
+.B \-\-demo
+Open disposable sample notes.
+.TP
+.B \-\-simulate-save-failure
+Exercise recovery with a scratch library; not an ordinary writing option.
+.TP
+.B \-\-help, \-\-version
+Show Rust edition help or version.
+.SH KEYBOARD
+Ctrl+N creates a note, Ctrl+S saves, Ctrl+K searches, Ctrl+, opens Settings,
+and Ctrl+Backslash toggles focus mode. Ctrl+Shift+N opens Quick Note;
+Ctrl+Shift+O moves Quick Note into the main window. Ctrl+Alt+N creates a folder.
+In the folder tree, arrows navigate/expand/collapse, Home/End reach its edges,
+and Enter opens the focused scope. Destructive actions require their focused
+library controls; editor Delete remains text editing.
+.SH FILES
+.TP
+.I $XDG_DATA_HOME/omarchy-notes-gpui/
+Default library, with ~/.local/share as the XDG fallback.
+.TP
+.I $XDG_CONFIG_HOME/omarchy-notes-gpui/preferences.json
+Writing preferences, with ~/.config as the XDG fallback.
+.TP
+.I $XDG_RUNTIME_DIR/omarchy-notes-rust/
+Private library-specific ownership and capture protocol.
+.SH COMPATIBILITY
+Tags and Smart Folder interfaces are deferred. Preserve their existing records
+through backups. Quotation/schema-3 libraries require Rust. Returning to Qt uses
+the verified pre-upgrade backup and excludes subsequent Rust changes. Portable
+Markdown/HTML exports can be lossy and do not replace lossless library backups.
+.SH QUICK NOTE SETUP
+The desktop launcher has a Rust Quick Note action. Optional compositor shortcuts
+should use a distinct key and the org.omarchy.Notes.Rust application identity;
+the installer does not claim to modify Rust compositor bindings automatically.
+.SH SEE ALSO
+.BR omarchy-notes (1)
+.PP
+https://github.com/last-refuge/omarchy-notes

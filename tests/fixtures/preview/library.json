@@ -1,0 +1,69 @@
+[
+  {
+    "id": "quiet", "title": "A quieter place to think", "summary": "Make room for the next good idea.",
+    "folder": "Personal", "day": "Today", "time": "1:46 PM", "pinned": true,
+    "blocks": [
+      {"kind": "lead", "text": "Make room for the next good idea."},
+      {"kind": "paragraph", "text": "The best notes begin without ceremony. A thought, a sentence, a small detail you want to keep."},
+      {"kind": "heading", "text": "A little less noise"},
+      {"kind": "paragraph", "text": "Keep the tools close, the page clear, and the important things easy to find."},
+      {"kind": "check", "text": "Capture the thought", "checked": true},
+      {"kind": "check", "text": "Give it a little shape", "checked": false},
+      {"kind": "check", "text": "Come back when you are ready", "checked": false},
+      {"kind": "quote", "text": "Leave room for ideas to arrive."}
+    ], "related": "monday"
+  },
+  {
+    "id": "mountains", "title": "Weekend in the mountains", "summary": "Crisp air, tall trees, and a slower pace…",
+    "folder": "Personal", "day": "Today", "time": "10:24 AM", "pinned": false,
+    "blocks": [
+      {"kind": "lead", "text": "A little further from the everyday."},
+      {"kind": "paragraph", "text": "Leave early on Saturday. Take the winding road, stop for coffee, and keep the afternoon free."},
+      {"kind": "heading", "text": "Bring the essentials"},
+      {"kind": "check", "text": "A good book and a warm layer", "checked": false},
+      {"kind": "check", "text": "Coffee, trail mix, and the small camera", "checked": true},
+      {"kind": "quote", "text": "There is no need to fill every hour."}
+    ], "related": null
+  },
+  {
+    "id": "keeping", "title": "A few things worth keeping", "summary": "People, places, habits that make a day.",
+    "folder": "Ideas", "day": "Today", "time": "9:12 AM", "pinned": false,
+    "blocks": [
+      {"kind": "lead", "text": "Small things, noticed."},
+      {"kind": "paragraph", "text": "The quiet hour before messages. A proper lunch away from the desk. Calling a friend with nothing particular to say."},
+      {"kind": "check", "text": "Walk somewhere without headphones", "checked": true},
+      {"kind": "check", "text": "Write one sentence worth remembering", "checked": false}
+    ], "related": "quiet"
+  },
+  {
+    "id": "monday", "title": "Monday intentions", "summary": "A calmer, more focused week.",
+    "folder": "Personal", "day": "Yesterday", "time": "Oct 11", "pinned": false,
+    "blocks": [
+      {"kind": "lead", "text": "Make space for the work that matters."},
+      {"kind": "heading", "text": "Three good intentions"},
+      {"kind": "check", "text": "Choose one important thing before opening email", "checked": false},
+      {"kind": "check", "text": "Leave a little breathing room between meetings", "checked": false},
+      {"kind": "check", "text": "Finish the day with a clean page for tomorrow", "checked": false}
+    ], "related": "quiet"
+  },
+  {
+    "id": "reading", "title": "Reading list", "summary": "Books, articles, and paths to explore.",
+    "folder": "Work", "day": "Yesterday", "time": "Oct 11", "pinned": false,
+    "blocks": [
+      {"kind": "lead", "text": "Follow the interesting questions."},
+      {"kind": "heading", "text": "On the desk"},
+      {"kind": "paragraph", "text": "A notebook about making things. An essay on attention. The article a colleague sent last week."},
+      {"kind": "quote", "text": "Read slowly enough to find your own thoughts between the lines."}
+    ], "related": null
+  },
+  {
+    "id": "later", "title": "Ideas for later", "summary": "Small thoughts. Big possibilities.",
+    "folder": "Ideas", "day": "Earlier", "time": "Oct 10", "pinned": false,
+    "blocks": [
+      {"kind": "lead", "text": "Nothing needs to be finished yet."},
+      {"kind": "paragraph", "text": "A place for the half-formed thought, the unexpected connection, and the question that deserves another look."},
+      {"kind": "heading", "text": "An open page"},
+      {"kind": "paragraph", "text": "What if the best tool helped you notice more, and asked you to manage less?"}
+    ], "related": "keeping"
+  }
+]

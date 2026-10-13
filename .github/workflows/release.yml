@@ -2,13 +2,14 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    tags: ["v*", "rust-v*"]
 
 permissions:
   contents: write
 
 jobs:
   release:
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     container: archlinux:latest
     timeout-minutes: 40
@@ -55,3 +56,60 @@ jobs:
           gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/*.pkg.tar.zst
           dist/install.sh dist/SHA256SUMS dist/SOURCE_REVISION --title "Omarchy Notes ${GITHUB_REF_NAME}"
           --notes-file dist/NOTES.md --verify-tag --draft
+
+  rust-release:
+    if: startsWith(github.ref, 'refs/tags/rust-v')
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    timeout-minutes: 90
+    steps:
+      - name: Install separate Rust release dependencies
+        run: pacman -Syu --noconfirm appstream base-devel clang cmake curl desktop-file-utils git github-cli namcap pkgconf python ripgrep rustup shellcheck sudo util-linux
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Create unprivileged builder
+        run: |
+          useradd --create-home builder
+          echo 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
+          chmod 440 /etc/sudoers.d/builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          runuser -u builder -- git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Verify immutable Rust metadata and installer
+        run: |
+          runuser -u builder -- python3 tests/test_rust_release.py
+          bash -n install.sh tests/check-rust-arch-package.sh tests/test-rust-installer-package.sh
+          shellcheck install.sh tests/check-rust-arch-package.sh tests/test-rust-installer-package.sh
+          runuser -u builder -- ./tests/test-installer.sh
+      - name: Prepare stable Rust artifacts from the exact Rust tag
+        run: |
+          runuser -u builder -- python3 packaging/prepare-release.py --edition rust --ref "$GITHUB_REF_NAME" --output dist-rust
+          runuser -u builder -- bash -c 'cd dist-rust/aur && makepkg --syncdeps --noconfirm --cleanbuild'
+          ./tests/check-rust-arch-package.sh dist-rust/aur
+          runuser -u builder -- ./tests/test-rust-installer-package.sh dist-rust/aur
+          cp dist-rust/aur/omarchy-notes-rust-[0-9]*-x86_64.pkg.tar.zst dist-rust/
+          cp install.sh dist-rust/install.sh
+          cd dist-rust
+          sha256sum ./*.tar.gz ./*.pkg.tar.zst install.sh SOURCE_REVISION RELEASE_KIND > SHA256SUMS
+      - name: Write Rust release notes
+        run: |
+          test -s docs/rust-release-notes.md
+          version="${GITHUB_REF_NAME#rust-v}"
+          rg -q "^# Omarchy Notes Rust ${version}([[:space:]]|$)" docs/rust-release-notes.md
+          if rg -qi 'unreleased candidate|not a published stable release|No stable artifact is authorized' docs/rust-release-notes.md; then
+            echo 'Replace candidate release notes after the stable acceptance decision.' >&2
+            exit 1
+          fi
+          cp docs/rust-release-notes.md dist-rust/NOTES.md
+      - name: Create separate draft Rust release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo 'The Rust release already exists; preserving its immutable assets.'
+            exit 0
+          fi
+          gh release create "$GITHUB_REF_NAME" dist-rust/*.tar.gz dist-rust/*.pkg.tar.zst \
+            dist-rust/install.sh dist-rust/SHA256SUMS dist-rust/SOURCE_REVISION dist-rust/RELEASE_KIND \
+            --title "Omarchy Notes Rust ${GITHUB_REF_NAME}" --notes-file dist-rust/NOTES.md --verify-tag --draft

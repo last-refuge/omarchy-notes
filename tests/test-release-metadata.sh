@@ -14,7 +14,7 @@ grep -q 'set(ONOTES_APP_ID "org.omarchy.Notes"' CMakeLists.txt
 grep -q 'https://lastrefuge.ai/projects/omarchy-notes' packaging/metainfo/org.omarchy.Notes.metainfo.xml
 grep -q 'GitHub Security Advisories' SECURITY.md
 appstreamcli validate --no-net packaging/metainfo/org.omarchy.Notes.metainfo.xml >/dev/null
-if [[ -n "${GITHUB_REF_NAME:-}" && "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+if [[ ${GITHUB_REF_NAME:-} == v* && "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
   [[ "$GITHUB_REF_NAME" == "v$version" ]]
 fi
 

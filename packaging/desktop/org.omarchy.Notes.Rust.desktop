@@ -1,0 +1,21 @@
+[Desktop Entry]
+Type=Application
+Name=Omarchy Notes (Rust)
+GenericName=Notes
+Comment=Local notes, Rust edition (early access)
+Exec=/usr/bin/omarchy-notes-rust
+Icon=org.omarchy.Notes.Rust
+Terminal=false
+Categories=Office;
+Keywords=notes;notebook;checklist;todo;omarchy;rust;
+StartupNotify=true
+StartupWMClass=org.omarchy.Notes.Rust
+Actions=new-note;quick-note;
+
+[Desktop Action new-note]
+Name=New Rust Note
+Exec=/usr/bin/omarchy-notes-rust --new
+
+[Desktop Action quick-note]
+Name=Rust Quick Note
+Exec=/usr/bin/omarchy-notes-rust --quick-note
