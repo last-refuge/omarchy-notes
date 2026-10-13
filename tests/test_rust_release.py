@@ -88,6 +88,32 @@ class RustReleaseTests(unittest.TestCase):
             self.assertEqual(recorded["cwd"], str(source / "omarchy-notes-rust-@RUST_VERSION@"))
             self.assertEqual(recorded["cargo_home"], str(source / "cargo-home"))
 
+    def test_package_validation_rejects_namcap_collection_error_even_with_zero_exit(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            tools = root / "bin"
+            tools.mkdir()
+            packages = root / "package"
+            packages.mkdir()
+            (packages / "omarchy-notes-rust-0.1.0-1-x86_64.pkg.tar.zst").touch()
+            for name, script in {
+                "pacman": "#!/bin/sh\nprintf 'omarchy-notes-rust 0.1.0-1\\n'\n",
+                "namcap": "#!/bin/sh\nprintf 'Error: recipe is not a valid PKGBUILD\\n'\nexit 0\n",
+                "bsdtar": "#!/bin/sh\ntouch \"$RUST_RELEASE_EXTRACT_SENTINEL\"\nexit 1\n",
+            }.items():
+                path = tools / name
+                path.write_text(script)
+                path.chmod(0o755)
+            sentinel = root / "extraction-started"
+            env = dict(os.environ, PATH=str(tools) + ":" + os.environ["PATH"], RUST_RELEASE_EXTRACT_SENTINEL=str(sentinel))
+            result = subprocess.run(
+                ["bash", str(ROOT / "tests/check-rust-arch-package.sh"), str(packages)],
+                env=env, capture_output=True, text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("namcap reported Rust packaging errors", result.stderr)
+            self.assertFalse(sentinel.exists(), "Failed collection must stop before package extraction")
+
     def test_candidate_preparation_is_exact_repeatable_and_rejects_cross_edition_tags(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -624,7 +624,11 @@ impl Shell {
                             .text_size(px(10.))
                             .text_color(theme.muted)
                             .child(if self.live.is_some() {
-                                "EARLY ACCESS"
+                                if env!("CARGO_PKG_VERSION").starts_with("0.") {
+                                    "EARLY ACCESS"
+                                } else {
+                                    "RUST EDITION"
+                                }
                             } else {
                                 "PREVIEW"
                             }),

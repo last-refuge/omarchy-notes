@@ -2,9 +2,10 @@
 
 Discovery recorded 13 October 2026 for R0 of the
 [Rust v1 release plan](../llm-docs/rust-v1-release-plan.md).
-This is a release contract and implementation map, **not an announcement that
-Rust v1 has shipped**. Current source and release tooling still identify the
-Rust application as a `0.1.0` preview. Human release gates remain required.
+This is the release contract and implementation map for Rust **1.0.0**.
+The owner directed release of the implemented build on 13 October 2026.
+The evidence ledger records completed checks and remaining follow-up;
+the study and five-day trial also follow after release.
 R4 source now provides the separate Rust executable/package, compatibility
 launcher and metadata, candidate preparation, edition-filtered installer and
 CI routes. Focused identity/installer checks pass; clean package builds,
@@ -101,9 +102,10 @@ Rust additionally implements `--request-id UUID` for safe capture retries,
 `--capture-status UUID` for read-only receipt checks, `--backup PATH`,
 `--inspect-backup PATH`, `--restore PATH --data-dir NEW`, `--reference`,
 `--light` and `--demo`. These need Rust-specific help/man documentation.
-Backup currently requires closing the writer; R3 must provide app routes with
-a declared committed revision boundary. No import/export CLI is currently
-advertised by either edition; app routes remain required for Rust v1.
+CLI backup requires closing the writer. Settings → Data provides in-app import,
+export, backup, inspection, restore and library opening. In-app backup waits for
+pending edits and declares its committed revision boundary. No import/export
+CLI is advertised by either edition.
 
 ## Keyboard contracts
 
@@ -113,8 +115,8 @@ advertised by either edition; app routes remain required for Rust v1.
 | New folder | Ctrl+Shift+N | **Ctrl+Alt+N**; Ctrl+Shift+N opens Rust Quick Note |
 | Library search | Ctrl+Shift+F | Same; Ctrl+K also focuses search |
 | Find in note, next | Ctrl+F, F3 / Enter | Same |
-| Delete selected note | Delete in note list | Required in R2; absent in current shell bindings |
-| Duplicate | Ctrl+D | Required in R2; absent in current shell bindings |
+| Delete selected note | Delete in note list | Keyboard-accessible Note actions → Delete; editor Delete remains text editing |
+| Duplicate | Ctrl+D | Keyboard-accessible Note actions → Duplicate; Qt's Ctrl+D shortcut is not assigned |
 | Show/hide folders | Ctrl+Shift+S | Absent; do not advertise until implemented |
 | Bold / italic / underline | Ctrl+B / I / U | Same |
 | Strikethrough / highlight / monospace | Ctrl+Shift+X / Y, Ctrl+E | Same |

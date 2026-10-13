@@ -14,10 +14,10 @@ import sys
 import tempfile
 import time
 import uuid
-from rust_native_test import InstanceSocket
+from rust_native_test import InstanceSocket, guard_nested_desktop
 
 REPO = Path(__file__).resolve().parents[1]
-BINARY = REPO / "target/release/omarchy-notes-rust"
+BINARY = Path(os.environ.get("NOTES_NATIVE_QA_BINARY", REPO / "target/release/omarchy-notes-rust"))
 
 
 def stop(process):
@@ -91,6 +91,7 @@ def run():
                 return json.loads(subprocess.check_output(["hyprctl", kind, "-j"], timeout=3))
 
             def guard():
+                guard_nested_desktop()
                 assert process.poll() is None, "Owned process exited"
                 active, workspace = compositor("activewindow"), compositor("activeworkspace")
                 assert active.get("pid") == process.pid and active.get("address") == address and active.get("class") == "org.omarchy.Notes.Rust", "Refusing input: owned test window lost focus"
@@ -174,21 +175,50 @@ def run():
             def undo_diagnostics(label):
                 active = compositor("activewindow")
                 selections = [Atspi.Text.get_selection(text, i) for i in range(Atspi.Text.get_n_selections(text))]
-                nodes = list(descendants(app))
-                buttons = {name: [{"enabled": n.get_state_set().contains(Atspi.StateType.ENABLED),
-                                  "sensitive": n.get_state_set().contains(Atspi.StateType.SENSITIVE)}
-                                 for n in nodes if n.get_name() == name]
+                # Diagnostic metadata can outlive a removed status/popover node.
+                # Resolve the current owned frame and snapshot each live node
+                # once; preserve defunct entries rather than aborting the actual
+                # text/undo/save assertions below.
+                nodes, defunct = [], []
+                def snapshot_node(node, path):
+                    if node is None:
+                        return
+                    try:
+                        node.clear_cache()
+                        states = node.get_state_set()
+                        nodes.append({"name": node.get_name(), "role": node.get_role_name(),
+                                      "enabled": states.contains(Atspi.StateType.ENABLED),
+                                      "sensitive": states.contains(Atspi.StateType.SENSITIVE),
+                                      "focused": states.contains(Atspi.StateType.FOCUSED)})
+                        children = [node.get_child_at_index(i) for i in range(node.get_child_count())]
+                    except GLib.GError as error:
+                        defunct.append({"path": path, "error": str(error)})
+                        return
+                    for i, child in enumerate(children):
+                        snapshot_node(child, path + [i])
+                current_app = owned_app()
+                if current_app:
+                    current_app.clear_cache()
+                    for i in range(current_app.get_child_count()):
+                        frame = current_app.get_child_at_index(i)
+                        try:
+                            frame.clear_cache()
+                            if frame.get_name() == active.get("title"):
+                                snapshot_node(frame, [i])
+                        except GLib.GError as error:
+                            defunct.append({"path": [i], "error": str(error)})
+                buttons = {name: [{"enabled": n["enabled"], "sensitive": n["sensitive"]}
+                                 for n in nodes if n["name"] == name]
                            for name in ("Undo", "Redo")}
                 state = {"label": label, "text": Atspi.Text.get_text(text, 0, -1),
                          "caret": Atspi.Text.get_caret_offset(text),
                          "selections": [[s.start_offset, s.end_offset] for s in selections],
-                         "focused_owned_nodes": [(n.get_role_name(), n.get_name()) for n in nodes
-                                                 if n.get_state_set().contains(Atspi.StateType.FOCUSED)],
+                         "focused_owned_nodes": [(n["role"], n["name"]) for n in nodes if n["focused"]],
                          "owned_window_active": active.get("pid") == process.pid and active.get("address") == address,
                          "active_pid": active.get("pid"), "owned_pid": process.pid,
                          "undo_redo_accessible_states": buttons, "app_exit_status": process.poll(),
-                         "cached_save_status_names": [n.get_name() for n in nodes
-                                                       if n.get_role_name() in ("status", "status bar")],
+                         "cached_save_status_names": [n["name"] for n in nodes if n["role"] in ("status", "status bar")],
+                         "defunct_diagnostic_entries": defunct,
                          "owned_composition_protocol_events": [line for line in (root / "app.log").read_text().splitlines()
                                                                if "text_input" in line and ("preedit_string(" in line or "commit_string(" in line)],
                          "operation": "named Undo action" if os.environ.get("NOTES_NATIVE_QA_FOCUS") == "undo-button" else "Ctrl-Z"}

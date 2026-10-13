@@ -149,7 +149,7 @@
       "sha256": "60095122806ebeca6f314c08f72df02681df03610afa6969a9b401157410ea40"
     }
   ],
-  "cargo_lock_sha256": "96a0998af78c6b369eac99bf11d38065bf03e17aebdabd39bf923ba4723a9c3c",
+  "cargo_lock_sha256": "5a8fe1b844982c13905dd931fd8df2208115ce421e5e1b3158983ac508cf46a1",
   "copied_notice_count": 927,
   "date": "2026-10-13",
   "graph": "cargo-tree-selected non-dev normal+build closure",
@@ -160,7 +160,7 @@
     "This does not prove runtime loading, clean installation, or stable release acceptance."
   ],
   "package": "omarchy-notes-preview",
-  "package_version": "0.1.0",
+  "package_version": "1.0.0",
   "resolved_notice_omissions": [
     {
       "license": "CC0-1.0",
@@ -336,5 +336,6 @@
   },
   "status": "source notice collection complete; no legal/runtime/stable acceptance",
   "target": "x86_64-unknown-linux-gnu",
-  "version": 1
+  "version": 1,
+  "version_update": "Only nine workspace package versions changed from0.1.0 to1.0.0; external dependency identities, checksums and bundled asset hashes unchanged."
 }

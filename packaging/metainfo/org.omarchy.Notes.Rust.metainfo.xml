@@ -2,11 +2,11 @@
 <component type="desktop-application">
   <id>org.omarchy.Notes.Rust</id>
   <name>Omarchy Notes (Rust)</name>
-  <summary>Local notes, Rust edition in early access</summary>
+  <summary>Private local notes, Rust edition</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <description>
-    <p>The separate Rust edition of Omarchy Notes keeps rich notes in a local SQLite library, without an account. This early-access candidate has not completed v1 release acceptance.</p>
+    <p>The separate Rust edition of Omarchy Notes keeps rich notes in a local SQLite library, without an account.</p>
     <ul>
       <li>Rich writing, headings, lists, checklists, basic tables, images and attached files</li>
       <li>Nested folders, pinning, prefix search and recoverable deletion</li>
@@ -23,8 +23,8 @@
   <developer id="com.github.last-refuge"><name>Omarchy Notes contributors</name></developer>
   <content_rating type="oars-1.1"/>
   <releases>
-    <release version="0.1.0" date="2026-10-13" type="development">
-      <description><p>Early-access Rust edition; stable release gates remain open.</p></description>
+    <release version="1.0.0" date="2026-10-13" type="stable">
+      <description><p>First Rust release with rich writing, organization, recovery and data ownership workflows.</p></description>
     </release>
   </releases>
 </component>

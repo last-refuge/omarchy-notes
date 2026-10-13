@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Opt-in real IME/Orca QA in an owned nested Hyprland; defaults to preflight.
+"""Opt-in native/IME/Orca QA in an owned nested Hyprland; defaults to preflight.
 No host IME replacement, desktop config writes, systemd environment updates,
 clipboard operations or input outside the exact owned nested app window.
 Speech generation logs are real Orca evidence, not a human usability pass.
@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from rust_native_test import process_start_ticks
 
 REPO = Path(__file__).resolve().parents[1]
 NAMED_KEYS = {"Return", "Escape", "Tab", "Home", "End", "Left", "Right", "Up", "Down", "BackSpace", "Delete", "space", "F3"}
@@ -32,7 +33,9 @@ def args():
     p.add_argument("--binary", type=Path, default=REPO / "target/release/omarchy-notes-rust")
     p.add_argument("--app-id", choices=("org.omarchy.Notes.Rust", "org.omarchy.Notes.Preview"), default="org.omarchy.Notes.Rust", help="Exact owned application identity; select Preview explicitly only for frozen historical binaries")
     p.add_argument("--output", type=Path, default=REPO / "target/isolated-native-qa")
-    p.add_argument("--mode", choices=("ime", "orca", "both"), default="both")
+    p.add_argument("--mode", choices=("ime", "orca", "both", "native"), default="both")
+    p.add_argument("--native-test", action="append", choices=("accessibility", "quick", "settings", "organization", "launch", "performance"), help="Native mode: select established drivers; default is the five functional drivers")
+    p.add_argument("--native-performance-args", nargs=argparse.REMAINDER, help="Arguments forwarded only to the existing selected performance driver")
     p.add_argument("--manual-seconds", type=int, default=0, help="Keep the owned desktop open after scripted checks; no automatic human-pass claim")
     p.add_argument("--routing-proof", action="store_true", help="Prove private input isolation with a second owned host Gtk target; no full scenarios")
     p.add_argument("--private-worker", type=Path, help=argparse.SUPPRESS)
@@ -193,7 +196,8 @@ app.run([sys.argv[0]])
         self.guard()
         initial = self.wait(lambda: json.loads(journal.read_text()) if journal.exists() else None, "owned host entry journal", guarded=True)
         assert initial["pid"] == target.pid and initial["changes"] == 0 and initial["sentinel_unchanged"]
-        checked(["fcitx5-remote", "-c"], self.env)
+        if self.a.mode in ("ime", "both"):
+            checked(["fcitx5-remote", "-c"], self.env)
         text = self.focused_editor()
         before = Atspi.Text.get_text(text, 0, -1)
         self.key("End", ctrl=True)
@@ -659,6 +663,9 @@ runpy.run_path('/usr/bin/orca', run_name='__main__')
         self.guard()
 
     def run(self):
+        if self.a.mode == "native":
+            self.run_native_suite()
+            return
         self.open()
         if self.a.routing_proof:
             self.prove_routing()
@@ -710,14 +717,105 @@ runpy.run_path('/usr/bin/orca', run_name='__main__')
                 time.sleep(.5)
         self.report["status"] = "observed"
 
-    def cleanup(self):
-        if hasattr(self, "signal_subscription"):
-            self.event_bus.signal_unsubscribe(self.signal_subscription)
-        if hasattr(self, "cache_subscription"):
-            self.event_bus.signal_unsubscribe(self.cache_subscription)
+    def stop_owned(self, child):
+        if child.poll() is None:
+            os.killpg(child.pid, signal.SIGTERM)
+            try:
+                child.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                os.killpg(child.pid, signal.SIGKILL)
+                child.wait(timeout=5)
+
+    def prepare_native_environment(self):
+        """Prove this exact private display, then leave only its compositor/bus."""
+        self.open()
+        self.prove_routing()
+        self.clear_listeners()
+        self.stop_owned(self.routing_target[0])
+        self.routing_target = None
+        for name, child in self.children:
+            if name in ("notes", "registry"):
+                self.stop_owned(child)
+        private = Path(self.verify_private_socket()["private_socket"])
+        contract = {"schema": 1, "uid": os.getuid(), "runtime": self.env["XDG_RUNTIME_DIR"],
+                    "instance": self.env["HYPRLAND_INSTANCE_SIGNATURE"],
+                    "private_socket": str(private), "private_inode": [private.stat().st_dev, private.stat().st_ino],
+                    "nested_pid": self.nest.pid, "nested_start_ticks": process_start_ticks(self.nest.pid),
+                    "host_socket": self.env["NOTES_QA_HOST_WAYLAND"],
+                    "host_runtime": self.env["NOTES_QA_HOST_RUNTIME"],
+                    "host_instance": self.env["NOTES_QA_HOST_INSTANCE"],
+                    "outer_address": self.outer_address, "outer_workspace": self.outer_workspace}
+        path = self.root / "nested-guard.json"
+        path.write_text(json.dumps(contract, indent=2) + "\n")
+        path.chmod(0o600)
+        env = dict(self.env, WAYLAND_DISPLAY=str(private), NOTES_NATIVE_QA_NESTED_GUARD=str(path),
+                   NOTES_NATIVE_QA_BINARY=str(self.a.binary))
+        for key in ("NOTES_NATIVE_QA_FOCUS", "NOTES_NATIVE_QA_TRACE", "NOTES_NATIVE_QA_OUTPUT"):
+            env.pop(key, None)
+        self.report["native_suite_guard"] = contract
+        self.report["status"] = "unverified"
+        self.report["native_stage"] = "routing proof observed; established drivers pending"
+        (self.a.output / "report.json").write_text(json.dumps(self.report, indent=2) + "\n")
+        return env
+
+    def run_native_suite(self):
+        env = self.prepare_native_environment()
+        drivers = {"accessibility": ("test-rust-accessibility-native.py", ["--private-bus"]),
+                   "quick": ("test-rust-quick-note-native.py", ["--isolated"]),
+                   "settings": ("test-rust-settings-native.py", ["--isolated"]),
+                   "organization": ("test-rust-organization-native.py", ["--isolated"]),
+                   "launch": ("test-rust-launch-native.py", ["--isolated"]),
+                   "performance": ("test-rust-performance-native.py", self.a.native_performance_args or [])}
+        selected = self.a.native_test or ["accessibility", "quick", "settings", "organization", "launch"]
+        self.report["native_suite"] = []
+        for name in selected:
+            script, arguments = drivers[name]
+            child_env = dict(env)
+            if name == "accessibility":
+                child_env["NOTES_NATIVE_QA_OUTPUT"] = str(self.a.output / "accessibility-details")
+            # Give each established driver a fresh AT-SPI cache. The display and
+            # guarded parent stay the same; only the minimal owned bus changes.
+            command = ["dbus-run-session", "--config-file=" + str(self.root / "dbus.conf"), "--",
+                       sys.executable, str(REPO / "tests" / script), *arguments]
+            child = self.start("native-" + name, command, child_env)
+            try:
+                while child.poll() is None:
+                    assert self.nest.poll() is None, "Owned compositor exited during native test"
+                    time.sleep(.1)
+                self.report["native_suite"].append({"test": name, "returncode": child.returncode,
+                                                   "status": "observed" if child.returncode == 0 else "failed"})
+                assert child.returncode == 0, f"Native {name} failed; inspect native-{name}.log"
+            finally:
+                self.stop_owned(child)
+                # Kill only this owned driver's remaining descendants, including
+                # a child left behind by an assertion before its normal cleanup.
+                try:
+                    os.killpg(child.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+            for source in (REPO / "target").glob(name + "-native-*.log"):
+                shutil.copyfile(source, self.a.output / source.name)
+        self.report["status"] = "observed"
+
+    def clear_listeners(self):
+        for name in ("signal_subscription", "cache_subscription"):
+            if hasattr(self, name):
+                try:
+                    self.event_bus.signal_unsubscribe(getattr(self, name))
+                except Exception as error:
+                    self.report.setdefault("listener_teardown_errors", []).append(repr(error))
+                delattr(self, name)
         if hasattr(self, "atspi_listener"):
             for event in ("object:text-caret-moved", "object:text-selection-changed"):
-                self.atspi_listener.deregister(event)
+                try:
+                    self.atspi_listener.deregister(event)
+                except Exception as error:
+                    self.report.setdefault("listener_teardown_errors", []).append(repr(error))
+            del self.atspi_listener
+
+    def cleanup(self):
+        # Listener failures must never prevent stopping the owned process groups.
+        self.clear_listeners()
         for log in (Path(self.env["XDG_RUNTIME_DIR"]) / "hypr").glob("*/hyprland.log"):
             shutil.copyfile(log, self.a.output / "nested-hyprland-runtime.log")
         results = []
@@ -750,6 +848,11 @@ def main():
     a.binary = a.binary.resolve()
     a.output = a.output.resolve()
     assert 0 <= a.manual_seconds <= 3600
+    assert not a.native_test or a.mode == "native", "--native-test requires --mode native"
+    assert not a.native_performance_args or a.native_test == ["performance"], "Performance arguments require only --native-test performance"
+    assert not a.native_test or len(a.native_test) == len(set(a.native_test)), "Select each native driver once"
+    assert not a.native_test or "performance" not in a.native_test or (a.native_test == ["performance"] and a.native_performance_args), "Select performance alone with its driver arguments"
+    assert a.mode != "native" or a.app_id == "org.omarchy.Notes.Rust", "Routing proof needs the standard Rust application"
     if a.private_worker:
         desktop = Desktop(a, a.private_worker)
         try:
@@ -804,6 +907,10 @@ def main():
         command = ["dbus-run-session", "--config-file=" + str(bus_config), "--", sys.executable, str(Path(__file__).resolve()), "--run", "--private-worker", directory, "--binary", str(a.binary), "--app-id", a.app_id, "--output", str(a.output), "--mode", a.mode, "--manual-seconds", str(a.manual_seconds)]
         if a.routing_proof:
             command.append("--routing-proof")
+        for name in a.native_test or []:
+            command += ["--native-test", name]
+        if a.native_performance_args:
+            command += ["--native-performance-args", *a.native_performance_args]
         with (a.output / "driver.log").open("w") as driver_log:
             session = subprocess.Popen(command, env=env, stdout=driver_log, stderr=driver_log, start_new_session=True)
             try:

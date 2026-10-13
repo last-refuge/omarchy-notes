@@ -1,11 +1,13 @@
 # Rust v1.0 release evidence
 
-Started 13 October 2026. The [release plan](rust-v1-release-plan.md) is the
-acceptance contract. Stable publication remains blocked until every required
-gate has evidence. The owner moved the five-person study and five-working-day
-trial after release on 13 October 2026; they no longer block stable publication.
-A unit, GPU or AT-SPI API test does not certify real IME or Orca operation,
-human first use, or elapsed daily use.
+Started 13 October 2026. The owner directed “Wrap it up and call it 1.0”
+on 13 October 2026, ending further pre-release testing and accepting release of
+the implemented build. Rust workspace/package/application metadata is 1.0.0;
+its separate tag is `rust-v1.0.0`. Remaining unchecked matrix items are recorded
+as post-release follow-up. Historical measured, observed, failed and unverified
+results remain unchanged; release authorization is not a claim that all passed.
+The five-person study and five-day trial also follow after release. No audio
+playback is authorized.
 
 ## Frozen distribution contract
 
@@ -77,6 +79,14 @@ GPU/native checks, ADRs 0002–0016 and preview/rebuild documentation. Existing 
 sources/distribution remain intact. Ignore `target/`, `build*/`, `.cache/` and
 Python caches. Exclude the unrelated
 `llm-docs/mortgage-automator-lendr-course-plan.md` from release commits.
+
+## Final owner-directed freeze
+
+- Version 1.0.0 aligns all nine workspace crates, lockfile, Rust AppStream/man metadata and the live edition label. External dependency versions and checksums are unchanged.
+- The 7969981 candidate package was built and validated, with 523 dependency packages, 927 verified notice references and zero missing texts. Package receipt and actual headless capture/retry checks are under `build-rust-candidates/7969981-identity`. The 1.0.0 package is rebuilt from its final immutable tag.
+- A 1 GiB synthetic corpus (64 distinct 16 MiB attachments) passed backup, inspection, restore, database equality and every asset hash; report `build-rust-candidates/large-asset-check-7969981/report.json`. This is not native typing/import/image-cache evidence.
+- Further native suite work stopped at the owner’s instruction. Private routing/guard checks passed; full accessibility traversal remained failed on stale accessible-node lookup after Unicode edit/undo. All exact owned processes closed; `/tmp/omarchy-v1-native-stop-cleanup.json` records cleanup. Other new private native dispatches, native performance/fairness, complete portal/scaling/suspend and installed upgrade/rollback/coexistence matrix remain unverified follow-up.
+- No five-person study, five-day trial, owner numeric visual scores or audible screen-reader usability results are invented. No further comprehensive run is required before this owner-directed release.
 
 ## Dated verification
 

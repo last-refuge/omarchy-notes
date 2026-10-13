@@ -1,9 +1,8 @@
 # Omarchy Notes — focused Rust v1.0 release push
 
 Date: 13 October 2026  
-Status: implementation in progress; R0 checkpoint `10f392b` is backed up on the
-remote, R1 checkpoint `12375b2`, R2/R3 checkpoint `640deae` and R4 packaging checkpoint `bf0d759` are pushed; final candidate checks are active, and the
-stable release gates remain incomplete. See the
+Status: Rust 1.0.0 release directed by the owner on 13 October 2026.
+Completed checks and remaining follow-up are recorded in the
 [release evidence](rust-v1-release-evidence.md).
 
 Execution update, 13 October 2026: the owner requested focused, quick checks
@@ -16,6 +15,12 @@ Owner decision, 13 October 2026: move the five-person first-use study and
 five-working-day trial to follow-up after release. They no longer block v1.0.
 Technical, data-safety, accessibility, performance, visual and package checks
 remain required; this decision does not turn unverified checks into passes.
+
+Final owner decision, 13 October 2026: “Wrap it up and call it 1.0.”
+Freeze the implemented build, align and publish the separate Rust 1.0.0 edition,
+and stop further pre-release testing. Remaining unchecked items below are
+post-release follow-up, not fabricated passes or blockers to this owner-directed
+release. This decision supersedes the earlier sequencing and exit criteria.
 
 ## Outcome
 

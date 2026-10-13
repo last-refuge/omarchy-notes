@@ -105,7 +105,11 @@ jobs:
       - name: Create separate draft Rust release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release create "$GITHUB_REF_NAME" dist-rust/*.tar.gz dist-rust/*.pkg.tar.zst
-          dist-rust/install.sh dist-rust/SHA256SUMS dist-rust/SOURCE_REVISION dist-rust/RELEASE_KIND
-          --title "Omarchy Notes Rust ${GITHUB_REF_NAME}" --notes-file dist-rust/NOTES.md --verify-tag --draft
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo 'The Rust release already exists; preserving its immutable assets.'
+            exit 0
+          fi
+          gh release create "$GITHUB_REF_NAME" dist-rust/*.tar.gz dist-rust/*.pkg.tar.zst \
+            dist-rust/install.sh dist-rust/SHA256SUMS dist-rust/SOURCE_REVISION dist-rust/RELEASE_KIND \
+            --title "Omarchy Notes Rust ${GITHUB_REF_NAME}" --notes-file dist-rust/NOTES.md --verify-tag --draft

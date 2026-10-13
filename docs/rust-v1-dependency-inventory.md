@@ -1,7 +1,7 @@
 # Rust candidate dependency notices
 
-This is a source inventory for the local **0.1.0 candidate**, not approval to
-publish v1.0. The locked Linux normal/build graph has **523 packages**, and the
+This is a source inventory for the Rust **1.0.0** source. Release was directed by the owner on
+13 October 2026; the inventory does not turn unverified checks into passes. The locked Linux normal/build graph has **523 packages**, and the
 collector currently copies **927 license/notice and publisher-evidence files**.
 **Strict source-text collection now passes with zero missing entries.** Legal
 review, final artifact/runtime inspection, and clean installation remain open

@@ -11,7 +11,7 @@ identity=$(pacman -Qp "$package")
 work_dir=$(mktemp -d)
 trap 'rm -rf "$work_dir"' EXIT
 namcap "$package_dir/PKGBUILD" "$package" | tee "$work_dir/namcap.log"
-if rg -q ' E: ' "$work_dir/namcap.log"; then echo 'namcap reported Rust packaging errors' >&2; exit 1; fi
+if rg -q ' E: |^Error:|^Traceback ' "$work_dir/namcap.log"; then echo 'namcap reported Rust packaging errors' >&2; exit 1; fi
 bsdtar -xf "$package" -C "$work_dir"
 for path in usr/bin/omarchy-notes-rust usr/bin/omarchy-notes-preview \
   usr/share/licenses/omarchy-notes-rust/LICENSE \

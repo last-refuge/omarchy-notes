@@ -3615,7 +3615,7 @@ checksum = "0676bb32a98c1a483ce53e500a81ad9c3d5b3f7c920c28c24e9cb0980d0b5bc8"
 
 [[package]]
 name = "notes-clipboard"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "notes-exchange",
@@ -3626,7 +3626,7 @@ dependencies = [
 
 [[package]]
 name = "notes-core"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -3638,7 +3638,7 @@ dependencies = [
 
 [[package]]
 name = "notes-editor"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "notes-core",
@@ -3650,7 +3650,7 @@ dependencies = [
 
 [[package]]
 name = "notes-exchange"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "base64",
@@ -3664,7 +3664,7 @@ dependencies = [
 
 [[package]]
 name = "notes-export"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "cairo-rs",
@@ -3679,7 +3679,7 @@ dependencies = [
 
 [[package]]
 name = "notes-platform"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "libc",
@@ -3697,7 +3697,7 @@ dependencies = [
 
 [[package]]
 name = "notes-storage"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "image",
@@ -3715,7 +3715,7 @@ dependencies = [
 
 [[package]]
 name = "notes-ui"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "env_logger",
@@ -4218,7 +4218,7 @@ dependencies = [
 
 [[package]]
 name = "omarchy-notes-preview"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "env_logger",

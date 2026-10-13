@@ -13,6 +13,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import time
+from rust_native_test import guard_nested_desktop
 
 
 def run():
@@ -70,6 +71,7 @@ def run():
             address = owned["address"]
 
             def guard():
+                guard_nested_desktop()
                 assert process.poll() is None, "Diagnostic process exited during input"
                 active = compositor("activewindow")
                 workspace = compositor("activeworkspace")

@@ -11,10 +11,10 @@ import subprocess
 import sys
 import tempfile
 import time
-from rust_native_test import InstanceSocket
+from rust_native_test import InstanceSocket, guard_nested_desktop
 
 REPO = Path(__file__).resolve().parents[1]
-BINARY = REPO / "target/release/omarchy-notes-rust"
+BINARY = Path(os.environ.get("NOTES_NATIVE_QA_BINARY", REPO / "target/release/omarchy-notes-rust"))
 APP_ID = "org.omarchy.Notes.Rust"
 
 
@@ -70,6 +70,7 @@ def run():
                 return next((w for w in windows() if w["title"].startswith("Quick Note") == quick), None)
 
             def guard(address):
+                guard_nested_desktop()
                 assert process.poll() is None, log.read_text()[-3000:]
                 active, workspace = compositor("activewindow"), compositor("activeworkspace")
                 assert active.get("pid") == process.pid and active.get("address") == address and active.get("class") == APP_ID, "Refusing input: owned window lost focus"
