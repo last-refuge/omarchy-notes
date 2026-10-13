@@ -128,6 +128,89 @@ class LicenseCollection(unittest.TestCase):
             report = collector.collect(metadata, "app", "linux", root / "different", supplement_file=None)
             self.assertEqual(len(report["missing"]), 1)
 
+    def test_canonical_text_requires_preserved_exact_publisher_declaration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            metadata = self.fixture(directory)
+            root = pathlib.Path(directory)
+            item = metadata["packages"][1]
+            item.update(source="registry+https://example.invalid/index", license="CC0-1.0")
+            metadata["workspace_members"] = ["app"]
+            (root / "normal/LICENSE-MIT").unlink()
+            (root / "normal/.cargo_vcs_info.json").write_text(json.dumps({"git": {"sha1": "locked"}}))
+            publisher = b'license = "CC0-1.0"\n'
+            (root / "normal/Cargo.toml.orig").write_bytes(publisher)
+            (root / "publisher.txt").write_bytes(publisher)
+            canonical = b"Unmodified fixture canonical text\n"
+            (root / "canonical.txt").write_bytes(canonical)
+            entry = {"name": "normal", "version": "1.0.0", "source": item["source"], "license": "CC0-1.0",
+                     "registry_package_sha256": None, "vcs_revision": "locked",
+                     "publisher_bindings": [{"upstream_path": "Cargo.toml.orig", "sha256": collector.hashlib.sha256(publisher).hexdigest(), "required_literal": 'license = "CC0-1.0"'}],
+                     "files": [{"path": "publisher.txt", "sha256": collector.hashlib.sha256(publisher).hexdigest(), "upstream_revision": "locked", "url": "https://example.invalid/locked/Cargo.toml"},
+                               {"path": "canonical.txt", "sha256": collector.hashlib.sha256(canonical).hexdigest(), "kind": "canonical-license-standard", "license_id": "CC0-1.0", "url": collector.CANONICAL_LICENSES["CC0-1.0"]}]}
+            supplement = root / "supplement.json"
+            supplement.write_text(json.dumps({"version": 1, "packages": [entry]}))
+            report = collector.collect(metadata, "app", "linux", root / "good", supplement_file=supplement)
+            notice = next(p for p in report["packages"] if p["name"] == "normal")["license_files"][1]
+            self.assertEqual(notice["authority_license_version"], "CC0-1.0")
+            self.assertNotIn("upstream_revision", notice)
+            (root / "normal/Cargo.toml.orig").write_text('license = "MIT"\n')
+            with self.assertRaisesRegex(ValueError, "Publisher license binding mismatch"):
+                collector.collect(metadata, "app", "linux", root / "changed", supplement_file=supplement)
+            self.assertFalse((root / "changed").exists())
+            (root / "normal/Cargo.toml.orig").write_bytes(publisher)
+            entry["files"][1]["license_id"] = "Apache-2.0"
+            entry["files"][1]["url"] = collector.CANONICAL_LICENSES["Apache-2.0"]
+            supplement.write_text(json.dumps({"version": 1, "packages": [entry]}))
+            with self.assertRaisesRegex(ValueError, "Canonical license lacks"):
+                collector.collect(metadata, "app", "linux", root / "wrong-standard", supplement_file=supplement)
+
+    def test_notice_only_successor_requires_exact_parent_paths_and_diff_text(self):
+        with tempfile.TemporaryDirectory() as directory:
+            metadata = self.fixture(directory)
+            root = pathlib.Path(directory)
+            item = metadata["packages"][1]
+            item["source"] = "registry+https://example.invalid/index"
+            metadata["workspace_members"] = ["app"]
+            (root / "normal/LICENSE-MIT").unlink()
+            (root / "normal/.cargo_vcs_info.json").write_text(json.dumps({"git": {"sha1": "locked"}}))
+            notice = b"Exact publisher permission\n"
+            (root / "notice.txt").write_bytes(notice)
+            commit = {"id": "correction", "parent_ids": ["locked"]}
+            changes = [{"new_path": "LICENSE", "old_path": "LICENSE", "new_file": True, "deleted_file": False,
+                        "renamed_file": False, "collapsed": False, "too_large": False, "diff": "@@ -0,0 +1 @@\n+Exact publisher permission\n"}]
+            entry = {"name": "normal", "version": "1.0.0", "source": item["source"], "license": "MIT",
+                     "registry_package_sha256": None, "vcs_revision": "locked", "files": [{"path": "notice.txt",
+                     "sha256": collector.hashlib.sha256(notice).hexdigest(), "upstream_revision": "correction", "upstream_path": "LICENSE",
+                     "kind": "publisher-notice-correction", "url": "https://example.invalid/correction/LICENSE"}]}
+            supplement = root / "supplement.json"
+            def update_proof():
+                proofs = {}
+                for name, value in (("commit", commit), ("diff", changes)):
+                    data = json.dumps(value).encode()
+                    (root / (name + ".json")).write_bytes(data)
+                    proofs[name] = {"path": name + ".json", "sha256": collector.hashlib.sha256(data).hexdigest(), "url": "https://example.invalid/api/" + name}
+                entry["notice_correction"] = dict(proofs, revision="correction")
+                supplement.write_text(json.dumps({"version": 1, "packages": [entry]}))
+            update_proof()
+            report = collector.collect(metadata, "app", "linux", root / "good", supplement_file=supplement)
+            normal = next(p for p in report["packages"] if p["name"] == "normal")
+            self.assertEqual(normal["license_files"][0]["correction_evidence"]["locked_source_revision"], "locked")
+            commit["parent_ids"] = ["unrelated"]
+            update_proof()
+            with self.assertRaisesRegex(ValueError, "exact notice-only successor"):
+                collector.collect(metadata, "app", "linux", root / "wrong-parent", supplement_file=supplement)
+            commit["parent_ids"] = ["locked"]
+            changes.append(dict(changes[0], new_path="src/lib.rs", old_path="src/lib.rs"))
+            update_proof()
+            with self.assertRaisesRegex(ValueError, "exact notice-only successor"):
+                collector.collect(metadata, "app", "linux", root / "code-change", supplement_file=supplement)
+            changes.pop()
+            changes[0]["diff"] = "@@ -0,0 +1 @@\n+Different notice\n"
+            update_proof()
+            with self.assertRaisesRegex(ValueError, "diff/text mismatch"):
+                collector.collect(metadata, "app", "linux", root / "wrong-diff", supplement_file=supplement)
+            self.assertFalse((root / "wrong-diff").exists())
+
     def test_local_candidate_is_explicit_while_strict_and_default_fail_gaps(self):
         with tempfile.TemporaryDirectory() as directory:
             metadata = self.fixture(directory)

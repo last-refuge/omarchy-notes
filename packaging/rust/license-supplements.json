@@ -1,5 +1,5 @@
 {
-  "description": "Unmodified primary-source license text omitted from exact locked crate archives; each record is bound to publisher archive checksum, Cargo license declaration and published VCS revision. This is provenance evidence, not legal approval.",
+  "description": "Unmodified license texts and publisher evidence for exact locked packages whose archives omit full notices. Exact-revision upstream texts, canonical authority texts with preserved publisher declarations, and verified immediate notice-only corrections are distinguished. Package/archive identity, revisions, authority URLs, source declarations and text hashes are checked; this is source collection, not legal approval.",
   "packages": [
     {
       "files": [
@@ -118,6 +118,38 @@
     {
       "files": [
         {
+          "kind": "upstream",
+          "path": "license-texts/hexf-parse-0.2.1-PUBLISHER-Cargo.toml-4a56dbdbc120.txt",
+          "sha256": "4a56dbdbc12054fd33b7a2634a45cbbe6fe12f5e6f4081002cbfa527f7220c70",
+          "upstream_path": "Cargo.toml.orig",
+          "upstream_revision": "4225763d744183d720f575ae96d04161b4d08ea0",
+          "url": "https://raw.githubusercontent.com/lifthrasiir/hexf/4225763d744183d720f575ae96d04161b4d08ea0/parse/Cargo.toml"
+        },
+        {
+          "kind": "canonical-license-standard",
+          "license_id": "CC0-1.0",
+          "path": "license-texts/hexf-parse-0.2.1-CC0-1.0-a2010f343487.txt",
+          "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+          "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode.txt"
+        }
+      ],
+      "license": "CC0-1.0",
+      "name": "hexf-parse",
+      "publisher_bindings": [
+        {
+          "required_literal": "license = \"CC0-1.0\"",
+          "sha256": "4a56dbdbc12054fd33b7a2634a45cbbe6fe12f5e6f4081002cbfa527f7220c70",
+          "upstream_path": "Cargo.toml.orig"
+        }
+      ],
+      "registry_package_sha256": "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "vcs_revision": "4225763d744183d720f575ae96d04161b4d08ea0",
+      "version": "0.2.1"
+    },
+    {
+      "files": [
+        {
           "path": "license-texts/lyon-1.0.19-LICENSE-MIT-80f275e90d79.txt",
           "sha256": "80f275e90d799911ed3830a7f242a2ef5a4ade2092fe0aa07bfb2d2cf2f2b95e",
           "upstream_revision": "56219c95c658d4f39de7b190d98e57d5773ba241",
@@ -228,6 +260,38 @@
     {
       "files": [
         {
+          "kind": "upstream",
+          "path": "license-texts/pathfinder_geometry-0.5.1-PUBLISHER-lib.rs-cedfb2d85e68.txt",
+          "sha256": "cedfb2d85e682e9b9e327a169347bf0cebecd52668e1ed91a3af05ec91b42090",
+          "upstream_path": "src/lib.rs",
+          "upstream_revision": "a5e98fac00f433fe2ff4b2135383d82491b8bfc5",
+          "url": "https://crates.io/api/v1/crates/pathfinder_geometry/0.5.1/download"
+        },
+        {
+          "kind": "canonical-license-standard",
+          "license_id": "Apache-2.0",
+          "path": "license-texts/pathfinder_geometry-0.5.1-Apache-2.0-cfc7749b96f6.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "MIT/Apache-2.0",
+      "name": "pathfinder_geometry",
+      "publisher_bindings": [
+        {
+          "required_literal": "http://www.apache.org/licenses/LICENSE-2.0",
+          "sha256": "cedfb2d85e682e9b9e327a169347bf0cebecd52668e1ed91a3af05ec91b42090",
+          "upstream_path": "src/lib.rs"
+        }
+      ],
+      "registry_package_sha256": "0b7b7e7b4ea703700ce73ebf128e1450eb69c3a8329199ffbfb9b2a0418e5ad3",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "vcs_revision": "a5e98fac00f433fe2ff4b2135383d82491b8bfc5",
+      "version": "0.5.1"
+    },
+    {
+      "files": [
+        {
           "path": "license-texts/pathfinder_simd-0.5.6-LICENSE-MIT-0621878e61f0.txt",
           "sha256": "0621878e61f0d0fda054bcbe02df75192c28bde1ecc8289cbd86aeba2dd72720",
           "upstream_revision": "6c3c0466f451c5bd2007087728cd168798cd64e8",
@@ -310,6 +374,37 @@
     {
       "files": [
         {
+          "kind": "publisher-notice-correction",
+          "path": "license-texts/seahash-4.1.0-LICENSE-MIT-23f18e03dc49.txt",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "upstream_path": "LICENSE",
+          "upstream_revision": "3088c5c912b70b586d27bf553fbe964e025a2c89",
+          "url": "https://gitlab.redox-os.org/redox-os/seahash/-/raw/3088c5c912b70b586d27bf553fbe964e025a2c89/LICENSE"
+        }
+      ],
+      "license": "MIT",
+      "name": "seahash",
+      "notice_correction": {
+        "commit": {
+          "path": "license-evidence/seahash-4.1.0-seahash-commit-88070d5450f1.json",
+          "sha256": "88070d5450f14766fa88c06ea0d0f82f6ae5ae5a8e16d0a596b6645d638052d3",
+          "url": "https://gitlab.redox-os.org/api/v4/projects/597/repository/commits/3088c5c912b70b586d27bf553fbe964e025a2c89"
+        },
+        "diff": {
+          "path": "license-evidence/seahash-4.1.0-seahash-diff-a7dc61ed6126.json",
+          "sha256": "a7dc61ed6126217d60b64c93d37f5f9b00a4b7f9aedc9e1993a88969c09d0d81",
+          "url": "https://gitlab.redox-os.org/api/v4/projects/597/repository/commits/3088c5c912b70b586d27bf553fbe964e025a2c89/diff"
+        },
+        "revision": "3088c5c912b70b586d27bf553fbe964e025a2c89"
+      },
+      "registry_package_sha256": "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "vcs_revision": "94b632aeac099031c373599313d5b5f0acbbaec0",
+      "version": "4.1.0"
+    },
+    {
+      "files": [
+        {
           "path": "license-texts/spirv-0.4.0+sdk-1.4.341.0-LICENSE-cfc7749b96f6.txt",
           "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
           "upstream_revision": "8afc3d0ac8e158128cd1410bb2e4b4c26ab11bb4",
@@ -354,6 +449,23 @@
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "vcs_revision": "45a56299d366ddb383e593a1f0372158d00e8530",
       "version": "0.13.0"
+    },
+    {
+      "files": [
+        {
+          "kind": "upstream",
+          "path": "license-texts/zune-inflate-0.2.54-LICENSE-ZLIB-7fa429541e55.txt",
+          "sha256": "7fa429541e55b1509909e058f2d21a37467e4958ec713b357f6e0cf9dc4ee352",
+          "upstream_revision": "69502ce83fdfecdd0beefd677e2abb3781b29d98",
+          "url": "https://raw.githubusercontent.com/etemesi254/zune-image/69502ce83fdfecdd0beefd677e2abb3781b29d98/LICENSE-ZLIB"
+        }
+      ],
+      "license": "MIT OR Apache-2.0 OR Zlib",
+      "name": "zune-inflate",
+      "registry_package_sha256": "73ab332fe2f6680068f3582b16a24f90ad7096d5d39b974d1c0aff0125116f02",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "vcs_revision": "69502ce83fdfecdd0beefd677e2abb3781b29d98",
+      "version": "0.2.54"
     }
   ],
   "version": 1

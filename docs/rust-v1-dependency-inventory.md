@@ -2,12 +2,13 @@
 
 This is a source inventory for the local **0.1.0 candidate**, not approval to
 publish v1.0. The locked Linux normal/build graph has **523 packages**, and the
-collector currently copies **921 license/notice files**. **Four packages still
-lack complete source license texts.** Legal review, final artifact/runtime
-inspection, and clean installation remain open gates.
+collector currently copies **927 license/notice and publisher-evidence files**.
+**Strict source-text collection now passes with zero missing entries.** Legal
+review, final artifact/runtime inspection, and clean installation remain open
+gates.
 
 The machine-readable summary in `rust-v1-dependency-inventory.json` records the
-exact Cargo.lock SHA-256, declaration counts, unresolved package evidence, and
+exact Cargo.lock SHA-256, declaration counts, resolved notice provenance, and
 bundled asset hashes. Counts are from the selected x86_64 Linux package graph on
 2026-10-13. They must be regenerated when the lock, features or target changes.
 
@@ -23,7 +24,7 @@ python3 packaging/rust/collect-licenses.py \
 ```
 
 `--candidate` explicitly permits testing a local candidate with an incomplete
-inventory. Its JSON retains `collection_complete: false`, all gaps, publisher
+inventory. Its JSON retains `collection_complete: false` when gaps exist, plus publisher
 evidence and a testing-only purpose; successful exit does not close licensing
 or stable release acceptance. The recipe permits this mode only when the
 committed archive's `RELEASE_KIND` is exactly `candidate`.
@@ -43,7 +44,7 @@ is not an exact list of compiled code inside the executable. Saved metadata
 via `--metadata` can overinclude workspace-unified features and says so in its
 inventory. Ambiguous package source identities fail rather than guess.
 
-## Text provenance and remaining gaps
+## Text provenance and resolved omissions
 
 Packaged LICENSE/COPYING/NOTICE/copyright files are copied unchanged from each
 exact crate. Local workspace crates may use the repository's MIT text. Pinned
@@ -51,26 +52,34 @@ Git workspace license links must resolve inside that source workspace; shared
 generic licenses require a matching declaring expression. In particular,
 GPUI's Apache crates use their Apache text, not Zed's GPL editor license.
 
-Eighteen published crate archives omitted their upstream license texts. The
-29 checked-in supplements in `packaging/rust/license-texts/` are unmodified
-primary-source texts from each crate's published VCS revision. The companion
-`license-supplements.json` binds every file to its SHA-256, upstream URL/revision,
-exact package version, Cargo declaration and locked archive checksum. A
-mismatched revision, archive identity or text hash fails collection. The two
-XIM subcrates use the MIT license present in their exact pinned Git workspace.
+Twenty-two published crate archives omitted full notices. The 35 checked-in
+supplements in `packaging/rust/license-texts/` preserve exact source texts,
+publisher declarations and canonical authority texts. The companion
+`license-supplements.json` distinguishes those origins and binds each to its
+SHA-256, primary URL, applicable version, Cargo declaration and locked archive
+checksum. A mismatched revision, archive identity, publisher binding or text
+hash fails collection. The two XIM subcrates use the MIT license present in
+their exact pinned Git workspace.
 
-| Package | Publisher declaration | Remaining source-text evidence |
+| Package | Publisher declaration | Verified resolution |
 | --- | --- | --- |
-| hexf-parse 0.2.1 | CC0-1.0 | Exact archive and VCS revision are identified; no full license text was found in the published crate or its revision. Publisher author metadata is retained, not treated as copyright ownership. |
-| pathfinder_geometry 0.5.1 | MIT/Apache-2.0 | `src/lib.rs` names the Pathfinder Project Developers and licensing URLs. The corresponding full texts are absent; the historical primary-source revision was not available from the attempted archive lookup. |
-| seahash 4.1.0 | MIT | Exact archive, revision and author metadata are retained. The source archive omits the full text, and the primary upstream endpoint was unavailable during this audit. |
-| zune-inflate 0.2.54 | MIT OR Apache-2.0 OR Zlib | Exact archive and revision are retained. Its source header gives a copyright year and alternatives; a full exact-revision license supplement still requires review and incorporation. |
+| hexf-parse 0.2.1 | CC0-1.0 | Its exact published manifest matches the primary revision's `parse/Cargo.toml` byte for byte. That declaration is preserved beside the unmodified official Creative Commons CC0 1.0 legal text. A later upstream change to 0BSD is not applied to this version. |
+| pathfinder_geometry 0.5.1 | MIT/Apache-2.0 | The complete unmodified `src/lib.rs` copyright/licensing notice from the checksum-bound crate is preserved beside the official Apache 2.0 text at the URL that notice identifies. The unavailable historical Git object is not presented as a fetched license file. |
+| seahash 4.1.0 | MIT | Upstream's immediate next commit adds only the missing MIT `LICENSE`. Primary commit/diff evidence verifies its sole parent is the exact published revision and that the copied text equals the added lines; no source change or copyright attribution is invented. |
+| zune-inflate 0.2.54 | MIT OR Apache-2.0 OR Zlib | The unmodified `LICENSE-ZLIB` from the exact published VCS revision is included. This documents the Zlib alternative; it does not claim all three alternative texts were found. |
 
-The generated inventory includes each missing package's publisher declaration,
+The generated inventory includes each package's publisher declaration,
 archive checksum, manifest hashes, repository/homepage, authors and VCS revision.
-Literal copyright excerpts are recorded with source path, line and file hash
-when present. Empty excerpt lists do not establish the absence of a rights
-holder. Generic replacement texts are not fabricated to make the gate pass.
+Publisher declarations and copyright notices are copied unchanged. Canonical
+license texts explicitly identify their authority/version and exact source
+binding; they are not falsely labeled files found in the archive. Author
+metadata is not converted into invented copyright holders or years.
+
+The source bindings are [hexf's exact declaration](https://github.com/lifthrasiir/hexf/blob/4225763d744183d720f575ae96d04161b4d08ea0/parse/Cargo.toml),
+the [official CC0 legal text](https://creativecommons.org/publicdomain/zero/1.0/legalcode.txt),
+Pathfinder's published crate notice and the [official Apache text](https://www.apache.org/licenses/LICENSE-2.0.txt),
+the [SeaHash notice-only correction](https://gitlab.redox-os.org/redox-os/seahash/-/commit/3088c5c912b70b586d27bf553fbe964e025a2c89),
+and [Zune's exact Zlib text](https://github.com/etemesi254/zune-image/blob/69502ce83fdfecdd0beefd677e2abb3781b29d98/LICENSE-ZLIB).
 
 ## Manual review and assets
 
@@ -99,10 +108,13 @@ has been met.
 
 ## Focused verification
 
-Six collector regressions pass: normal/build graph selection and deterministic
+Eight collector regressions pass: normal/build graph selection and deterministic
 output, missing-text reporting and overwrite refusal, bounded source symlinks,
 exact supplement identity/hash enforcement, shared Git license declaration
-matching, and explicit candidate versus default/strict failure behavior.
-The actual locked selected graph produced the local candidate inventory in
-0.89 seconds, retaining all four gaps. No app build, native input, settings
-change or audio operation was performed for this collection.
+matching, explicit candidate versus default/strict failure behavior, exact
+canonical publisher/authority bindings, and notice-only successor parent/path/
+diff verification. Changed publisher declarations, wrong license standards,
+unrelated parents, code-changing successors and mismatched notice additions
+fail before output creation. The actual locked selected graph passes
+`--require-complete` with zero gaps. No app build, native input, settings change
+or audio operation was performed for this collection.

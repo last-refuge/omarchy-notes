@@ -57,6 +57,37 @@ class RustReleaseTests(unittest.TestCase):
             self.assertEqual(result.returncode, 37)
             self.assertEqual(json.loads(result.stdout), args)
 
+    def test_prepare_fetches_only_the_locked_advertised_target_in_private_cargo_home(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "src"
+            (source / "omarchy-notes-rust-@RUST_VERSION@").mkdir(parents=True)
+            tools = root / "bin"
+            tools.mkdir()
+            cargo = tools / "cargo"
+            cargo.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json,os,sys\n"
+                "from pathlib import Path\n"
+                "Path(os.environ['RUST_RELEASE_FETCH_LOG']).write_text(json.dumps({"
+                "'args':sys.argv[1:],'cwd':os.getcwd(),'cargo_home':os.environ.get('CARGO_HOME')}))\n"
+            )
+            cargo.chmod(0o755)
+            rustup = tools / "rustup"
+            rustup.write_text("#!/bin/sh\nexit 0\n")
+            rustup.chmod(0o755)
+            log = root / "fetch.json"
+            env = dict(os.environ, PATH=str(tools) + ":" + os.environ["PATH"], RUST_RELEASE_FETCH_LOG=str(log))
+            subprocess.run(
+                ["bash", "-c", 'source "$1"; srcdir="$2"; prepare', "rust-recipe-prepare",
+                 str(ROOT / "packaging/arch/PKGBUILD-rust.in"), str(source)],
+                env=env, check=True, capture_output=True, text=True,
+            )
+            recorded = json.loads(log.read_text())
+            self.assertEqual(recorded["args"], ["fetch", "--locked", "--target", "x86_64-unknown-linux-gnu"])
+            self.assertEqual(recorded["cwd"], str(source / "omarchy-notes-rust-@RUST_VERSION@"))
+            self.assertEqual(recorded["cargo_home"], str(source / "cargo-home"))
+
     def test_candidate_preparation_is_exact_repeatable_and_rejects_cross_edition_tags(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

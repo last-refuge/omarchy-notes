@@ -22,7 +22,7 @@ prepare() {
   cd "$srcdir/$pkgname-$pkgver"
   # The source's rust-toolchain.toml supplies the exact toolchain.
   rustup show
-  cargo fetch --locked
+  cargo fetch --locked --target x86_64-unknown-linux-gnu
 }
 
 build() {

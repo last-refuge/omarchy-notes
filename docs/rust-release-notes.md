@@ -14,6 +14,8 @@ notes do not certify them.
 
 Before a stable tag, replace this candidate note with the exact tested scope,
 source revision, supported platform, installation/rollback instructions and
-remaining minor limitations. Required human trial/accessibility, full native,
-performance, failure, compatibility, installed-package and dependency-license
-gates remain open. No stable artifact is authorized by this file.
+remaining minor limitations. Required owner visual review, accessibility, full
+native, performance, failure, compatibility, installed-package and
+dependency-license gates remain open. The owner moved the five-person first-use
+study and five-working-day trial to follow-up after release on 13 October 2026;
+neither has recorded results yet. No stable artifact is authorized by this file.

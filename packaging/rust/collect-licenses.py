@@ -14,6 +14,10 @@ from pathlib import Path
 MAX_TEXT_BYTES = 2 * 1024 * 1024
 TEXT_PREFIXES = ("LICENSE", "LICENCE", "COPYING", "NOTICE", "UNLICENSE", "COPYRIGHT")
 SUPPLEMENTS = Path(__file__).with_name("license-supplements.json")
+CANONICAL_LICENSES = {
+    "CC0-1.0": "https://creativecommons.org/publicdomain/zero/1.0/legalcode.txt",
+    "Apache-2.0": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+}
 
 
 def normal_build_closure(metadata: dict, package: str) -> tuple[list[dict], dict]:
@@ -167,17 +171,75 @@ def supplement_texts(item: dict, evidence: dict, supplement_file: Path | None) -
         entry["registry_package_sha256"] != evidence["registry_package_sha256"] or
         entry["vcs_revision"] != evidence["vcs_revision"]):
         raise ValueError(f"License supplement does not match locked publisher identity: {item['name']}")
-    result = []
     boundary = supplement_file.parent.resolve()
-    for notice in entry["files"]:
-        path = (boundary / notice["path"]).resolve(strict=True)
+
+    def checked_file(record: dict) -> bytes:
+        path = (boundary / record["path"]).resolve(strict=True)
         if not path.is_file() or not path.is_relative_to(boundary) or path.stat().st_size > MAX_TEXT_BYTES:
-            raise ValueError(f"Invalid supplement path: {notice['path']}")
+            raise ValueError(f"Invalid supplement path: {record['path']}")
         data = path.read_bytes()
         data.decode("utf-8")
-        if not data or hashlib.sha256(data).hexdigest() != notice["sha256"]:
-            raise ValueError(f"License supplement hash mismatch: {notice['path']}")
-        if notice["upstream_revision"] != entry["vcs_revision"]:
+        if not data or hashlib.sha256(data).hexdigest() != record["sha256"]:
+            raise ValueError(f"License supplement hash mismatch: {record['path']}")
+        return data
+
+    # A canonical legal text needs an exact publisher declaration/header, not
+    # just our inference from a related crate's license. Preserve that publisher
+    # evidence verbatim alongside the canonical text.
+    bindings = entry.get("publisher_bindings", [])
+    root = Path(item["manifest_path"]).resolve().parent
+    for binding in bindings:
+        path = (root / binding["upstream_path"]).resolve(strict=True)
+        if not path.is_file() or not path.is_relative_to(root) or path.stat().st_size > MAX_TEXT_BYTES:
+            raise ValueError(f"Invalid publisher binding: {item['name']}")
+        data = path.read_bytes()
+        if (hashlib.sha256(data).hexdigest() != binding["sha256"] or
+            binding["required_literal"] not in data.decode("utf-8")):
+            raise ValueError(f"Publisher license binding mismatch: {item['name']}")
+        preserved = [n for n in entry["files"] if n["sha256"] == binding["sha256"] and n.get("kind", "upstream") == "upstream"]
+        if not preserved:
+            raise ValueError(f"Publisher license evidence is not preserved: {item['name']}")
+
+    # SeaHash fixed its omitted notice in the immediate next commit. Verify the
+    # primary API evidence confirms the exact parent and only new notice files;
+    # a later code-changing revision must never substitute for locked source.
+    correction = entry.get("notice_correction")
+    if correction:
+        commit = json.loads(checked_file(correction["commit"]))
+        changes = json.loads(checked_file(correction["diff"]))
+        if (commit.get("id") != correction["revision"] or
+            commit.get("parent_ids") != [entry["vcs_revision"]] or not changes or
+            any(not d.get("new_file") or d.get("deleted_file") or d.get("renamed_file") or
+                d.get("collapsed") or d.get("too_large") or
+                d.get("new_path") != d.get("old_path") or
+                "/" in d.get("new_path", "") or
+                not d.get("new_path", "").upper().startswith(TEXT_PREFIXES) for d in changes)):
+            raise ValueError(f"Publisher notice correction is not an exact notice-only successor: {item['name']}")
+
+    result = []
+    for notice in entry["files"]:
+        data = checked_file(notice)
+        kind = notice.get("kind", "upstream")
+        if kind == "canonical-license-standard":
+            ident = notice.get("license_id")
+            tokens = re.findall(r"[A-Za-z0-9.+-]+", item.get("license") or "")
+            if (not bindings or ident not in tokens or
+                notice.get("url") != CANONICAL_LICENSES.get(ident)):
+                raise ValueError(f"Canonical license lacks exact publisher/authority binding: {item['name']}")
+        elif kind == "publisher-notice-correction":
+            if (not correction or notice["upstream_revision"] != correction["revision"] or
+                not any(d["new_path"] == notice.get("upstream_path") for d in changes)):
+                raise ValueError(f"License correction revision mismatch: {notice['path']}")
+            change = next(d for d in changes if d["new_path"] == notice["upstream_path"])
+            added = "\n".join(line[1:] for line in change["diff"].splitlines() if line.startswith("+") and not line.startswith("+++")) + "\n"
+            if added.encode("utf-8") != data:
+                raise ValueError(f"License correction diff/text mismatch: {notice['path']}")
+            notice = dict(notice, correction_evidence={
+                "locked_source_revision": entry["vcs_revision"],
+                "commit": {k: correction["commit"][k] for k in ("url", "sha256")},
+                "diff": {k: correction["diff"][k] for k in ("url", "sha256")},
+            })
+        elif kind != "upstream" or notice["upstream_revision"] != entry["vcs_revision"]:
             raise ValueError(f"License supplement revision mismatch: {notice['path']}")
         result.append((notice, data))
     return result
@@ -232,11 +294,22 @@ def collect(metadata: dict, package: str, target: str, output: Path, selected: s
         if not record["license_files"]:
             for notice, data in supplement_texts(item, record["publisher_evidence"], supplement_file):
                 destination = f"{directory}/{Path(notice['path']).name}"
-                record["license_files"].append({
+                copied = {
                     "path": destination, "sha256": notice["sha256"],
-                    "upstream_url": notice["url"], "upstream_revision": notice["upstream_revision"],
-                    "origin": "checked-in exact-revision source supplement; absent from published crate archive",
-                })
+                    "upstream_url": notice["url"],
+                    "origin": notice.get("kind", "upstream"),
+                }
+                if notice.get("kind") == "canonical-license-standard":
+                    copied["authority_license_version"] = notice["license_id"]
+                    copied["publisher_binding"] = "Exact source declaration/header preserved beside this unmodified canonical text; not a license file found in the publisher archive."
+                else:
+                    copied["upstream_revision"] = notice["upstream_revision"]
+                if notice.get("upstream_path"):
+                    copied["upstream_path"] = notice["upstream_path"]
+                if notice.get("kind") == "publisher-notice-correction":
+                    copied["publisher_binding"] = "Verified immediate successor of locked source adds only notice files; primary commit/diff evidence is preserved in the source supplement manifest."
+                    copied["correction_evidence"] = notice["correction_evidence"]
+                record["license_files"].append(copied)
                 texts.append((destination, data))
         if not record["license"] or not record["license_files"]:
             missing.append(f"{item['name']} {item['version']}: missing declaration or redistribution text")

@@ -2,8 +2,10 @@
 
 Started 13 October 2026. The [release plan](rust-v1-release-plan.md) is the
 acceptance contract. Stable publication remains blocked until every required
-gate has evidence. A unit, GPU or AT-SPI API test does not certify real IME or
-Orca operation, human first use, or elapsed daily use.
+gate has evidence. The owner moved the five-person study and five-working-day
+trial after release on 13 October 2026; they no longer block stable publication.
+A unit, GPU or AT-SPI API test does not certify real IME or Orca operation,
+human first use, or elapsed daily use.
 
 ## Frozen distribution contract
 
@@ -22,14 +24,14 @@ Orca operation, human first use, or elapsed daily use.
 | Gate | Status | Revision / procedure / platform | Result and remaining work |
 |---|---|---|---|
 | V1-01 checkpoint | measured / observed | `10f392bb5d6075419b0e3e1549fe892d96b3deca`; archived Git tree and commands below | Checkpoint committed on `codex/rust-v1-release` and pushed to origin with owner approval. Exact archived-source headless CI checks pass locally. All four hosted CI jobs passed, including clean Qt package/install verification. |
-| V1-02 identity/scope | observed contract; distribution unverified | Contract above; [edition audit](../docs/rust-edition.md) | Scope/platform/naming and preview alias route are explicit. AUR name and Rust tags absent at discovery. Executable/package/installer implementation remains R4 work. |
+| V1-02 identity/scope | observed contract; distribution checks active | `bf0d759`; [edition audit](../docs/rust-edition.md) | Separate Rust executable, desktop ID, package recipe, preview alias and edition-aware installer are implemented. Immutable candidate package build and installed verification remain active. |
 | V1-03 writing/capture/IME/Orca | unverified; frozen-binary engine observations | R1 checkpoint; isolated fcitx5/Orca and native AT-SPI procedures below | Frozen-binary main/Quick CJK composition, handoff and silent Orca event processing observed. Full cached-client suite, candidate visual review, long Quick scrolling and human screen-reader core tasks remain required. Owner's no-dictation constraint persists. |
-| V1-04 organization/search/recovery | implementation / focused checks | R2 source increments below | Keyboard tree, per-library persistence and tagged FTS sorting/paging pass focused GPU checks. Duplicate/trash UI integration and final end-to-end acceptance remain open. |
-| V1-05 portability | implementation / focused backend checks | R3 source increments below | Prepared atomic file import, portable exports with assets and controlled exact-boundary backup checks pass. App integration, native chooser/open-window and final failure/round-trip matrix remain open. |
+| V1-04 organization/search/recovery | implemented / focused checks passed | `640deae`; R2 source increments below | Keyboard tree, persistence, tagged FTS sorting/paging, duplicate, trash, Undo and recovery pass focused GPU/backend checks. Final native/fault acceptance remains open. |
+| V1-05 portability | implemented / focused checks passed | `640deae`; R3 source increments below | In-app reviewed import, note/library export, exact-boundary backup, inspect and restore pass focused GPU/backend checks with asset/reopen verification. Native chooser/open-library and final failure matrix remain open. |
 | V1-06 performance/fault/rollback | failed large-edit CPU budget; remaining scopes unverified | R1/R4; [performance record](../docs/rust-performance.md) | Undo and editor/cache bounds implemented. Latest frozen large-edit CPU p95 60.217 ms fails 33 ms; scrolling meets its CPU target. Native submission/under-load decision and full memory/fault/rollback matrix remain pending. |
 | V1-07 visual/native integrations | unverified | R4 state matrix | Existing GPU artifacts are baseline evidence; new paths, scaling and native integrations require review. |
-| V1-08 licenses/package/installer | unverified | R4 | Rust package not yet built; runtime/licenses and disposable installation matrix pending. |
-| V1-09 human acceptance | unverified | R5, identifiable installed candidate | Five actual participants, owner visual scores and five working days of actual use required. No participants or trial results recorded. |
+| V1-08 licenses/package/installer | implemented / focused checks passed; build active | `bf0d759` and notice follow-up; R4 | Immutable preparation, 26 installer cases, four release tests and eight notice-collector tests pass. Strict collection covers 523 packages and 927 notice/evidence files with zero gaps. Package/runtime audit and disposable installation matrix remain open. |
+| V1-09 human acceptance | visual review unverified; study/trial follow after release | Owner decision, 13 October 2026 | Owner visual scores remain required. Five actual participants and five working days of use are post-release follow-up; no invented or elapsed-use results recorded. |
 | V1-10 immutable release | unverified | R6 | No Rust stable tag/artifact published; final exact revision/hosted CI/checksums pending. |
 
 ## Reproduction environment
@@ -65,7 +67,7 @@ committed revision; configured jobs alone do not pass that check.
 | B03 / R1 | Real CJK composition and Orca editing in main/Quick windows. | Dependencies installed; actual Pinyin and silent Orca event diagnostics observed. Final binary/candidate review and human core-task usability remain unverified. No audio playback is authorized. |
 | B04 / R1 | Run defined 3,000-paragraph/20-table and 10,000-note workloads. | Record latency/frame/RSS/cache/undo budgets and pinned calloop decision under load. Eager layout remains a risk until measured. |
 | B05 / R2–R4 | Execute each frozen workflow and visual/fault/install matrix. | Finish implementations and verify with exact fixtures and revision; no inferred passes. |
-| B06 / R5 | Start acceptance on the installed release candidate. | Real first-use observations, owner review and five elapsed working days; cannot be replaced with a synthetic script. |
+| B06 / R5 | Owner visual review on the identifiable release candidate. | First-use study and five-day trial moved after release by owner decision on 13 October 2026; actual follow-up evidence remains required. |
 
 ## Checkpoint inventory
 
@@ -77,6 +79,15 @@ Python caches. Exclude the unrelated
 `llm-docs/mortgage-automator-lendr-course-plan.md` from release commits.
 
 ## Dated verification
+
+- 13 October 2026, immutable `bf0d759` source: **measured** formatting, 171 workspace tests (zero failures, three ignored subprocess helpers), six vendored AccessKit tests and strict all-target/all-feature Clippy passed. Full Qt suite passed all six targets with zero skipped QTest cases; Qt product source is unchanged from the archived `640deae` build. Initial socket restrictions and transient scratch-write failures are preserved as failed environment runs. Logs: `/tmp/omarchy-v1-final-rust-bf0d759` and `/tmp/omarchy-v1-final-qt-640deae`.
+- 13 October 2026, preserved standard binary SHA-256 `76f292efc6d45493ae132ef0ff8dd957a79bfbf6fc72ad1bdfb480ca8fe792ed`: **observed** actual fcitx5 Pinyin main/Quick commit/cancel/selection/Enter/undo/redo/scroll/resize, guarded handoff and durable acknowledgments. Actual Orca generated 20 utterances with audio transport disabled; cache warnings were absent and all five owned child processes closed. Main/Quick candidate screenshots reviewed; complete human usability and resize/scale visual acceptance remain unverified. Report: `build-rust-candidates/bf0d759-standard/isolated-native/report.json`. Product/Cargo/vendor diff between binary source `640deae` and package checkpoint `bf0d759` is empty; the report honestly records current documentation/notice changes.
+- 13 October 2026, notice-only follow-up: **measured** strict collection passes 523 locked Linux normal/build packages, 927 notice/publisher-evidence files, zero missing entries; eight collector and four immutable-release/recipe tests pass. Primary exact notices, canonical texts bound to exact publisher declarations, and a verified immediate notice-only SeaHash successor have distinct recorded provenance. No license or copyright attribution is invented.
+
+- 13 October 2026: **observed** R2/R3 checkpoint `640deae401c435aad0e3bf68ea403f79a05ca3c7` pushed; its [hosted CI](https://github.com/last-refuge/omarchy-notes/actions/runs/38475657846) passed. Default-feature release binary `omarchy-notes-rust 0.1.0` built with SHA-256 `76f292efc6d45493ae132ef0ff8dd957a79bfbf6fc72ad1bdfb480ca8fe792ed`. This is a usable early-access build, not stable acceptance.
+- 13 October 2026: **observed** packaging checkpoint `bf0d759d681026d7882ba0e58760725aefb34f5a` pushed; its [hosted CI](https://github.com/last-refuge/omarchy-notes/actions/runs/38476724975) is running. Exact immutable candidate prepared in `/tmp/omarchy-rust-candidate-bf0d759`; local fresh-Cargo package build uses `makepkg --nodeps --cleanbuild`, so it does not prove declared-dependency installation. Docker is unavailable because the local socket denies access; no host permissions were changed.
+- 13 October 2026: **observed** current Rust native startup checks passed raced creation/one owner, display-free forwarding, explicit-note startup, unknown-target refusal and failed creation without false success. Private bus and temporary libraries, no synthetic input or audio; log `/tmp/omarchy-v1-final-startup-bf0d759.log`. Launch-input run stopped on its exact-window focus guard before typing; that interrupted run is not a pass.
+- 13 October 2026: **owner scope decision** moves the five-person study and five-working-day trial after release. Technical tests, fixes and owner visual review continue; no human results are inferred.
 
 - 13 October 2026, local original preview tree: **measured** formatting and
   all-target/all-feature Clippy with warnings denied passed. Logs are local

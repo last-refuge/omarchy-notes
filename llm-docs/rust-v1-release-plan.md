@@ -2,7 +2,7 @@
 
 Date: 13 October 2026  
 Status: implementation in progress; R0 checkpoint `10f392b` is backed up on the
-remote, R1 checkpoint `12375b2` is pushed, R2/R3 implementation and focused checks are active, and the
+remote, R1 checkpoint `12375b2`, R2/R3 checkpoint `640deae` and R4 packaging checkpoint `bf0d759` are pushed; final candidate checks are active, and the
 stable release gates remain incomplete. See the
 [release evidence](rust-v1-release-evidence.md).
 
@@ -11,6 +11,11 @@ after each implementation increment and comprehensive testing on the final
 candidate. Preserve every frozen feature and stable acceptance gate below;
 carry remaining native/performance/visual matrix checks forward explicitly
 instead of delaying missing user workflows through repeated harness refinement.
+
+Owner decision, 13 October 2026: move the five-person first-use study and
+five-working-day trial to follow-up after release. They no longer block v1.0.
+Technical, data-safety, accessibility, performance, visual and package checks
+remain required; this decision does not turn unverified checks into passes.
 
 ## Outcome
 
@@ -85,14 +90,13 @@ not appear as inert buttons. Publish an explicit Rust/Qt feature comparison.
 | R2 | Complete organize → find → delete → recover workflow | R1 |
 | R3 | Complete import → export → backup → restore workflow | R1; integrate with R2 |
 | R4 | Polished, hardened, installable release candidate | R2 and R3 |
-| R5 | Candidate passes first-use review and five-working-day trial | R4 |
+| R5 | Candidate passes visual and technical sign-off; study/trial follow after release | R4 |
 | R6 | Immutable, verified stable Rust release and recovery instructions | R5 |
 
 Keep one product increment active at a time. Packaging discovery can begin in R0,
 and representative fault/visual tests belong in each stage. Do not leave all
-native testing or visual correction until R4. Set a release-date estimate after
-R1 exposes the actual input/accessibility/performance work; the five-working-day
-trial is real elapsed use, not a test script or an implementation estimate.
+native testing or visual correction until R4. The post-release five-working-day
+trial records actual use; no synthetic or invented participant evidence is valid.
 
 ### R0 — Preserve the work and establish the release baseline
 
@@ -241,23 +245,24 @@ Only documented minor defects can remain; unsupported core workflows are blocker
 
 ### R5 — Prove the product is ready to use
 
-1. Run the first-use study with at least five people. At least four must complete
+1. After release, run the first-use study with at least five people. At least four must complete
    each task without hints: create/format, organize, search/reopen, open an
    attachment, recover a deleted note, and create/restore a backup. Record actual
    observations, time/friction and accessibility issues; do not invent participants.
-2. Conduct five working days of actual use of the installed candidate. Include
+2. After release, conduct five working days of actual use of the installed app. Include
    repeated main/Quick handoff, notes with media, imports/exports, backup and
    suspend/resume. Record crashes, confusing behavior and recurring annoyances.
 3. Score composition, typography, spacing, color/contrast, feedback and state
    completeness from 1–5. Require at least 4 in each, with the product owner's
    assessment of the reference comparison. Correct material deviations.
 4. Fix blockers and retest their affected paths. A material change to saving,
-   migration, input or ownership requires a fresh relevant trial; unchanged areas
-   may retain dated evidence. The final candidate must be identifiable throughout.
+   migration, input or ownership requires fresh relevant verification; unchanged
+   areas may retain dated evidence. The final candidate must be identifiable throughout.
 
 **Exit:** no open data-loss, false-save, crash-in-core-workflow, keyboard-trap,
 unusable accessible editing, serious performance or severe visual issue. Repeated
-everyday friction has been resolved. Human evidence is real and recorded.
+everyday friction has been resolved. The study and trial are recorded follow-up
+work after release under the owner's decision above, with real human evidence.
 
 ### R6 — Release the tested Rust edition
 
@@ -337,7 +342,7 @@ shareable screenshots free of production notes and unrelated desktop content.
 - [ ] V1-06 — Performance, memory, failure/crash and migration/rollback gates pass.
 - [ ] V1-07 — Included visual states, focus/scaling and native integrations pass.
 - [ ] V1-08 — License/runtime audit and installed-package/installer matrix pass.
-- [ ] V1-09 — First-use study, product-owner visual review and five-day trial pass.
+- [ ] V1-09 — Product-owner visual review passes; study and five-day trial are documented post-release follow-up.
 - [ ] V1-10 — Exact release artifacts, documentation, tag and checksums agree.
 
 For each final candidate run formatting, workspace tests and all-target/all-feature

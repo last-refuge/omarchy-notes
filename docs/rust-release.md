@@ -3,7 +3,9 @@
 The Rust workspace is still **0.1.0, early access**. These tools prepare a
 candidate; they do not declare v1 ready, publish an artifact or install anything
 on their own. The release evidence ledger retains the native, compatibility,
-performance, license, installation and human acceptance gates.
+performance, license, installation, accessibility and owner visual acceptance
+gates. The owner moved the five-person first-use study and five-working-day trial
+to follow-up after release on 13 October 2026; neither has recorded results yet.
 
 Rust uses `omarchy-notes-rust`, desktop identity `org.omarchy.Notes.Rust`, and
 eventually the separate `rust-v1.0.0` tag. Qt remains the default installer route
