@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Omarchy Notes</title>
-<meta name="description" content="Fast, native notes for Omarchy. Checklists, tables, images, tags and search, stored on your machine and dressed in your theme.">
+<meta name="description" content="Native Rust notes for Omarchy. Rich writing, checklists, basic tables, images and search, stored on your machine.">
 <meta property="og:title" content="Omarchy Notes">
 <meta property="og:description" content="Fast, native notes for Omarchy, inspired by Apple Notes.">
-<meta property="og:image" content="images/screenshot-dark.png">
+<meta property="og:image" content="images/rust-v1-writing-dark.png">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -208,20 +208,20 @@
 
   <main>
     <div class="hero">
-      <span class="eyebrow">For Omarchy · Native Qt · Free and open source</span>
+      <span class="eyebrow">For Omarchy · Native Rust / GPUI · Free and open source</span>
       <h1>Notes that feel at home on Omarchy.</h1>
-      <p class="lede">Apple Notes' easy capture, rebuilt as a fast native app for your desktop. Start typing and it's saved: checklists, tables, images, <span class="tag">#tags</span> and search, stored on your machine and dressed in your theme.</p>
+      <p class="lede">Local, offline notes in a native Rust app. Rich writing, checklists, basic tables, images, Quick Note and search, stored on your machine with no account required.</p>
       <div class="cta">
         <div class="command" aria-label="Install command">
-          <span class="prompt">$</span><code id="install-cmd">sudo pacman -U https://github.com/last-refuge/omarchy-notes/releases/download/v1.0.0/omarchy-notes-1.0.0-1-x86_64.pkg.tar.zst</code>
+          <span class="prompt">$</span><code id="install-cmd">bash install.sh --version rust-v1.0.0 --no-quick-note</code>
           <button class="copy" type="button" data-copy="install-cmd">Copy</button>
         </div>
-        <a class="secondary" href="#install">Other ways to install</a>
+        <a class="secondary" href="#install">Download and inspect the installer</a>
       </div>
-      <p class="soon">Coming soon to the AUR, once it reopens new account sign-ups.</p>
+      <p class="soon">x86_64 Arch/Omarchy · Wayland/Hyprland. Qt is retired; <a href="migrating.md">legacy migration</a> only.</p>
       <div class="shot">
-        <img src="images/screenshot-dark.png" width="1240" height="780"
-             alt="Omarchy Notes in the Kanagawa theme: a folder sidebar with tags, a note list, and a meeting note with headings, round checkboxes and a table">
+        <img src="images/rust-v1-writing-dark.png"
+             alt="Omarchy Notes Rust 1.0 dark writing view">
       </div>
     </div>
 
@@ -234,10 +234,10 @@
       <div class="features">
         <div class="feature"><h3>Write, it's saved</h3><p>Autosave confirms "Saved" only once your words are really on disk. If saving ever fails, your text stays put with Retry and Export.</p></div>
         <div class="feature"><h3>Checklists and tables</h3><p>Nested checklists with round checkboxes, numbered and bulleted lists, and tables where <kbd>Tab</kbd> moves between cells.</p></div>
-        <div class="feature"><h3>Images and files</h3><p>Paste images, attach PDFs and anything else, and browse every attachment across your notes in one place.</p></div>
-        <div class="feature"><h3>Folders, tags, Smart Folders</h3><p>Nest folders, type <span class="tag">#work</span> to tag, and save filters like "tagged #work with an open checklist" that stay current.</p></div>
+        <div class="feature"><h3>Images and files</h3><p>Paste images and attach files to notes. Existing merged tables and rich documents are preserved.</p></div>
+        <div class="feature"><h3>Folders and filing</h3><p>Nested folders, pins, sorting and Recently Deleted. Tag/Smart Folder interfaces, gallery and library-wide attachment browsing remain deferred.</p></div>
         <div class="feature"><h3>Find anything</h3><p>Search all notes as you type with <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>F</kbd>, or find inside a note with <kbd>Ctrl</kbd> <kbd>F</kbd>.</p></div>
-        <div class="feature"><h3>Quick Note</h3><p>A small capture window on a key of your choice, plus <code>omarchy-notes --capture "idea"</code> from any terminal.</p></div>
+        <div class="feature"><h3>Quick Note</h3><p>A small capture window on a key of your choice, plus <code>omarchy-notes-rust --capture "idea"</code> from any terminal.</p></div>
       </div>
     </section>
 
@@ -245,16 +245,16 @@
       <div class="section-head">
         <span class="eyebrow">Theming</span>
         <h2 id="themes-h">It wears whatever theme you do.</h2>
-        <p>Colours come straight from your active Omarchy theme and change the moment you switch, with automatic fixes when a palette would be hard to read.</p>
+        <p>The initial appearance follows supported Omarchy theme settings. Settings remembers your palette, writing font, size and pane preferences.</p>
       </div>
       <div class="themes">
         <figure>
-          <img src="images/screenshot-light.png" width="1240" height="780" loading="lazy" alt="A note in the Catppuccin Latte theme">
-          <figcaption>Catppuccin Latte</figcaption>
+          <img src="images/rust-v1-writing-light.png" loading="lazy" alt="Rust writing view in a light palette">
+          <figcaption>Light writing</figcaption>
         </figure>
         <figure>
-          <img src="images/screenshot-gallery.png" width="1240" height="780" loading="lazy" alt="The gallery view in the Rosé Pine theme, with an image preview card">
-          <figcaption>Rosé Pine, gallery view</figcaption>
+          <img src="images/rust-v1-quick-note.png" loading="lazy" alt="Rust Quick Note window">
+          <figcaption>Quick Note</figcaption>
         </figure>
       </div>
     </section>
@@ -264,12 +264,12 @@
         <div class="section-head">
           <span class="eyebrow">Yours to keep</span>
           <h2 id="yours-h">No account. No cloud. No lock-in.</h2>
-          <p>Your library is a folder in <code>~/.local/share/omarchy-notes</code>: one SQLite database and your attachments.</p>
+          <p>Your library is a folder in <code>~/.local/share/omarchy-notes-gpui</code>: one SQLite database and your attachments.</p>
         </div>
         <ul class="points">
           <li><span><b>Works offline, always.</b> Nothing leaves your machine.</span></li>
-          <li><span><b>Crash-safe.</b> Every confirmed save survives a power cut, and deleted notes wait 30 days in Recently Deleted.</span></li>
-          <li><span><b>One-click backups.</b> Complete copies you can restore, checked before anything is replaced.</span></li>
+          <li><span><b>Crash-safe.</b> Confirmed saves are committed to SQLite; deleted notes have 30-day retention in Recently Deleted.</span></li>
+          <li><span><b>One-click backups.</b> Verified complete copies, restored into a new library without replacing your current notebook.</span></li>
           <li><span><b>Leave any time.</b> Export notes as Markdown, HTML or PDF, or your whole library as Markdown folders.</span></li>
           <li><span><b>Moving in.</b> Import Markdown files or whole folders from Apple Notes exporters, Obsidian and more.</span></li>
         </ul>
@@ -283,32 +283,28 @@
       </div>
       <div class="install">
         <div class="step">
-          <h3>From the latest release</h3>
-          <p>On Omarchy or any Arch system, install the package from <a href="https://github.com/last-refuge/omarchy-notes/releases/latest">GitHub Releases</a>:</p>
-          <div class="command"><span class="prompt">$</span><code id="install-cmd-2">sudo pacman -U https://github.com/last-refuge/omarchy-notes/releases/download/v1.0.0/omarchy-notes-1.0.0-1-x86_64.pkg.tar.zst</code><button class="copy" type="button" data-copy="install-cmd-2">Copy</button></div>
-          <p class="note"><b>Coming soon to the AUR.</b> The AUR has paused new account sign-ups while it deals with a wave of automated registrations. Omarchy Notes will be published there as soon as registration reopens, and then <code>yay -S omarchy-notes</code> will work too.</p>
-        </div>
-        <div class="step">
-          <h3>Install with guided progress</h3>
-          <p>The checkout installer checks release checksums, shows progress, and offers optional Quick Note setup. Download and inspect it, then run it as your normal user:</p>
-<pre class="block">curl -fsSL https://raw.githubusercontent.com/last-refuge/omarchy-notes/master/install.sh -o install.sh
+          <h3>Download and inspect</h3>
+          <p>Use the published <a href="https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.0.0">Rust 1.0 release</a> installer on x86_64 Arch/Omarchy, as your normal user:</p>
+<pre class="block">curl -fsSL https://github.com/last-refuge/omarchy-notes/releases/download/rust-v1.0.0/install.sh -o install.sh
 less install.sh
-bash install.sh --dry-run
-bash install.sh</pre>
-          <p class="note">Run it again to update. Use <code>--version v1.0.0</code> to choose a release or <code>--source</code> to build with makepkg. <code>--yes</code> accepts package installation; Quick Note requires <code>--quick-note</code> for unattended runs. Your notes are kept. The v1.0.0 release has no installer asset yet.</p>
+bash install.sh --version rust-v1.0.0 --dry-run
+bash install.sh --version rust-v1.0.0 --no-quick-note</pre>
+          <p class="note">The current installer installs Rust by default and needs no edition selector. Older edition-aware installers require <code>--edition rust</code>. Checksums and package identity are verified before pacman installation. Run it again to update; data is retained. Binary/package remains <code>omarchy-notes-rust</code>, desktop ID <code>org.omarchy.Notes.Rust</code>.</p>
         </div>
         <div class="step">
-          <h3>Then open it</h3>
-          <p>Press <kbd>Super</kbd> <kbd>Space</kbd> and search for <b>Omarchy Notes</b>. Optional: put Quick Note on <kbd>Super</kbd> <kbd>Alt</kbd> <kbd>N</kbd>. This checks your existing key bindings first and never overwrites one:</p>
-          <div class="command"><span class="prompt">$</span><code id="hypr-cmd">omarchy-notes --setup-hyprland</code><button class="copy" type="button" data-copy="hypr-cmd">Copy</button></div>
+          <h3>Open and capture</h3>
+          <p>Search your launcher for <b>Omarchy Notes (Rust)</b>. Use its <b>Rust Quick Note</b> action, <code>omarchy-notes-rust --quick-note</code>, or <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>N</kbd> in the app. A global shortcut needs a manual unused compositor binding; automatic setup is not implemented.</p>
         </div>
         <div class="step">
-          <h3>Or build it yourself</h3>
-          <p>You'll need Qt 6.8 or newer, SQLite, CMake and Ninja.</p>
-<pre class="block">git clone https://github.com/last-refuge/omarchy-notes.git
-cd omarchy-notes
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$HOME/.local"
-cmake --build build &amp;&amp; cmake --install build</pre>
+          <h3>Build from source</h3>
+          <p>Install the pinned Rust toolchain and native dependencies from the <a href="rust-release.md">Rust build guide</a>. The Cargo package name is historical:</p>
+<pre class="block">cargo run --release --locked -p omarchy-notes-preview --bin omarchy-notes-rust
+cargo test --workspace --locked</pre>
+        </div>
+        <div class="step">
+          <h3>Scope and migration</h3>
+          <p>Advanced table operations, drag filing, bulk organization and browsable revision history are deferred. X11 and other architectures are not advertised. Native/package and human usability checks still have gaps; see <a href="rust-release-notes.md">release notes</a>.</p>
+          <p>Qt is retired, not a current install or support option. Migrate copies with verified backups; schema-3 quotation libraries require Rust. See <a href="migrating.md">migration</a> and <a href="rust-data-ownership.md">data and backups</a>. Profile names remain unchanged; data and backups are unencrypted.</p>
         </div>
       </div>
     </section>

@@ -1,11 +1,17 @@
-# Rust / GPUI writing preview
+# Rust / GPUI writing and capture guide
+
+Omarchy Notes is Rust-only; Qt is retired and mentioned below only for legacy
+format migration. This guide retains incremental screenshots and verification
+notes from development. Old milestone gates are historical, not current support
+policy. For current release scope and unverified acceptance items, see the
+[release notes](rust-release-notes.md).
 
 The Rust edition creates, edits and saves real notes with inline images,
 attachment cards, rich clipboard exchange and carefully typeset PDF export. It pairs a quiet,
 serif writing surface with graphite/champagne and warm-paper appearances,
 selection-aware formatting controls, focus mode and layouts down to 420 logical
-pixels. **This is early access.** The Qt app remains the supported release and
-installer; the complete rebuild feasibility gate is still open.
+pixels. The current installer defaults to Rust. Retirement of Qt does not close
+the native/package or human usability verification gaps.
 
 ![Images and attachment cards in the real GPUI editor](images/gpui-media-dark.png)
 
@@ -24,16 +30,16 @@ uses installed fonts: `noto-fonts` is recommended, with `noto-fonts-cjk`,
 `noto-fonts-emoji` and fonts for the languages you write in. Do not run Cargo as root.
 
 ```sh
-cargo run --release -p omarchy-notes-preview -- --reference
-cargo run --release -p omarchy-notes-preview -- --light
+cargo run --release --locked -p omarchy-notes-preview --bin omarchy-notes-rust -- --reference
+cargo run --release --locked -p omarchy-notes-preview --bin omarchy-notes-rust -- --light
 # Choose a new library explicitly:
-cargo run --release -p omarchy-notes-preview -- --data-dir /tmp/my-rust-notebook
+cargo run --release --locked -p omarchy-notes-preview --bin omarchy-notes-rust -- --data-dir /tmp/my-rust-notebook
 # The original disposable design sample remains opt-in:
-cargo run --release -p omarchy-notes-preview -- --demo --reference
+cargo run --release --locked -p omarchy-notes-preview --bin omarchy-notes-rust -- --demo --reference
 ```
 
 Normal launches use `$XDG_DATA_HOME/omarchy-notes-gpui`, falling back to
-`~/.local/share/omarchy-notes-gpui`. The installed Qt library is never selected
+`~/.local/share/omarchy-notes-gpui`. The retired Qt library is never selected
 automatically. `--data-dir` can open a compatible library; use a consistent
 backup/copy for compatibility testing, and close the other edition first.
 The editions exclude each other through the same `.lock` protocol. Rust forwards
@@ -121,8 +127,9 @@ acknowledgement; errors keep your input ready to correct and retry.
 
 Filing keeps your current text, caret and undo/redo history and returns you to
 the editor. Existing rich documents and the Qt-compatible schema are preserved.
-Folder deletion, trash, drag-and-drop filing, persistent expansion state and
-complete keyboard tree navigation remain pending. See
+Folder deletion, Recently Deleted and keyboard tree navigation are available.
+Drag-and-drop filing remains deferred; folder deletion Undo restores notes unfiled
+rather than rebuilding the deleted folders. See
 [ADR 0016](decisions/0016-folders-and-filing.md).
 
 ## Make yourself at home
@@ -234,8 +241,9 @@ path and database digest, but cannot protect a backup that is later moved or del
 JSON and rich clipboard preserve quotation blocks. HTML uses `blockquote`, and
 the Markdown conversion backend uses `>`. Pasting a quote into prose keeps its
 boundaries; nested HTML/Markdown quotes flatten with an explicit warning. PDF
-preserves the inset rule across page breaks. Full Markdown file import/export and
-media packaging remain pending; the conversion backend is not yet a file UI.
+preserves the inset rule across page breaks. Reviewed Markdown/text file import
+and portable Markdown/HTML exports with assets are available through Settings;
+see [data ownership](rust-data-ownership.md).
 
 ## Connect a thought
 
@@ -358,7 +366,7 @@ other Wayland clipboard protocols remain pending.
 Headless capture, help and version do not initialize a window or GPU:
 
 ```sh
-printf 'A thought to keep\nSome details.' | cargo run --release -p omarchy-notes-preview -- --capture -
+printf 'A thought to keep\nSome details.' | omarchy-notes-rust --capture -
 ```
 
 Capture now also works while the Rust app owns that library. The note appears in
@@ -389,7 +397,7 @@ Use **Ctrl+Shift+N** or the notebook icon beside New Note to open Quick Note.
 Start directly in its compact writing window, or reach the existing Quick Note:
 
 ```sh
-cargo run --release -p omarchy-notes-preview -- --reference --quick-note
+cargo run --release --locked -p omarchy-notes-preview --bin omarchy-notes-rust -- --reference --quick-note
 ```
 
 Quick Note has the same rich formatting, images, files and clipboard as the main
@@ -416,9 +424,9 @@ It preserves the current note and caret. These options work at startup and when
 that Rust library is already open:
 
 ```sh
-target/release/omarchy-notes-preview --new
-target/release/omarchy-notes-preview --note NOTE_UUID
-target/release/omarchy-notes-preview --quick-note
+omarchy-notes-rust --new
+omarchy-notes-rust --note NOTE_UUID
+omarchy-notes-rust --quick-note
 ```
 
 Add `--data-dir PATH` when using a different library. `--new` creates and opens
@@ -482,15 +490,15 @@ blocks creation. Never use your only copy of a library for fault testing.
 
 ### Full-library backups and safe restore
 
-Close the edition using the source library, then use the preview's headless
+Close the writer using the source library, then use the Rust app's headless
 commands. The destination's parent must exist; its final folder must be new.
 
 ```sh
 # Replace the example paths with your library, backup and recovery locations.
-target/release/omarchy-notes-preview --data-dir /path/to/library --backup /path/to/new-backup
-target/release/omarchy-notes-preview --inspect-backup /path/to/new-backup
-target/release/omarchy-notes-preview --restore /path/to/new-backup --data-dir /path/to/new-restored-library
-target/release/omarchy-notes-preview --data-dir /path/to/new-restored-library --reference
+omarchy-notes-rust --data-dir /path/to/library --backup /path/to/new-backup
+omarchy-notes-rust --inspect-backup /path/to/new-backup
+omarchy-notes-rust --restore /path/to/new-backup --data-dir /path/to/new-restored-library
+omarchy-notes-rust --data-dir /path/to/new-restored-library --reference
 ```
 
 These commands need no display or running app. Backup takes the shared library
@@ -521,15 +529,17 @@ such a directory as a completed backup. An error syncing the parent after
 publication preserves the completed destination and names it for inspection.
 The commands refuse missing/damaged assets and unsupported future formats.
 
-Actual Qt backup creation → Rust restore and Rust backup → Qt inspection/open
-pass in the scratch-library oracle. SIGKILL tests cover snapshot, blob, manifest
+Historical Qt backup creation → Rust restore and Rust backup → Qt inspection/open
+passed in the scratch-library oracle. SIGKILL tests cover snapshot, blob, manifest
 and publication boundaries; injected write failures cover ENOSPC paths. Physical
 disk-full, sudden power loss, network filesystems and production-scale timing are
 not verified. The quote-upgrade panel uses this backup path with progress and
-cancellation. General in-app backup/restore and Settings routes remain pending.
-Schema-3 backups restore in Rust; Qt rejects them. Actual Qt refusal and restoring
-the pre-upgrade schema-2 backup are covered by the cross-edition oracle; see
-[ADR 0011](decisions/0011-backups-and-quote-migration.md).
+cancellation. General in-app backup/restore and Settings routes are now available;
+see [data ownership](rust-data-ownership.md).
+Schema-3 backups restore in Rust. Historical cross-edition checks verified that
+Qt rejected them and could reopen the restored pre-upgrade schema-2 backup; see
+[ADR 0011](decisions/0011-backups-and-quote-migration.md). Current regressions use
+Rust and frozen legacy fixtures; the live Qt oracle has been retired.
 
 ## A page worth sharing
 
@@ -576,17 +586,18 @@ large-document performance guarantees.
 
 ## Remaining work
 
-New table merges, trash and folder deletion, tags/Smart Folders,
-remaining library views, non-PDF import/export and the in-app backup/restore workflow
-remain pending. Personal writing/appearance Settings are available; their
-remaining library-action routes still need implementation. Window forwarding, Quick Note and headless verified
-backup/restore commands are available.
-Library search uses loaded text; SQLite FTS is maintained for compatibility but
-is not yet the search backend. Large-document layout and undo memory have not
-been optimized or benchmarked. Loaded documents and undo snapshots are in memory.
+New table merges and advanced table operations, tags/Smart Folder interfaces,
+gallery and library-wide attachment browsing, drag filing, bulk organization and
+browsable revision history remain deferred. Trash, folder deletion, prefix search
+with snippets, reviewed imports, portable exports and in-app backup/restore are
+implemented. Editor retention and layout have bounded implementations and measured
+CPU budgets; broader native fairness/performance acceptance remains follow-up.
 
-The input adapter implements UTF-16 ranges, marked text and caret geometry, with
-composition logic tested through GPUI. **Real IME and Orca are not verified.**
+The input adapter implements UTF-16 ranges, marked text and caret geometry.
+Release checks recorded actual CJK composition and silent Orca processing, but
+**complete human accessibility usability is unverified**. The native Unicode
+editing/undo test stopped on stale accessible node traversal; see the
+[release notes](rust-release-notes.md) for the evidence boundary.
 The installed AT-SPI client reports cache-signature warnings and can retain
 closed-window nodes; the multi-window oracle explicitly selects the active
 window's accessibility frame. Screen-reader behavior across handoff still needs
@@ -601,7 +612,8 @@ geometry need deeper coverage.
 The pinned Linux AccessKit adapter exposes `Text`, but not AT-SPI `EditableText`;
 editing uses the keyboard after accessible caret/selection changes.
 X11 runtime, mixed-DPI, suspend/resume and long-session behavior remain unverified.
-These gaps keep M2 open and prevent installer cutover.
+These were open M2 gates. Rust is now the installer default, but retirement does
+not establish that these checks passed; consult the current release evidence.
 
 ## Development checks
 
@@ -625,17 +637,10 @@ cargo run -p notes-ui --example pdf-ui-check --features visual-tests -- target/p
 # PDF checks also require Poppler and qpdf; --output must name a new directory:
 cargo build -p notes-export --example pdf-check --locked
 python tests/test-rust-pdf.py target/debug/examples/pdf-check --output target/pdf-review
-# Cross-version checks additionally require Qt6Core, sqlite3, Python and g++:
-cargo build --release -p omarchy-notes-preview --locked
-cargo build -p notes-storage --example compatibility-edit --locked
-python tests/test-rust-compatibility.py target/release/omarchy-notes-preview target/debug/examples/compatibility-edit
-cargo build -p notes-storage --example quote-upgrade --locked
-python tests/test-rust-backups.py target/release/omarchy-notes-preview --quote-driver target/debug/examples/quote-upgrade
-cargo build -p notes-storage --example organization-roundtrip --locked
-python tests/test-rust-organization.py target/debug/examples/organization-roundtrip
 # Durable capture and local Unix IPC, with no graphical session:
+cargo build --release -p omarchy-notes-preview --bin omarchy-notes-rust --locked
 cargo build -p notes-platform --example instance-owner --locked
-python tests/test-rust-capture.py target/release/omarchy-notes-preview target/debug/examples/instance-owner
+python tests/test-rust-capture.py target/release/omarchy-notes-rust target/debug/examples/instance-owner
 ```
 
 The writing harness routes real GPUI input through the rich editor and storage
@@ -648,8 +653,9 @@ The media harness imports images/files through the real writer queue, checks
 cached image rendering, removal/undo, stale-cursor confirmation, cancellation,
 failed import and compact reopen. Storage tests also verify exact portable bytes,
 remapped ownership, corrupt/missing files, size limits and nonblocking rejection
-of special files. The compatibility probe uses the actual Qt document reader and `QLockFile` APIs
-against scratch copies; it checks both lock directions and unchanged blob hashes.
+of special files. Historical legacy migration oracles used the actual Qt document
+reader and `QLockFile` APIs against scratch copies to check both lock directions
+and unchanged blob hashes. Those results are migration evidence, not Qt support.
 
 For opt-in desktop clipboard/input checks (Hyprland, `wtype`, `wl-clipboard`):
 

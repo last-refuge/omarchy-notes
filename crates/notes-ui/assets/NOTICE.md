@@ -7,8 +7,9 @@ https://github.com/notofonts/latin-greek-cyrillic/blob/main/OFL.txt.
 They were copied from the installed Arch `noto-fonts` package; the embedded license
 was checked independently of the package's aggregate license file.
 
-Existing line icons were adapted from this project's `src/app/icons/`, under the
-repository MIT license, changing black strokes to `currentColor`. The additional
+Existing line icons were adapted from the retired Qt app's `src/app/icons/`
+(preserved in Git history), under the repository MIT license, changing black
+strokes to `currentColor`. The additional
 simple geometric icons were authored for this preview under the same license.
 
 The search adapter's input-handler and custom paint integration follows the GPUI

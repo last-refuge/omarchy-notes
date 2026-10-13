@@ -1,7 +1,9 @@
-# Performance
+# Historical Qt performance report
 
-Release gate results for Omarchy Notes 1.0.0, from `tests/bench_library` (build it, then run
-`./tests/bench_library 10000 1024` in the build directory).
+> Qt is retired. These recorded measurements describe the former Qt 1.0.0 app,
+> not the current Rust app. See [Rust performance diagnostics](rust-performance.md).
+
+Historical release gate results from `tests/bench_library` on the Qt build.
 
 The benchmark builds a library of 10,000 generated notes (3–15 paragraphs each, with
 checklists and #tags mixed in) and 1 GB of image attachments. It then measures storage and

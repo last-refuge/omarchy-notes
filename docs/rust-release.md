@@ -1,4 +1,4 @@
-# Building and installing the separate Rust edition
+# Building and installing Omarchy Notes (Rust)
 
 The Rust workspace is **1.0.0**, released at the owner's direction on
 13 October 2026. The evidence ledger distinguishes completed checks from
@@ -6,9 +6,21 @@ remaining follow-up; no unverified check is presented as passed. The five-person
 first-use study and five-working-day trial also follow after release.
 
 Rust uses `omarchy-notes-rust`, desktop identity `org.omarchy.Notes.Rust`, and
-the separate `rust-v1.0.0` tag. Qt remains the default installer route
-and its `omarchy-notes` package remains available. Rust has no `provides` or
-`conflicts` relationship with Qt.
+the `rust-v1.0.0` tag. Omarchy Notes is Rust-only; Qt is retired and relevant
+only for legacy migration. Binary/package/profile identity is unchanged. Rust
+has no `provides` or `conflicts` relationship with the retired Qt package.
+
+## Run from source
+
+Install the toolchain in `rust-toolchain.toml` through rustup and the native
+[development dependencies](gpui-preview.md#run-it). Do not run Cargo as root.
+
+```sh
+cargo run --release --locked -p omarchy-notes-preview --bin omarchy-notes-rust
+cargo test --workspace --locked
+```
+
+The Cargo package name is historical; it does not change the app identity.
 
 ## Candidate source and package
 
@@ -17,7 +29,7 @@ revision, excluding dirty and untracked files, and refuses an existing output
 directory. Use a new directory per candidate:
 
 ```sh
-python3 packaging/prepare-release.py --edition rust --candidate \
+python3 packaging/prepare-release.py --candidate \
   --ref COMMIT_SHA --output build-rust-candidate
 cd build-rust-candidate/aur
 makepkg --syncdeps --cleanbuild
@@ -55,15 +67,16 @@ this list does not claim that audit is complete.
 ## Published installer route
 
 After a Rust release is actually published, download and inspect its installer
-before running it. Select Rust explicitly:
+before running it. The current installer installs Rust by default and needs no
+edition selector. Older edition-aware installers require `--edition rust`.
 
 ```sh
-bash install.sh --edition rust --version rust-vVERSION --dry-run
-bash install.sh --edition rust --version rust-vVERSION --no-quick-note
+bash install.sh --version rust-vVERSION --dry-run
+bash install.sh --version rust-vVERSION --no-quick-note
 ```
 
-Without `--edition rust`, the installer selects Qt. Its latest-release lookup
-filters published, non-draft, non-prerelease tags by the chosen edition; if no
+The installer selects Rust releases by default. Its latest-release lookup
+filters published, non-draft, non-prerelease Rust tags; if no
 match occurs in the newest 100 releases, choose an explicit tag. Tags, assets,
 package metadata and the package-owned executable must all match that edition.
 The installer requires Python 3 for this JSON lookup, along with its existing
@@ -79,14 +92,14 @@ on `PATH` may take precedence; move that specific executable aside after
 verifying the package-owned one. The installer reports such shadowing and does
 not delete manual copies.
 
-## Quick Note and coexistence
+## Quick Note
 
 Choose **Rust Quick Note** from the Rust desktop launcher's actions, run
-`omarchy-notes-rust --quick-note`, or use Ctrl+Shift+N inside Rust. Qt and Rust
-must use distinct global shortcut keys. For a compositor binding, choose an
-unused key such as Super+Alt+Shift+N and execute the absolute Rust command above;
-use `org.omarchy.Notes.Rust` when matching its windows. Keep the existing Qt
-binding intact. Follow the configuration format used by your installed Omarchy
+`omarchy-notes-rust --quick-note`, or use Ctrl+Shift+N inside Rust. For a
+compositor binding, choose an unused key such as Super+Alt+Shift+N and execute
+`/usr/bin/omarchy-notes-rust --quick-note`; use `org.omarchy.Notes.Rust` when
+matching its windows. Do not overwrite a legacy binding during migration.
+Follow the configuration format used by your installed Omarchy
 version; Lua and native Hyprland configuration are not interchangeable.
 
 Rust does not currently implement automatic `--setup-hyprland`. The installer's
@@ -96,7 +109,8 @@ floating-rule and shortcut behavior still require the supported-platform matrix.
 
 ## Recovery and release freeze
 
-Use copies and verified backups when bringing Qt libraries into Rust. Enabling
+Use copies and verified backups when migrating retired Qt libraries into Rust;
+see [migration](migrating.md). Enabling
 quotations creates schema-3 data requiring Rust; returning to Qt uses the
 pre-upgrade backup and excludes later Rust edits. Preserve the newer Rust library
 and export/backup before rollback. Restore into a new verified directory rather
@@ -106,6 +120,7 @@ are useful copies, not lossless replacements for library backups.
 At the final freeze, align workspace, man page, AppStream and release versions,
 record every required gate on that exact revision, and use `rust-vVERSION`.
 Stable artifact preparation requires that exact Rust tag and refuses Qt tags.
-The Rust release workflow creates a draft only; reviewing or publishing it and
-changing the default edition are separate decisions. Never replace an existing
-published archive or reuse Qt's tag.
+The Rust release workflow creates a draft only; reviewing and publishing it are
+separate decisions. The installer default is now Rust, not a reason to rename
+packages or profiles. Never replace an existing published archive or reuse a
+retired Qt tag.

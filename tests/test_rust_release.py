@@ -19,6 +19,26 @@ spec.loader.exec_module(prepare_release)
 
 
 class RustReleaseTests(unittest.TestCase):
+    def test_distribution_routes_are_rust_only(self):
+        installer = (ROOT / "install.sh").read_text()
+        self.assertNotIn("--edition", installer)
+        self.assertNotIn("QT_QPA_PLATFORM", installer)
+        self.assertNotIn("qt6-", installer)
+        release = (ROOT / ".github/workflows/release.yml").read_text()
+        self.assertIn('tags: ["rust-v*"]', release)
+        for workflow in (ROOT / ".github/workflows").glob("*.yml"):
+            self.assertNotIn("qt6-", workflow.read_text())
+            self.assertNotIn("--edition", workflow.read_text())
+        for legacy in ("arch/PKGBUILD.in", "desktop/org.omarchy.Notes.desktop.in",
+                       "icons/org.omarchy.Notes.svg", "man/omarchy-notes.1",
+                       "metainfo/org.omarchy.Notes.metainfo.xml"):
+            self.assertFalse((ROOT / "packaging" / legacy).exists())
+        result = subprocess.run(["python3", str(ROOT / "packaging/prepare-release.py"),
+                                 "--edition", "qt", "--ref", "HEAD", "--output", "/unused"],
+                                capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unrecognized arguments", result.stderr)
+
     def test_metadata_names_and_current_preview_version_align(self):
         version = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["package"]["version"]
         component = ET.parse(ROOT / "packaging/metainfo/org.omarchy.Notes.Rust.metainfo.xml").getroot()
@@ -121,9 +141,7 @@ class RustReleaseTests(unittest.TestCase):
             repo.mkdir()
             (repo / "packaging/arch").mkdir(parents=True)
             (repo / "Cargo.toml").write_text('[workspace.package]\nversion="0.1.0"\n')
-            (repo / "CMakeLists.txt").write_text("project(omarchy-notes VERSION 1.0.0)\n")
-            for name in ("PKGBUILD.in", "PKGBUILD-rust.in"):
-                (repo / "packaging/arch" / name).write_bytes((ROOT / "packaging/arch" / name).read_bytes())
+            (repo / "packaging/arch/PKGBUILD-rust.in").write_bytes((ROOT / "packaging/arch/PKGBUILD-rust.in").read_bytes())
             (repo / "tracked").write_text("committed source\n")
             subprocess.run(["git", "init", "-q", str(repo)], check=True)
             subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
@@ -141,14 +159,14 @@ class RustReleaseTests(unittest.TestCase):
             os.environ["PATH"] = str(bin_dir) + ":" + old_path
             try:
                 with self.assertRaisesRegex(ValueError, "require --candidate"):
-                    prepare_release.prepare(repo, "HEAD", root / "refused", "rust")
-                with self.assertRaisesRegex(ValueError, "edition"):
-                    prepare_release.prepare(repo, "v1.0.0", root / "wrong-rust", "rust", True)
-                with self.assertRaisesRegex(ValueError, "edition"):
-                    prepare_release.prepare(repo, "rust-v0.1.0", root / "wrong-qt")
+                    prepare_release.prepare(repo, "HEAD", root / "refused")
+                with self.assertRaisesRegex(ValueError, "source version"):
+                    prepare_release.prepare(repo, "v1.0.0", root / "wrong-tag", candidate=True)
+                with self.assertRaisesRegex(ValueError, "require --candidate"):
+                    prepare_release.prepare(repo, "rust-v0.1.0", root / "unreleased")
                 first, second = root / "first", root / "second"
-                prepare_release.prepare(repo, revision, first, "rust", True)
-                prepare_release.prepare(repo, revision, second, "rust", True)
+                prepare_release.prepare(repo, revision, first, candidate=True)
+                prepare_release.prepare(repo, revision, second, candidate=True)
                 self.assertEqual((first / "SOURCE_REVISION").read_text().strip(), revision)
                 self.assertEqual((first / "RELEASE_KIND").read_text().strip(), "candidate")
                 self.assertEqual((first / "SHA256SUMS").read_bytes(), (second / "SHA256SUMS").read_bytes())
@@ -162,6 +180,21 @@ class RustReleaseTests(unittest.TestCase):
                 for line in (first / "SHA256SUMS").read_text().splitlines():
                     digest, name = line.split()
                     self.assertEqual(hashlib.sha256((first / name).read_bytes()).hexdigest(), digest)
+                with self.assertRaisesRegex(ValueError, "already exists"):
+                    prepare_release.prepare(repo, revision, first, candidate=True)
+                (repo / "Cargo.toml").write_text('[workspace.package]\nversion="1.0.0"\n')
+                subprocess.run(["git", "-C", str(repo), "add", "Cargo.toml"], check=True)
+                subprocess.run(["git", "-C", str(repo), "-c", "user.name=Release test", "-c", "user.email=release-test@example.invalid", "commit", "-qm", "stable"], check=True)
+                subprocess.run(["git", "-C", str(repo), "tag", "rust-v1.0.0"], check=True)
+                stable = root / "stable"
+                prepare_release.prepare(repo, "rust-v1.0.0", stable)
+                self.assertEqual((stable / "RELEASE_KIND").read_text(), "stable\n")
+                self.assertNotIn("early access", (stable / "aur/PKGBUILD").read_text())
+                with self.assertRaisesRegex(ValueError, "exact rust-vVERSION tag"):
+                    prepare_release.prepare(repo, "HEAD", root / "untagged-stable")
+                subprocess.run(["git", "-C", str(repo), "tag", "rust-v2.0.0"], check=True)
+                with self.assertRaisesRegex(ValueError, "source version"):
+                    prepare_release.prepare(repo, "rust-v2.0.0", root / "mismatched", candidate=True)
             finally:
                 os.environ["PATH"] = old_path
 

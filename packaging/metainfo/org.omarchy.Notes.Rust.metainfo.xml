@@ -6,14 +6,14 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <description>
-    <p>The separate Rust edition of Omarchy Notes keeps rich notes in a local SQLite library, without an account.</p>
+    <p>Omarchy Notes keeps rich notes in a local SQLite library, without an account.</p>
     <ul>
       <li>Rich writing, headings, lists, checklists, basic tables, images and attached files</li>
       <li>Nested folders, pinning, prefix search and recoverable deletion</li>
       <li>Quick Note and durable command-line capture</li>
       <li>Portable import/export and verified library backups</li>
     </ul>
-    <p>Rust uses its preview data directory and coexists with the Qt edition. Tags and Smart Folder interfaces are deferred; existing records remain preserved. Quotation libraries require Rust and returning to Qt uses a pre-upgrade backup.</p>
+    <p>The Rust application retains its preview data directory. Legacy Qt libraries can be migrated from verified backup copies. Tags and Smart Folder interfaces are deferred; existing records remain preserved. Quotation libraries require Rust and returning to Qt uses a pre-upgrade backup.</p>
   </description>
   <launchable type="desktop-id">org.omarchy.Notes.Rust.desktop</launchable>
   <provides><binary>omarchy-notes-rust</binary></provides>
