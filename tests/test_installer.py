@@ -196,7 +196,8 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(list((self.root / "tmp").iterdir()), [])
         self.assertNotIn("\x1b", result.stdout)
         urls = [args[-1] for args in self.calls("curl")]
-        self.assertEqual(urls.count(RELEASES_API), 1)
+        self.assertEqual(sum(url.startswith(RELEASES_API + "&refresh=") for url in urls), 1)
+        self.assertRegex(urls[0], r"&refresh=\d+$")
         self.assertTrue(all("/download/rust-v1.0.0/" in url for url in urls[1:]))
         self.assertFalse(any("debug" in url for url in urls))
 

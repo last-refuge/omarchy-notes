@@ -300,8 +300,9 @@ main() {
   printf '\n  %s%somarchy notes%s  %s%s  A place for your thoughts.%s\n\n' "$ACCENT" "$BOLD" "$RESET" "$DIM" "$BULLET" "$RESET"
   if (( IS_OMARCHY )); then ok "Omarchy detected $BULLET $ARCH"; else ok "Arch Linux detected $BULLET $ARCH"; fi
   if [[ -z $TAG ]]; then
+    # Avoid a stale cached release list immediately after a release is published.
     step 'Finding the latest published release' "${CURL[@]}" --output "$WORK/releases.json" \
-      'https://api.github.com/repos/last-refuge/omarchy-notes/releases?per_page=100' ||
+      "https://api.github.com/repos/last-refuge/omarchy-notes/releases?per_page=100&refresh=$(date +%s)" ||
       die 'Could not resolve the latest release. Check GitHub and your network, or select --version TAG.'
     TAG=$(python3 - "$WORK/releases.json" "$TAG_PREFIX" <<'PY'
 import json, re, sys

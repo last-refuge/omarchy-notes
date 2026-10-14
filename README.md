@@ -52,8 +52,7 @@ curl -fsSL https://raw.githubusercontent.com/last-refuge/omarchy-notes/main/inst
 ```
 
 This installs the latest stable Omarchy Notes release with the new package name.
-Version **1.0.1** is the approved packaging/installer fix; this route requires its
-newly named artifacts to be published first.
+Version **1.0.1** fixes the packaging/installer mismatch and is now published.
 **Release compatibility:** Older published `rust-v1.0.0` artifacts still use the
 `omarchy-notes-rust` package name. The new installer requires a newly named
 `omarchy-notes` release package; no published release has been modified. There is only one app;
