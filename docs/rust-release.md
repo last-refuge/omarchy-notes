@@ -1,9 +1,14 @@
 # Building and installing Omarchy Notes
 
-The Rust workspace is **1.0.0**, released at the owner's direction on
-13 October 2026. The evidence ledger distinguishes completed checks from
-remaining follow-up; no unverified check is presented as passed. The five-person
-first-use study and five-working-day trial also follow after release.
+The Rust workspace is **1.0.1**, approved by the owner on 13 October 2026 to
+fix the renamed-package installer mismatch and complete the Rust-only branding
+cutover. The target release is `rust-v1.0.1`; its new artifacts must be published
+before the updated installer can use them. Preparation is not publication.
+
+The Rust **1.0.0** release was directed by the owner on 13 October 2026. Its
+evidence ledger remains historical: completed checks do not certify 1.0.1.
+Remaining native/package checks, the five-person first-use study and the
+five-working-day trial remain follow-up; no unverified check is presented as passed.
 
 The Arch package is now `omarchy-notes`; the binary remains `omarchy-notes-rust`.
 This is a package-only rename: desktop identity `org.omarchy.Notes.Rust`,
@@ -76,11 +81,12 @@ edition selector. Older edition-aware installers require `--edition rust`.
 Older published `rust-v1.0.0` artifacts still have the `omarchy-notes-rust`
 package name. The new installer requires a newly named `omarchy-notes` release
 package; it cannot install those old artifacts. No published release has been
-modified. Use the commands below only with a release carrying the new package.
+modified. Use the commands below only after `rust-v1.0.1` is published with the
+new package.
 
 ```sh
-bash install.sh --version rust-vVERSION --dry-run
-bash install.sh --version rust-vVERSION --no-quick-note
+bash install.sh --version rust-v1.0.1 --dry-run
+bash install.sh --version rust-v1.0.1 --no-quick-note
 ```
 
 The installer selects Rust releases by default. Its latest-release lookup

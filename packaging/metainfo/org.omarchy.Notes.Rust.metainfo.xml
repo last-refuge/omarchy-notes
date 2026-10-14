@@ -23,6 +23,9 @@
   <developer id="com.github.last-refuge"><name>Omarchy Notes contributors</name></developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.0.1" date="2026-10-13" type="stable">
+      <description><p>Fix the installer/package-name mismatch with newly named omarchy-notes packages and archives. Complete the Rust-only Omarchy Notes branding cutover while retaining executable, app identity and data paths.</p></description>
+    </release>
     <release version="1.0.0" date="2026-10-13" type="stable">
       <description><p>Version 1.0 release with rich writing, organization, recovery and data ownership workflows.</p></description>
     </release>

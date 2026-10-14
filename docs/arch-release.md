@@ -13,7 +13,8 @@ New source archives are `omarchy-notes-VERSION.tar.gz`.
 
 Older published `rust-v1.0.0` artifacts still have the `omarchy-notes-rust`
 package name. The new installer requires a newly named `omarchy-notes` release
-package; no published release has been modified.
+package. The approved release target is `rust-v1.0.1`, which fixes this mismatch
+with newly named artifacts once published; no published release has been modified.
 Do not reuse the retired Qt `vVERSION` tags or replace published archives.
 
 See [release identity](rust-edition.md), [dependency notices](rust-v1-dependency-inventory.md)

@@ -284,6 +284,18 @@ class InstallerTests(unittest.TestCase):
         self.assert_failure(self.run_installer("--yes"), "Malformed release checksum")
         self.assertEqual(self.mutations(), [])
 
+    def test_retired_release_package_explains_the_cutover(self):
+        assets = self.root / "assets"
+        for path in assets.iterdir():
+            path.unlink()
+        (assets / "omarchy-notes-rust-1.0.0-1-x86_64.pkg.tar.zst").write_bytes(b"old release")
+        self.manifest()
+        for options in (("--yes",), ("--yes", "--source")):
+            result = self.run_installer(*options)
+            self.assert_failure(result, "uses the retired package name")
+            self.assertNotIn("Try --source", result.stdout)
+        self.assertEqual(self.mutations(), [])
+
     def test_package_identity_and_architecture(self):
         for config in ({"identity": "other-package 1.0.0-1"}, {"package_arch": "aarch64"}):
             self.config = config

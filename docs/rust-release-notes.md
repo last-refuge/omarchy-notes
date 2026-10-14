@@ -1,4 +1,10 @@
-# Omarchy Notes 1.0.0
+# Omarchy Notes 1.0.1
+
+Version **1.0.1** fixes the packaging/install mismatch and completes the
+Omarchy Notes branding cutover. Release `rust-v1.0.1` uses `omarchy-notes`
+packages and source/recipe archives. The updated installer cannot use the older
+named 1.0.0 packages.
+Executable names, app IDs, profile/runtime paths and user data remain unchanged.
 
 Omarchy Notes is now Rust-only; Qt is retired and retained only as a legacy
 migration reference. Version 1.0 provides offline notes with rich writing,
@@ -12,10 +18,10 @@ Install on x86_64 Arch/Omarchy. The current installer installs Omarchy Notes;
 older edition-aware installers require `--edition rust`.
 Older published `rust-v1.0.0` artifacts still use the old `omarchy-notes-rust`
 package name. The new installer requires a newly named `omarchy-notes` release
-package; no published release has been modified. For a release with the new package:
+package; the older release has not been modified. Install 1.0.1 with:
 
 ```sh
-bash install.sh --version rust-vVERSION --no-quick-note
+bash install.sh --version rust-v1.0.1 --no-quick-note
 ```
 
 The Arch package is now `omarchy-notes`; the executable remains
@@ -37,7 +43,10 @@ advertised. Use the desktop Quick Note action or a distinct manual compositor
 binding; automatic compositor setup is not implemented and legacy bindings are
 not altered.
 
-The implemented build was released at the owner's direction on 13 October 2026.
+## Historical Rust 1.0.0 evidence
+
+The 1.0.0 build was released at the owner's direction on 13 October 2026.
+These historical checks do not certify the 1.0.1 artifacts.
 Recorded checks include 171 Rust tests, six dependency tests, full Qt regression
 and interchange checks, 18 GPU workflows, actual CJK composition and silent Orca
 processing, passing CPU budgets, verified dependency notices and a validated

@@ -5,10 +5,20 @@ All notable changes to Omarchy Notes are documented here. The project uses
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-13
+
+### Fixed
+
+- Installer/package-name mismatch: prepare new `rust-v1.0.1` artifacts with the
+  `omarchy-notes` package name expected by the renamed-package installer.
+  Published `rust-v1.0.0` artifacts remain unchanged; the updated installer
+  requires the new release artifacts to be published before installation.
+
 ### Changed
 
-- Rust/GPUI is now the only app implementation and installer target. Existing
-  Rust executable names and data directories remain unchanged.
+- Complete the Rust-only Omarchy Notes branding cutover: remove edition labels
+  from app and distribution metadata. Rust/GPUI is the only app implementation
+  and installer target; executable names, app IDs and data directories are unchanged.
 - The Arch package and release archive names are now `omarchy-notes`, replacing
   the former `omarchy-notes-rust` package. Existing data directories are retained;
   newly named release artifacts must be published before the updated installer
@@ -45,5 +55,6 @@ All notable changes to Omarchy Notes are documented here. The project uses
 - Live Omarchy theme following with contrast correction.
 - Arch packaging with desktop entry, AppStream metadata and man page.
 
-[Unreleased]: https://github.com/last-refuge/omarchy-notes/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/last-refuge/omarchy-notes/compare/rust-v1.0.1...HEAD
+[1.0.1]: https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.0.1
 [1.0.0]: https://github.com/last-refuge/omarchy-notes/releases/tag/v1.0.0

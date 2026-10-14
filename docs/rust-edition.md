@@ -13,7 +13,7 @@ support and installer-default statements are not current policy.
 | Source archive | `omarchy-notes-VERSION.tar.gz` |
 | Cargo application package | `omarchy-notes-preview` |
 | Desktop / AppStream ID | `org.omarchy.Notes.Rust` |
-| Release tag | `rust-v1.0.0` (future releases: `rust-vVERSION`) |
+| Release tag | `rust-v1.0.1` (approved target; release pattern: `rust-vVERSION`) |
 | Default library | `$XDG_DATA_HOME/omarchy-notes-gpui` |
 | Preferences | `$XDG_CONFIG_HOME/omarchy-notes-gpui/preferences.json` |
 | Runtime instance directory | `$XDG_RUNTIME_DIR/omarchy-notes-rust` |
@@ -34,7 +34,8 @@ or migrate Qt data.
 
 Older published `rust-v1.0.0` artifacts still use the old `omarchy-notes-rust`
 package name. The new installer requires a newly named `omarchy-notes` release
-package; no published release has been modified.
+package. The approved `rust-v1.0.1` release supplies the new package once
+published; no published release has been modified.
 See [installation and release instructions](rust-release.md).
 
 ## Scope and evidence

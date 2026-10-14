@@ -8,13 +8,13 @@ A native app built with **Rust and GPUI**. Rich notes stay on your machine,
 with no account required. Rust is the only maintained implementation.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Release 1.0](https://img.shields.io/badge/release-1.0.0-2d4f8e)](https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.0.0)
+[![Release 1.0.1](https://img.shields.io/badge/release-1.0.1-2d4f8e)](https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.0.1)
 ![SQLite](https://img.shields.io/badge/SQLite-FTS5-003b57?logo=sqlite&logoColor=white)
 ![Wayland](https://img.shields.io/badge/Wayland-native-ffbc00)
 
 <img src="docs/images/rust-v1-writing-dark.png" alt="Omarchy Notes 1.0 writing view in a dark theme" width="820">
 
-[Download Omarchy Notes 1.0](https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.0.0)
+[Download Omarchy Notes 1.0.1](https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.0.1)
 
 </div>
 
@@ -52,6 +52,8 @@ curl -fsSL https://raw.githubusercontent.com/last-refuge/omarchy-notes/main/inst
 ```
 
 This installs the latest stable Omarchy Notes release with the new package name.
+Version **1.0.1** is the approved packaging/installer fix; this route requires its
+newly named artifacts to be published first.
 **Release compatibility:** Older published `rust-v1.0.0` artifacts still use the
 `omarchy-notes-rust` package name. The new installer requires a newly named
 `omarchy-notes` release package; no published release has been modified. There is only one app;

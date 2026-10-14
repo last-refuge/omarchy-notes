@@ -140,7 +140,14 @@ select_asset() {
       ASSET=${ASSET_NAMES[i]}; HASH=${ASSET_HASHES[i]}; count=$((count + 1))
     fi
   done
-  (( count > 0 )) || die "No $description in $TAG. Try --source for a missing binary; downloads never trigger an automatic build."
+  if (( count == 0 )); then
+    for i in "${!ASSET_NAMES[@]}"; do
+      if [[ ${ASSET_NAMES[i]} == omarchy-notes-rust-*.pkg.tar.zst ]]; then
+        die "$TAG uses the retired package name. Select a newer release containing omarchy-notes; --source cannot repair missing renamed release artifacts. Nothing was installed."
+      fi
+    done
+    die "No $description in $TAG. Try --source for a missing binary; downloads never trigger an automatic build."
+  fi
   (( count == 1 )) || die "Ambiguous release: found $count assets for $description."
 }
 

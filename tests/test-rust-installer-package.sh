@@ -40,7 +40,9 @@ export PATH="$test_workspace/bin:$PATH"
 unset DISPLAY WAYLAND_DISPLAY
 printf 'Qt library retained\n' > "$XDG_DATA_HOME/omarchy-notes/sentinel"
 bash "$project_dir/install.sh" --version "$NOTES_INSTALLER_TEST_TAG" --dry-run
-! pacman -Q omarchy-notes >/dev/null 2>&1
+if pacman -Q omarchy-notes >/dev/null 2>&1; then
+  echo 'Dry run unexpectedly installed the package.' >&2; exit 1
+fi
 bash "$project_dir/install.sh" --version "$NOTES_INSTALLER_TEST_TAG" --yes --no-quick-note
 [[ $(pacman -Q omarchy-notes) == "$identity" ]]
 [[ $(/usr/bin/omarchy-notes-rust --version) == "omarchy-notes-rust $version" ]]
