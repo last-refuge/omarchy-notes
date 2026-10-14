@@ -261,7 +261,7 @@ main() {
     esac
     shift
   done
-  PACKAGE_NAME=omarchy-notes-rust; EXECUTABLE=omarchy-notes-rust; TAG_PREFIX=rust-v; DISPLAY_NAME='Omarchy Notes'
+  PACKAGE_NAME=omarchy-notes; EXECUTABLE=omarchy-notes-rust; TAG_PREFIX=rust-v; DISPLAY_NAME='Omarchy Notes'
   [[ -z $TAG || $TAG =~ ^${TAG_PREFIX}[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "--version must be a stable release tag such as ${TAG_PREFIX}1.0.0."
   HAVE_TTY=0
   if ( : </dev/tty ) 2>/dev/null; then HAVE_TTY=1; fi

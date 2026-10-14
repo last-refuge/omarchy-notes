@@ -1,8 +1,11 @@
 # Maintainer: Jason Alexander <jason@greatspark.com>
 # Generated from an immutable revision. Preserve the Rust executable identity.
-pkgname=omarchy-notes-rust
+pkgname=omarchy-notes
+replaces=('omarchy-notes-rust')
+conflicts=('omarchy-notes-rust')
 pkgver=@RUST_VERSION@
-pkgrel=1
+# Distinguish this cutover from the retired omarchy-notes 1.0.0-1 Qt package.
+pkgrel=2
 pkgdesc='Omarchy Notes — private local notes (early access; v1 acceptance pending)'
 arch=('x86_64')
 url='https://lastrefuge.ai/projects/omarchy-notes'

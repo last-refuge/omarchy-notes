@@ -9,6 +9,10 @@ All notable changes to Omarchy Notes are documented here. The project uses
 
 - Rust/GPUI is now the only app implementation and installer target. Existing
   Rust executable names and data directories remain unchanged.
+- The Arch package and release archive names are now `omarchy-notes`, replacing
+  the former `omarchy-notes-rust` package. Existing data directories are retained;
+  newly named release artifacts must be published before the updated installer
+  can use them.
 
 ### Removed
 

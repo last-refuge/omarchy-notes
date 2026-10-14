@@ -39,7 +39,7 @@ jobs:
           runuser -u builder -- bash -c 'cd dist-rust/aur && makepkg --syncdeps --noconfirm --cleanbuild'
           ./tests/check-rust-arch-package.sh dist-rust/aur
           runuser -u builder -- ./tests/test-rust-installer-package.sh dist-rust/aur
-          cp dist-rust/aur/omarchy-notes-rust-[0-9]*-x86_64.pkg.tar.zst dist-rust/
+          cp dist-rust/aur/omarchy-notes-[0-9]*-x86_64.pkg.tar.zst dist-rust/
           cp install.sh dist-rust/install.sh
           cd dist-rust
           sha256sum ./*.tar.gz ./*.pkg.tar.zst install.sh SOURCE_REVISION RELEASE_KIND > SHA256SUMS

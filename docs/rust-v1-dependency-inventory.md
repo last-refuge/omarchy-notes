@@ -99,7 +99,9 @@ and both vendored AccessKit texts/provenance. The vendored AccessKit patch keeps
 its original source identity and documents the local marshaling correction.
 
 The recipe installs dependency texts and their inventory under
-`/usr/share/licenses/omarchy-notes-rust/dependencies`, readable by ordinary users.
+`/usr/share/licenses/omarchy-notes/dependencies` in newly named packages, readable
+by ordinary users. Older published packages use
+`/usr/share/licenses/omarchy-notes-rust/dependencies`.
 Final review must compare that installed inventory with the exact packaged
 binary, native vendored sources, dynamically loaded system libraries, asset
 hashes and declared runtime dependencies. This source-only pass does not prove

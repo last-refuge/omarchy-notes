@@ -60,7 +60,7 @@ def prepare(repo, ref, output, candidate=False):
         template = template.replace("@RUST_VERSION@", version)
         if not candidate:
             template = template.replace(" (early access; v1 acceptance pending)", "")
-        source_name = f"omarchy-notes-rust-{version}"
+        source_name = f"omarchy-notes-{version}"
         kind = "candidate" if candidate else "stable"
         (tree / "SOURCE_REVISION").write_text(revision + "\n")
         (tree / "RELEASE_KIND").write_text(kind + "\n")

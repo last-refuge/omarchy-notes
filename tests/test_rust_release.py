@@ -26,6 +26,8 @@ class RustReleaseTests(unittest.TestCase):
         self.assertNotIn("qt6-", installer)
         release = (ROOT / ".github/workflows/release.yml").read_text()
         self.assertIn('tags: ["rust-v*"]', release)
+        self.assertIn("dist-rust/aur/omarchy-notes-[0-9]*-x86_64.pkg.tar.zst", release)
+        self.assertNotIn("omarchy-notes-rust-[0-9]*-x86_64.pkg.tar.zst", release)
         for workflow in (ROOT / ".github/workflows").glob("*.yml"):
             self.assertNotIn("qt6-", workflow.read_text())
             self.assertNotIn("--edition", workflow.read_text())
@@ -81,13 +83,17 @@ class RustReleaseTests(unittest.TestCase):
         self.assertIn("Icon=org.omarchy.Notes.Rust", desktop)
         self.assertIn("Exec=/usr/bin/omarchy-notes-rust --quick-note", desktop)
         recipe = (ROOT / "packaging/arch/PKGBUILD-rust.in").read_text()
-        self.assertIn("pkgname=omarchy-notes-rust\n", recipe)
+        self.assertIn("pkgname=omarchy-notes\n", recipe)
+        self.assertIn("pkgrel=2\n", recipe)  # Upgrade the retired Qt 1.0.0-1 package.
         self.assertIn("pkgdesc='Omarchy Notes — private local notes", recipe)
         self.assertNotIn("Rust edition", recipe)
-        self.assertNotIn("conflicts=", recipe)
+        self.assertIn("replaces=('omarchy-notes-rust')\n", recipe)
+        self.assertIn("conflicts=('omarchy-notes-rust')\n", recipe)
         self.assertNotIn("provides=", recipe)
         self.assertIn("arch=('x86_64')", recipe)
         self.assertIn("--locked --offline", recipe)
+        self.assertIn('--bin omarchy-notes-rust', recipe)
+        self.assertIn('"$pkgdir/usr/bin/omarchy-notes-rust"', recipe)
         self.assertNotIn("qt6-", recipe)
 
     def test_preview_launcher_preserves_arguments_exit_and_stable_destination(self):
@@ -109,7 +115,7 @@ class RustReleaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             source = root / "src"
-            (source / "omarchy-notes-rust-@RUST_VERSION@").mkdir(parents=True)
+            (source / "omarchy-notes-@RUST_VERSION@").mkdir(parents=True)
             tools = root / "bin"
             tools.mkdir()
             cargo = tools / "cargo"
@@ -133,7 +139,7 @@ class RustReleaseTests(unittest.TestCase):
             )
             recorded = json.loads(log.read_text())
             self.assertEqual(recorded["args"], ["fetch", "--locked", "--target", "x86_64-unknown-linux-gnu"])
-            self.assertEqual(recorded["cwd"], str(source / "omarchy-notes-rust-@RUST_VERSION@"))
+            self.assertEqual(recorded["cwd"], str(source / "omarchy-notes-@RUST_VERSION@"))
             self.assertEqual(recorded["cargo_home"], str(source / "cargo-home"))
 
     def test_package_validation_rejects_namcap_collection_error_even_with_zero_exit(self):
@@ -143,9 +149,9 @@ class RustReleaseTests(unittest.TestCase):
             tools.mkdir()
             packages = root / "package"
             packages.mkdir()
-            (packages / "omarchy-notes-rust-0.1.0-1-x86_64.pkg.tar.zst").touch()
+            (packages / "omarchy-notes-0.1.0-1-x86_64.pkg.tar.zst").touch()
             for name, script in {
-                "pacman": "#!/bin/sh\nprintf 'omarchy-notes-rust 0.1.0-1\\n'\n",
+                "pacman": "#!/bin/sh\nprintf 'omarchy-notes 0.1.0-1\\n'\n",
                 "namcap": "#!/bin/sh\nprintf 'Error: recipe is not a valid PKGBUILD\\n'\nexit 0\n",
                 "bsdtar": "#!/bin/sh\ntouch \"$RUST_RELEASE_EXTRACT_SENTINEL\"\nexit 1\n",
             }.items():
@@ -181,7 +187,7 @@ class RustReleaseTests(unittest.TestCase):
             (repo / "untracked").write_text("not a release input\n")
             bin_dir = root / "bin"; bin_dir.mkdir()
             shim = bin_dir / "makepkg"
-            shim.write_text("#!/bin/sh\nprintf 'pkgbase = omarchy-notes-rust\\n\\tpkgname = omarchy-notes-rust\\n'\n")
+            shim.write_text("#!/bin/sh\nprintf 'pkgbase = omarchy-notes\\n\\tpkgname = omarchy-notes\\n'\n")
             shim.chmod(0o755)
             old_path = os.environ["PATH"]
             os.environ["PATH"] = str(bin_dir) + ":" + old_path
@@ -198,10 +204,21 @@ class RustReleaseTests(unittest.TestCase):
                 self.assertEqual((first / "SOURCE_REVISION").read_text().strip(), revision)
                 self.assertEqual((first / "RELEASE_KIND").read_text().strip(), "candidate")
                 self.assertEqual((first / "SHA256SUMS").read_bytes(), (second / "SHA256SUMS").read_bytes())
-                self.assertNotIn("@SOURCE_B2SUM@", (first / "aur/PKGBUILD").read_text())
-                archive = first / "omarchy-notes-rust-0.1.0.tar.gz"
+                recipe = (first / "aur/PKGBUILD").read_text()
+                self.assertNotIn("@SOURCE_B2SUM@", recipe)
+                self.assertIn("pkgname=omarchy-notes\n", recipe)
+                self.assertEqual(
+                    {path.name for path in first.glob("*.tar.gz")},
+                    {"omarchy-notes-0.1.0.tar.gz", "omarchy-notes-0.1.0-aur.tar.gz"},
+                )
+                archive = first / "omarchy-notes-0.1.0.tar.gz"
+                self.assertEqual(archive.read_bytes(), (first / "aur" / archive.name).read_bytes())
+                self.assertIn(hashlib.blake2b(archive.read_bytes()).hexdigest(), recipe)
+                with tarfile.open(first / "omarchy-notes-0.1.0-aur.tar.gz") as aur:
+                    self.assertEqual(aur.extractfile("aur/PKGBUILD").read().decode(), recipe)
+                    self.assertIn("pkgname = omarchy-notes\n", aur.extractfile("aur/.SRCINFO").read().decode())
                 with tarfile.open(archive) as source:
-                    prefix = "omarchy-notes-rust-0.1.0/"
+                    prefix = "omarchy-notes-0.1.0/"
                     self.assertEqual(source.extractfile(prefix + "tracked").read(), b"committed source\n")
                     self.assertEqual(source.extractfile(prefix + "SOURCE_REVISION").read().decode().strip(), revision)
                     self.assertNotIn(prefix + "untracked", source.getnames())
@@ -218,6 +235,10 @@ class RustReleaseTests(unittest.TestCase):
                 prepare_release.prepare(repo, "rust-v1.0.0", stable)
                 self.assertEqual((stable / "RELEASE_KIND").read_text(), "stable\n")
                 self.assertNotIn("early access", (stable / "aur/PKGBUILD").read_text())
+                self.assertEqual(
+                    {path.name for path in stable.glob("*.tar.gz")},
+                    {"omarchy-notes-1.0.0.tar.gz", "omarchy-notes-1.0.0-aur.tar.gz"},
+                )
                 with self.assertRaisesRegex(ValueError, "exact rust-vVERSION tag"):
                     prepare_release.prepare(repo, "HEAD", root / "untagged-stable")
                 subprocess.run(["git", "-C", str(repo), "tag", "rust-v2.0.0"], check=True)

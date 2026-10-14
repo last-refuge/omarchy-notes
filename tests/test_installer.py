@@ -24,7 +24,7 @@ import time
 import unittest
 
 INSTALLER = Path(sys.argv.pop(1)).resolve()
-PACKAGE = "omarchy-notes-rust-1.0.0-1-x86_64.pkg.tar.zst"
+PACKAGE = "omarchy-notes-1.0.0-1-x86_64.pkg.tar.zst"
 REPO = "https://github.com/last-refuge/omarchy-notes"
 RELEASES_API = "https://api.github.com/repos/last-refuge/omarchy-notes/releases?per_page=100"
 
@@ -32,7 +32,7 @@ SHIM = r'''#!/usr/bin/env python3
 import json, os, pathlib, subprocess, sys, time
 root = pathlib.Path(os.environ["MOCK_ROOT"])
 cfg = json.loads((root / "config.json").read_text())
-package = cfg.get("package", "omarchy-notes-rust")
+package = cfg.get("package", "omarchy-notes")
 version = cfg.get("version", "1.0.0")
 name = pathlib.Path(sys.argv[0]).name
 args = sys.argv[1:]
@@ -72,7 +72,7 @@ elif name == "sudo":
     sys.exit(subprocess.call(args, stdin=sys.stdin))
 elif name == "pacman":
     if args[0] == "-Q":
-        state = root / ("installed-rust" if args[1] == "omarchy-notes-rust" else "installed")
+        state = root / ("installed" if args[1] == "omarchy-notes" else "installed-rust")
         if not state.exists(): sys.exit(1)
         print(args[1] + " " + state.read_text())
     elif args[0] == "-Qp":
@@ -80,12 +80,12 @@ elif name == "pacman":
     elif args[0] == "-Qip":
         print("Architecture    : " + cfg.get("package_arch", "x86_64"))
     elif args[0] == "-Ql":
-        print(args[1] + " " + str(root / "system/bin" / args[1]))
-        if args[1] == "omarchy-notes-rust":
+        print(args[1] + " " + str(root / "system/bin/omarchy-notes-rust"))
+        if args[1] == "omarchy-notes":
             print(args[1] + " " + str(root / "system/bin/omarchy-notes-preview"))
     elif args[0] == "-U":
         if cfg.get("deny_pacman"): fail("pacman: simulated transaction failure")
-        (root / ("installed-rust" if package == "omarchy-notes-rust" else "installed")).write_text(version + "-1")
+        (root / ("installed" if package == "omarchy-notes" else "installed-rust")).write_text(version + "-1")
         print("pacman transaction visible")
     elif args[0] == "-S":
         print("build dependency transaction visible")
@@ -127,9 +127,9 @@ class InstallerTests(unittest.TestCase):
         (self.root / "config/hypr/hyprland.lua").write_text("-- sentinel rule\n")
         (self.root / "data/omarchy-notes/library.sqlite3").write_bytes(b"untouched notes")
         (self.root / "assets" / PACKAGE).write_bytes(b"release package")
-        (self.root / "assets" / PACKAGE.replace("omarchy-notes-rust-", "omarchy-notes-rust-debug-")).write_bytes(b"debug")
-        self.archive("omarchy-notes-rust-1.0.0-aur.tar.gz", {"aur/PKGBUILD": "pkgname=omarchy-notes-rust\n", "aur/.SRCINFO": "pkgname = omarchy-notes-rust\n"})
-        self.archive("omarchy-notes-rust-1.0.0.tar.gz", {"omarchy-notes-rust-1.0.0/Cargo.toml": "source"})
+        (self.root / "assets" / PACKAGE.replace("omarchy-notes-", "omarchy-notes-debug-")).write_bytes(b"debug")
+        self.archive("omarchy-notes-1.0.0-aur.tar.gz", {"aur/PKGBUILD": "pkgname=omarchy-notes\n", "aur/.SRCINFO": "pkgname = omarchy-notes\n"})
+        self.archive("omarchy-notes-1.0.0.tar.gz", {"omarchy-notes-1.0.0/Cargo.toml": "source"})
         self.manifest()
         self.env = dict(os.environ, MOCK_ROOT=str(self.root), HOME=str(self.root / "home"),
                         XDG_CONFIG_HOME=str(self.root / "config"), XDG_DATA_HOME=str(self.root / "data"),
@@ -200,8 +200,18 @@ class InstallerTests(unittest.TestCase):
         self.assertTrue(all("/download/rust-v1.0.0/" in url for url in urls[1:]))
         self.assertFalse(any("debug" in url for url in urls))
 
+    def test_new_package_name_and_old_package_identity_are_distinct(self):
+        (self.root / "installed-rust").write_text("1.0.0-1")
+        result = self.run_installer("--yes", "--version", "rust-v1.0.0")
+        self.assert_success(result)
+        self.assertEqual(self.calls("pacman")[0], ["-Q", "omarchy-notes"])
+        self.assertIn("omarchy-notes-1.0.0-1-x86_64.pkg.tar.zst", self.mutations()[0][-1])
+        self.assertIn("sudo pacman -R omarchy-notes", result.stdout)
+        self.assertNotIn("sudo pacman -R omarchy-notes-rust", result.stdout)
+        self.assertEqual((self.root / "data/omarchy-notes/library.sqlite3").read_bytes(), b"untouched notes")
+
     def test_upgrade_and_already_installed(self):
-        (self.root / "installed-rust").write_text("0.9.0-1")
+        (self.root / "installed").write_text("0.9.0-1")
         self.assert_success(self.run_installer("--yes", "--version", "rust-v1.0.0"))
         self.assertEqual(len(self.mutations()), 1)
         (self.root / "calls.jsonl").unlink()
@@ -287,12 +297,12 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(self.calls("sudo")[0][0], "-n")
         self.config = {"deny_pacman": True}
         self.assert_failure(self.run_installer("--yes"), "pacman could not install")
-        self.assertFalse((self.root / "installed-rust").exists())
+        self.assertFalse((self.root / "installed").exists())
 
     def test_post_install_verification_failure(self):
         self.config["fail_verify"] = True
         self.assert_failure(self.run_installer("--yes"), "application verification failed")
-        self.assertTrue((self.root / "installed-rust").exists())
+        self.assertTrue((self.root / "installed").exists())
         self.assertEqual(self.calls("omarchy-notes-rust"), [["--version"]])
 
     def test_missing_preview_alias_is_refused(self):
@@ -339,10 +349,10 @@ class InstallerTests(unittest.TestCase):
         self.assertFalse(any(PACKAGE == args[-1].rsplit("/", 1)[-1] for args in self.calls("curl")))
 
     def rust_release(self):
-        self.config.update(package="omarchy-notes-rust", version="0.1.0")
-        name = "omarchy-notes-rust-0.1.0"
+        self.config.update(package="omarchy-notes", version="0.1.0")
+        name = "omarchy-notes-0.1.0"
         (self.root / "assets" / f"{name}-1-x86_64.pkg.tar.zst").write_bytes(b"separate rust package")
-        self.archive(f"{name}-aur.tar.gz", {"aur/PKGBUILD":"pkgname=omarchy-notes-rust\n", "aur/.SRCINFO":"pkgname = omarchy-notes-rust\n"})
+        self.archive(f"{name}-aur.tar.gz", {"aur/PKGBUILD":"pkgname=omarchy-notes\n", "aur/.SRCINFO":"pkgname = omarchy-notes\n"})
         self.archive(f"{name}.tar.gz", {f"{name}/Cargo.toml":"source"})
         self.manifest()
         self.config["releases"] = [
@@ -362,7 +372,7 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("No bindings were changed", result.stdout)
         self.assertEqual(self.calls("omarchy-notes-rust"), [["--version"], ["--version"]])
         self.assertEqual(self.calls("omarchy-notes"), [])
-        self.assertEqual((self.root / "installed").read_text(), "1.0.0-1")
+        self.assertEqual((self.root / "installed").read_text(), "0.1.0-1")
         self.assertEqual((self.root / "data/omarchy-notes/library.sqlite3").read_bytes(), b"untouched notes")
         self.assertEqual((self.root / "config/hypr/bindings.lua").read_text(), "-- sentinel binding\n")
         self.assertTrue(all("/download/rust-v0.1.0/" in url[-1] for url in self.calls("curl")[1:]))
@@ -372,7 +382,7 @@ class InstallerTests(unittest.TestCase):
         self.assert_failure(self.run_installer("--yes", "--version=v1.0.0"), "stable release tag")
         for edition in ("qt", "rust", "other"):
             self.assert_failure(self.run_installer("--yes", f"--edition={edition}"), "Unknown option")
-        self.config["identity"] = "omarchy-notes 0.1.0-1"
+        self.config["identity"] = "omarchy-notes-rust 0.1.0-1"
         self.assert_failure(self.run_installer("--yes"), "Unexpected package identity")
         self.config["arch"] = "aarch64"
         self.assert_failure(self.run_installer("--yes"), "x86_64 only")
@@ -387,7 +397,7 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(self.calls("omarchy-notes-rust"), [["--version"], ["--version"]])
 
     def test_source_failures(self):
-        self.config["corrupt_asset"] = "omarchy-notes-rust-1.0.0-aur.tar.gz"
+        self.config["corrupt_asset"] = "omarchy-notes-1.0.0-aur.tar.gz"
         self.assert_failure(self.run_installer("--yes", "--source"), "Checksum failed")
         self.assertEqual(self.mutations(), [])
         self.config = {"fail_build": True}
@@ -395,7 +405,7 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual([args[0] for args in self.mutations()], ["-S"])
 
     def test_unexpected_recipe_path(self):
-        self.archive("omarchy-notes-rust-1.0.0-aur.tar.gz", {"../escaped": "bad"})
+        self.archive("omarchy-notes-1.0.0-aur.tar.gz", {"../escaped": "bad"})
         self.manifest()
         self.assert_failure(self.run_installer("--yes", "--source"), "Unexpected path")
         self.assertEqual(self.mutations(), [])

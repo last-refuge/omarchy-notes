@@ -4,15 +4,15 @@ set -euo pipefail
 [[ ${CI:-} == true && -f /.dockerenv && $EUID != 0 ]] || {
   echo 'Run this test as the build user in the disposable CI container.' >&2; exit 1;
 }
-if pacman -Q omarchy-notes-rust >/dev/null 2>&1; then echo 'Expected a fresh Rust installation.' >&2; exit 1; fi
+if pacman -Q omarchy-notes >/dev/null 2>&1; then echo 'Expected a fresh Rust installation.' >&2; exit 1; fi
 project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 package_dir="$(realpath "${1:?usage: test-rust-installer-package.sh PACKAGE_DIRECTORY}")"
 shopt -s nullglob
-packages=("$package_dir"/omarchy-notes-rust-[0-9]*-x86_64.pkg.tar.zst)
+packages=("$package_dir"/omarchy-notes-[0-9]*-x86_64.pkg.tar.zst)
 [[ ${#packages[@]} == 1 ]]
 identity=$(pacman -Qp "${packages[0]}")
-[[ $identity == omarchy-notes-rust\ * ]]
-version=${identity#omarchy-notes-rust }; version=${version%-*}
+[[ $identity == omarchy-notes\ * ]]
+version=${identity#omarchy-notes }; version=${version%-*}
 test_workspace=$(mktemp -d)
 trap 'rm -rf "$test_workspace"' EXIT
 mkdir -p "$test_workspace/bin" "$test_workspace/assets" "$test_workspace/data/omarchy-notes" "$test_workspace/config" "$test_workspace/runtime"
@@ -40,9 +40,9 @@ export PATH="$test_workspace/bin:$PATH"
 unset DISPLAY WAYLAND_DISPLAY
 printf 'Qt library retained\n' > "$XDG_DATA_HOME/omarchy-notes/sentinel"
 bash "$project_dir/install.sh" --version "$NOTES_INSTALLER_TEST_TAG" --dry-run
-! pacman -Q omarchy-notes-rust >/dev/null 2>&1
+! pacman -Q omarchy-notes >/dev/null 2>&1
 bash "$project_dir/install.sh" --version "$NOTES_INSTALLER_TEST_TAG" --yes --no-quick-note
-[[ $(pacman -Q omarchy-notes-rust) == "$identity" ]]
+[[ $(pacman -Q omarchy-notes) == "$identity" ]]
 [[ $(/usr/bin/omarchy-notes-rust --version) == "omarchy-notes-rust $version" ]]
 [[ $(/usr/bin/omarchy-notes-preview --version) == "omarchy-notes-rust $version" ]]
 request=01234567-89ab-4cde-8fab-0123456789ab
@@ -53,7 +53,7 @@ before=$(sha256sum "$XDG_DATA_HOME/omarchy-notes-gpui/library.sqlite3")
 bash "$project_dir/install.sh" --version "$NOTES_INSTALLER_TEST_TAG" --yes --no-quick-note > "$test_workspace/repeat.log"
 rg -q 'already installed' "$test_workspace/repeat.log"
 [[ $(cat "$XDG_DATA_HOME/omarchy-notes/sentinel") == 'Qt library retained' ]]
-sudo -n pacman -R --noconfirm omarchy-notes-rust
+sudo -n pacman -R --noconfirm omarchy-notes
 [[ $(sha256sum "$XDG_DATA_HOME/omarchy-notes-gpui/library.sqlite3") == "$before" ]]
 [[ $(cat "$XDG_DATA_HOME/omarchy-notes/sentinel") == 'Qt library retained' ]]
 echo 'Rust disposable install/repeat/alias/headless capture/removal contract: ok'

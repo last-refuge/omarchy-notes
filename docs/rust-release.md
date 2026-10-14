@@ -5,10 +5,11 @@ The Rust workspace is **1.0.0**, released at the owner's direction on
 remaining follow-up; no unverified check is presented as passed. The five-person
 first-use study and five-working-day trial also follow after release.
 
-Rust uses `omarchy-notes-rust`, desktop identity `org.omarchy.Notes.Rust`, and
-the `rust-v1.0.0` tag. Omarchy Notes is Rust-only; Qt is retired and relevant
-only for legacy migration. Binary/package/profile identity is unchanged. Rust
-has no `provides` or `conflicts` relationship with the retired Qt package.
+The Arch package is now `omarchy-notes`; the binary remains `omarchy-notes-rust`.
+This is a package-only rename: desktop identity `org.omarchy.Notes.Rust`,
+profile/runtime paths and `rust-vVERSION` tags are unchanged. The new recipe
+replaces and conflicts with the old `omarchy-notes-rust` package. Omarchy Notes
+is Rust-only; Qt is retired and relevant only for legacy migration.
 
 ## Run from source
 
@@ -37,6 +38,8 @@ cd ../..
 tests/check-rust-arch-package.sh build-rust-candidate/aur
 ```
 
+New source archives are named `omarchy-notes-VERSION.tar.gz`, with a matching
+`omarchy-notes-VERSION/` root; recipe archives are `omarchy-notes-VERSION-aur.tar.gz`.
 The source archive and package carry `SOURCE_REVISION` and `RELEASE_KIND`.
 Candidate artifacts say `candidate`; preparation refuses to treat unreleased
 0.x sources as stable. Version remains the workspace version until the release
@@ -60,7 +63,7 @@ refuse stable packaging. A local archive explicitly marked `candidate` may
 retain documented source-text gaps in its installed inventory; this is not
 permission to publish a stable package or claim license acceptance. That
 inventory includes manual-review limits and is installed
-under `share/licenses/omarchy-notes-rust/dependencies`.
+under `share/licenses/omarchy-notes/dependencies` in newly named packages.
 The complete dependency redistribution/runtime audit remains a final gate;
 this list does not claim that audit is complete.
 
@@ -69,6 +72,11 @@ this list does not claim that audit is complete.
 After a release is actually published, download and inspect its installer
 before running it. The current installer installs Omarchy Notes and needs no
 edition selector. Older edition-aware installers require `--edition rust`.
+
+Older published `rust-v1.0.0` artifacts still have the `omarchy-notes-rust`
+package name. The new installer requires a newly named `omarchy-notes` release
+package; it cannot install those old artifacts. No published release has been
+modified. Use the commands below only with a release carrying the new package.
 
 ```sh
 bash install.sh --version rust-vVERSION --dry-run
@@ -121,6 +129,5 @@ At the final freeze, align workspace, man page, AppStream and release versions,
 record every required gate on that exact revision, and use `rust-vVERSION`.
 Stable artifact preparation requires that exact Rust tag and refuses Qt tags.
 The Rust release workflow creates a draft only; reviewing and publishing it are
-separate decisions. The installer default is now Rust, not a reason to rename
-packages or profiles. Never replace an existing published archive or reuse a
-retired Qt tag.
+separate decisions. The package-only rename does not rename binaries or profiles.
+Never replace an existing published archive or reuse a retired Qt tag.

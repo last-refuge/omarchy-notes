@@ -213,7 +213,7 @@
       <p class="lede">Local, offline notes in a native Rust app. Rich writing, checklists, basic tables, images, Quick Note and search, stored on your machine with no account required.</p>
       <div class="cta">
         <div class="command" aria-label="Install command">
-          <span class="prompt">$</span><code id="install-cmd">bash install.sh --version rust-v1.0.0 --no-quick-note</code>
+          <span class="prompt">$</span><code id="install-cmd">bash install.sh --no-quick-note</code>
           <button class="copy" type="button" data-copy="install-cmd">Copy</button>
         </div>
         <a class="secondary" href="#install">Download and inspect the installer</a>
@@ -284,12 +284,13 @@
       <div class="install">
         <div class="step">
           <h3>Download and inspect</h3>
-          <p>Use the published <a href="https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.0.0">Omarchy Notes 1.0 release</a> installer on x86_64 Arch/Omarchy, as your normal user:</p>
-<pre class="block">curl -fsSL https://github.com/last-refuge/omarchy-notes/releases/download/rust-v1.0.0/install.sh -o install.sh
+          <p>Download the current installer on x86_64 Arch/Omarchy, as your normal user:</p>
+<pre class="block">curl -fsSL https://raw.githubusercontent.com/last-refuge/omarchy-notes/main/install.sh -o install.sh
 less install.sh
-bash install.sh --version rust-v1.0.0 --dry-run
-bash install.sh --version rust-v1.0.0 --no-quick-note</pre>
-          <p class="note">The current installer installs Omarchy Notes and needs no edition selector. Older edition-aware installers require <code>--edition rust</code>. Checksums and package identity are verified before pacman installation. Run it again to update; data is retained. Binary/package remains <code>omarchy-notes-rust</code>, desktop ID <code>org.omarchy.Notes.Rust</code>.</p>
+bash install.sh --dry-run
+bash install.sh --no-quick-note</pre>
+          <p class="note">Older published <code>rust-v1.0.0</code> artifacts still have the old <code>omarchy-notes-rust</code> package name. The new installer requires a newly named <code>omarchy-notes</code> release package; no published release has been modified.</p>
+          <p class="note">The current installer installs Omarchy Notes and needs no edition selector. Older edition-aware installers require <code>--edition rust</code>. Checksums and package identity are verified before pacman installation. Run it again to update; data is retained. The Arch package is now <code>omarchy-notes</code>. This is a package-only rename: binary <code>omarchy-notes-rust</code>, desktop ID <code>org.omarchy.Notes.Rust</code>, profile/runtime paths and <code>rust-vVERSION</code> tags are unchanged. New source archives are <code>omarchy-notes-VERSION.tar.gz</code>.</p>
         </div>
         <div class="step">
           <h3>Open and capture</h3>

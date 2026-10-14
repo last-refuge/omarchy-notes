@@ -6,8 +6,14 @@ publication instructions.
 
 Use [Building and installing Omarchy Notes](rust-release.md) for candidate
 source preparation, Arch packaging, installer verification and release freeze.
-The package/executable remains `omarchy-notes-rust`, desktop ID remains
-`org.omarchy.Notes.Rust`, and release tags remain `rust-vVERSION`.
+The Arch package is now `omarchy-notes`; the executable remains
+`omarchy-notes-rust`. This package-only rename leaves desktop ID
+`org.omarchy.Notes.Rust`, profile/runtime paths and `rust-vVERSION` tags unchanged.
+New source archives are `omarchy-notes-VERSION.tar.gz`.
+
+Older published `rust-v1.0.0` artifacts still have the `omarchy-notes-rust`
+package name. The new installer requires a newly named `omarchy-notes` release
+package; no published release has been modified.
 Do not reuse the retired Qt `vVERSION` tags or replace published archives.
 
 See [release identity](rust-edition.md), [dependency notices](rust-v1-dependency-inventory.md)

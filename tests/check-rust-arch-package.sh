@@ -3,30 +3,30 @@
 set -euo pipefail
 package_dir="$(realpath "${1:?usage: check-rust-arch-package.sh PACKAGE_DIRECTORY}")"
 shopt -s nullglob
-packages=("$package_dir"/omarchy-notes-rust-[0-9]*-x86_64.pkg.tar.zst)
+packages=("$package_dir"/omarchy-notes-[0-9]*-x86_64.pkg.tar.zst)
 [[ ${#packages[@]} == 1 ]] || { echo 'Expected one Rust application package' >&2; exit 1; }
 package=${packages[0]}
 identity=$(pacman -Qp "$package")
-[[ $identity == omarchy-notes-rust\ * ]] || { echo 'Wrong Rust package identity' >&2; exit 1; }
+[[ $identity == omarchy-notes\ * ]] || { echo 'Wrong Rust package identity' >&2; exit 1; }
 work_dir=$(mktemp -d)
 trap 'rm -rf "$work_dir"' EXIT
 namcap "$package_dir/PKGBUILD" "$package" | tee "$work_dir/namcap.log"
 if rg -q ' E: |^Error:|^Traceback ' "$work_dir/namcap.log"; then echo 'namcap reported Rust packaging errors' >&2; exit 1; fi
 bsdtar -xf "$package" -C "$work_dir"
 for path in usr/bin/omarchy-notes-rust usr/bin/omarchy-notes-preview \
-  usr/share/licenses/omarchy-notes-rust/LICENSE \
-  usr/share/licenses/omarchy-notes-rust/ASSET-NOTICES.md \
-  usr/share/licenses/omarchy-notes-rust/GPUI-LICENSE \
-  usr/share/licenses/omarchy-notes-rust/FONT-OFL.txt \
-  usr/share/licenses/omarchy-notes-rust/ACCESSKIT-LICENSE-APACHE \
-  usr/share/licenses/omarchy-notes-rust/ACCESSKIT-LICENSE-MIT \
-  usr/share/licenses/omarchy-notes-rust/dependencies/inventory.json \
+  usr/share/licenses/omarchy-notes/LICENSE \
+  usr/share/licenses/omarchy-notes/ASSET-NOTICES.md \
+  usr/share/licenses/omarchy-notes/GPUI-LICENSE \
+  usr/share/licenses/omarchy-notes/FONT-OFL.txt \
+  usr/share/licenses/omarchy-notes/ACCESSKIT-LICENSE-APACHE \
+  usr/share/licenses/omarchy-notes/ACCESSKIT-LICENSE-MIT \
+  usr/share/licenses/omarchy-notes/dependencies/inventory.json \
   usr/share/applications/org.omarchy.Notes.Rust.desktop \
   usr/share/icons/hicolor/scalable/apps/org.omarchy.Notes.Rust.svg \
   usr/share/metainfo/org.omarchy.Notes.Rust.metainfo.xml \
   usr/share/man/man1/omarchy-notes-rust.1.gz \
-  usr/share/doc/omarchy-notes-rust/SOURCE_REVISION \
-  usr/share/doc/omarchy-notes-rust/RELEASE_KIND; do
+  usr/share/doc/omarchy-notes/SOURCE_REVISION \
+  usr/share/doc/omarchy-notes/RELEASE_KIND; do
   [[ -s $work_dir/$path ]] || { echo "Missing Rust package file: $path" >&2; exit 1; }
 done
 [[ ! -e $work_dir/usr/bin/omarchy-notes && ! -e $work_dir/usr/share/applications/org.omarchy.Notes.desktop ]]
@@ -36,7 +36,7 @@ fi
 rg -q '^exec /usr/bin/omarchy-notes-rust "\$@"$' "$work_dir/usr/bin/omarchy-notes-preview"
 desktop-file-validate "$work_dir/usr/share/applications/org.omarchy.Notes.Rust.desktop"
 appstreamcli validate --no-net "$work_dir/usr/share/metainfo/org.omarchy.Notes.Rust.metainfo.xml"
-python3 - "$work_dir/usr/share/doc/omarchy-notes-rust" "$work_dir/usr/share/licenses/omarchy-notes-rust/dependencies/inventory.json" <<'PY'
+python3 - "$work_dir/usr/share/doc/omarchy-notes" "$work_dir/usr/share/licenses/omarchy-notes/dependencies/inventory.json" <<'PY'
 import json, re, sys
 from pathlib import Path
 doc = Path(sys.argv[1])

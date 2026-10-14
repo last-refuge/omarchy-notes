@@ -4,11 +4,13 @@ Omarchy Notes is a Rust-only app. Qt is retired and relevant only to legacy data
 migration. Historical rebuild plans and ADRs record earlier decisions; their Qt
 support and installer-default statements are not current policy.
 
-## Unchanged identity
+## Package rename and unchanged app identity
 
 | Identity | Omarchy Notes |
 |---|---|
-| Arch package / executable | `omarchy-notes-rust` |
+| Arch package | `omarchy-notes` |
+| Executable | `omarchy-notes-rust` |
+| Source archive | `omarchy-notes-VERSION.tar.gz` |
 | Cargo application package | `omarchy-notes-preview` |
 | Desktop / AppStream ID | `org.omarchy.Notes.Rust` |
 | Release tag | `rust-v1.0.0` (future releases: `rust-vVERSION`) |
@@ -17,8 +19,8 @@ support and installer-default statements are not current policy.
 | Runtime instance directory | `$XDG_RUNTIME_DIR/omarchy-notes-rust` |
 | Advertised platform | x86_64 Arch/Omarchy, Wayland/Hyprland |
 
-The XDG fallbacks are `~/.local/share` and `~/.config`. Retirement does not rename
-profiles, binaries or packages. The installed `omarchy-notes-preview` compatibility
+The XDG fallbacks are `~/.local/share` and `~/.config`. The rename is package-only:
+binaries, app IDs, profile/runtime paths and release tags are unchanged. The installed `omarchy-notes-preview` compatibility
 launcher executes `omarchy-notes-rust` with the same arguments and exit status,
 never Qt. An older manual preview earlier on `PATH` can shadow it; inspect and move
 that specific old executable aside rather than deleting profiles.
@@ -26,8 +28,13 @@ that specific old executable aside rather than deleting profiles.
 The current installer installs Omarchy Notes and needs no edition selector.
 Older edition-aware installers require `--edition rust`. Use Rust tags, not the retired `v1.0.0` tag.
 Checksums, assets, package metadata and the package-owned executable must match
-Rust identity. The package does not provide or conflict with the former
-`omarchy-notes` package; retirement is not an automatic package or data replacement.
+Rust identity. The new Arch recipe replaces and conflicts with the old
+`omarchy-notes-rust` package. Reusing the retired Qt package name does not select
+or migrate Qt data.
+
+Older published `rust-v1.0.0` artifacts still use the old `omarchy-notes-rust`
+package name. The new installer requires a newly named `omarchy-notes` release
+package; no published release has been modified.
 See [installation and release instructions](rust-release.md).
 
 ## Scope and evidence

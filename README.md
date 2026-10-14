@@ -51,18 +51,23 @@ On Omarchy or Arch Linux, run:
 curl -fsSL https://raw.githubusercontent.com/last-refuge/omarchy-notes/main/install.sh | bash
 ```
 
-This installs the latest stable Omarchy Notes release. There is only one app;
+This installs the latest stable Omarchy Notes release with the new package name.
+**Release compatibility:** Older published `rust-v1.0.0` artifacts still use the
+`omarchy-notes-rust` package name. The new installer requires a newly named
+`omarchy-notes` release package; no published release has been modified. There is only one app;
 no edition selector is needed. The installer verifies the release checksum and
 package identity, then uses pacman. You can [inspect the script](install.sh)
 before running it. Open **Omarchy Notes** from your launcher, or run
 `omarchy-notes-rust`. The `omarchy-notes-preview` compatibility launcher forwards
 to Rust; an older manual preview earlier on `PATH` may need moving aside.
-The binary and Arch package remain `omarchy-notes-rust`, and the desktop ID remains
-`org.omarchy.Notes.Rust`.
+The Arch package is now `omarchy-notes`. This is a package-only rename: the
+binary remains `omarchy-notes-rust`, the desktop ID remains
+`org.omarchy.Notes.Rust`, and profile paths and `rust-vVERSION` tags are unchanged.
+New source archives are named `omarchy-notes-VERSION.tar.gz`.
 
 Run the installer again to update, then close and reopen the app normally.
 Downloads do not silently fall back to source builds. Removing the package with
-`sudo pacman -R omarchy-notes-rust` retains your notes and preferences.
+`sudo pacman -R omarchy-notes` retains your notes and preferences.
 See the [build, install and recovery guide](docs/rust-release.md).
 
 ### Quick Note

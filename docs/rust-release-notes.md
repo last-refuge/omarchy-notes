@@ -10,15 +10,20 @@ inspection, safe restore into a new library and library opening.
 
 Install on x86_64 Arch/Omarchy. The current installer installs Omarchy Notes;
 older edition-aware installers require `--edition rust`.
+Older published `rust-v1.0.0` artifacts still use the old `omarchy-notes-rust`
+package name. The new installer requires a newly named `omarchy-notes` release
+package; no published release has been modified. For a release with the new package:
 
 ```sh
-bash install.sh --version rust-v1.0.0 --no-quick-note
+bash install.sh --version rust-vVERSION --no-quick-note
 ```
 
-The executable/package is `omarchy-notes-rust`, desktop identity is
+The Arch package is now `omarchy-notes`; the executable remains
+`omarchy-notes-rust`, desktop identity is
 `org.omarchy.Notes.Rust`, and the `omarchy-notes-preview` compatibility launcher
 forwards to Rust. Existing Rust notes/preferences remain at `omarchy-notes-gpui`.
-Retirement changes neither Rust package identity nor its historical profile paths.
+This is a package-only rename: app IDs, profile/runtime paths and `rust-vVERSION`
+tags are unchanged. New source archives are `omarchy-notes-VERSION.tar.gz`.
 
 Use copies and verified backups for retired Qt libraries; see [migration](migrating.md). Quotation/schema-3 libraries
 require Rust; return to Qt using the pre-upgrade backup, which excludes later
