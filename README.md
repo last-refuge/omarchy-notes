@@ -48,7 +48,7 @@ usability verification gaps.
 On Omarchy or Arch Linux, run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/last-refuge/omarchy-notes/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/last-refuge/omarchy-notes/main/install.sh | bash
 ```
 
 This installs the latest stable Omarchy Notes release. There is only one app;
