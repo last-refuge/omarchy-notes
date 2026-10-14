@@ -182,7 +182,7 @@ fn mime(name: &str, bytes: &[u8]) -> String {
     }
 }
 pub(super) fn attachment(db: &Connection, id: &str) -> Result<Attachment> {
-    db.query_row("SELECT id,blob_hash,file_name,mime_type,size FROM attachments WHERE id=?1",[id],|r|Ok(Attachment{id:r.get(0)?,hash:r.get(1)?,name:r.get(2)?,mime:r.get(3)?,size:r.get(4)?})).optional()?.context("This selection references an attachment that is unavailable in this library. Copy it from a Rust edition with portable media, or attach the file.")
+    db.query_row("SELECT id,blob_hash,file_name,mime_type,size FROM attachments WHERE id=?1",[id],|r|Ok(Attachment{id:r.get(0)?,hash:r.get(1)?,name:r.get(2)?,mime:r.get(3)?,size:r.get(4)?})).optional()?.context("This selection references an attachment that is unavailable in this library. Copy it from Omarchy Notes with portable media, or attach the file.")
 }
 fn readonly(root: &Path) -> Result<Connection> {
     Ok(Connection::open_with_flags(

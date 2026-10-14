@@ -173,7 +173,7 @@ fn run_inner(
                     },
                     |window, cx| {
                         if let Some((root, worker, library, receiver)) = library {
-                            window.set_window_title("Omarchy Notes — Rust edition");
+                            window.set_window_title("Omarchy Notes");
                             cx.new(|cx| {
                                 let mut shell = shell::Shell::new_live(
                                     appearance, root, worker, library, window, cx,

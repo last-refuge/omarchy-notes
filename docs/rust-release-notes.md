@@ -1,14 +1,14 @@
-# Omarchy Notes Rust 1.0.0
+# Omarchy Notes 1.0.0
 
 Omarchy Notes is now Rust-only; Qt is retired and retained only as a legacy
-migration reference. The Rust 1.0 app provides offline notes with rich writing,
+migration reference. Version 1.0 provides offline notes with rich writing,
 Quick Note and durable command-line capture, nested keyboard-accessible folders,
 pinning, three sort modes, prefix search and snippets, duplication, Recently
 Deleted, Undo and recovery. Settings provides reviewed Markdown/text import,
 Markdown/HTML/PDF note export, library Markdown plus assets, exact backups,
 inspection, safe restore into a new library and library opening.
 
-Install on x86_64 Arch/Omarchy. The current installer installs Rust by default;
+Install on x86_64 Arch/Omarchy. The current installer installs Omarchy Notes;
 older edition-aware installers require `--edition rust`.
 
 ```sh

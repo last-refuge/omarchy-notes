@@ -21,6 +21,10 @@ def check(directory):
         run("qpdf", "--check", str(pdf))
         structure = json.loads(run("qpdf", "--json", str(pdf)))
         assert not structure["attachments"], "Attachment labels must not embed files"
+        creators = [obj.get("value", {}).get("/Creator")
+                    for obj in structure["qpdf"][1].values()
+                    if isinstance(obj.get("value"), dict) and "/Creator" in obj["value"]]
+        assert creators == ["u:Omarchy Notes"], creators
         text = run("pdftotext", "-layout", str(pdf), "-")
         compact = re.sub(r"\s+", "", text)
         fonts = run("pdffonts", str(pdf)).splitlines()[2:]

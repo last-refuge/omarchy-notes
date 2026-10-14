@@ -1,4 +1,4 @@
-# Building and installing Omarchy Notes (Rust)
+# Building and installing Omarchy Notes
 
 The Rust workspace is **1.0.0**, released at the owner's direction on
 13 October 2026. The evidence ledger distinguishes completed checks from
@@ -51,7 +51,7 @@ rendering needs a working driver for the machine's GPU. A portal backend must
 provide its file chooser; Omarchy commonly supplies Hyprland integration with
 a GTK chooser. X11 and other architectures remain unadvertised until tested.
 
-The recipe installs the app, preview compatibility launcher, Rust desktop
+The recipe installs the app, preview compatibility launcher, desktop
 actions, distinct icon, AppStream metadata and man page. It also installs the
 repository, bundled asset/font, GPUI and vendored AccessKit license texts.
 It collects declaration/provenance and packaged license/notice texts from the
@@ -66,8 +66,8 @@ this list does not claim that audit is complete.
 
 ## Published installer route
 
-After a Rust release is actually published, download and inspect its installer
-before running it. The current installer installs Rust by default and needs no
+After a release is actually published, download and inspect its installer
+before running it. The current installer installs Omarchy Notes and needs no
 edition selector. Older edition-aware installers require `--edition rust`.
 
 ```sh
@@ -94,16 +94,16 @@ not delete manual copies.
 
 ## Quick Note
 
-Choose **Rust Quick Note** from the Rust desktop launcher's actions, run
-`omarchy-notes-rust --quick-note`, or use Ctrl+Shift+N inside Rust. For a
+Choose **Quick Note** from the **Omarchy Notes** desktop launcher's actions, run
+`omarchy-notes-rust --quick-note`, or use Ctrl+Shift+N inside the app. For a
 compositor binding, choose an unused key such as Super+Alt+Shift+N and execute
 `/usr/bin/omarchy-notes-rust --quick-note`; use `org.omarchy.Notes.Rust` when
 matching its windows. Do not overwrite a legacy binding during migration.
 Follow the configuration format used by your installed Omarchy
 version; Lua and native Hyprland configuration are not interchangeable.
 
-Rust does not currently implement automatic `--setup-hyprland`. The installer's
-Rust `--quick-note` option explains the desktop/manual route and makes no
+Omarchy Notes does not currently implement automatic `--setup-hyprland`. The installer's
+`--quick-note` option explains the desktop/manual route and makes no
 binding changes; it never invokes Qt's setup. Installed launcher, portal,
 floating-rule and shortcut behavior still require the supported-platform matrix.
 

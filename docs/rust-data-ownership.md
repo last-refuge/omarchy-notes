@@ -1,4 +1,4 @@
-# Rust notes: import, export and backups
+# Omarchy Notes: import, export and backups
 
 Omarchy Notes is Rust-only. Qt is retired; references to it below describe legacy
 migration compatibility, not current support.

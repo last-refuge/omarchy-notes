@@ -111,7 +111,7 @@ pub fn export(
             &title
         },
     )?;
-    surface.set_metadata(PdfMetadata::Creator, "Omarchy Notes — Rust edition")?;
+    surface.set_metadata(PdfMetadata::Creator, "Omarchy Notes")?;
     let canvas = Canvas::new(&surface)?;
     let mut engine = layout::Engine::new(root, &canvas, paper, cancel);
     let plan = engine.paginate(document)?;

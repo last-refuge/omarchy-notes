@@ -80,7 +80,7 @@ impl Message {
     fn validate(&self) -> Result<()> {
         ensure!(
             self.version == VERSION,
-            "Unsupported Rust instance protocol {}.",
+            "Unsupported Notes instance protocol {}.",
             self.version
         );
         validate_id(&self.request_id)?;
@@ -188,7 +188,7 @@ impl Endpoint {
             {
                 return Ok(None);
             }
-            Err(e) => return Err(e).context("Could not connect to the Rust library owner."),
+            Err(e) => return Err(e).context("Could not connect to the library owner."),
         };
         same_user(&stream)?;
         write_frame(&mut stream, &serde_json::to_vec(message)?, IO_TIMEOUT)?;
@@ -347,7 +347,7 @@ fn handle(
                     reply: tx,
                 };
                 match launches {
-                    None => Outcome::Unconfirmed { message: "This owner supports capture only. Open the Rust desktop app to receive window launches.".into() },
+                    None => Outcome::Unconfirmed { message: "This owner supports capture only. Open Omarchy Notes to receive window launches.".into() },
                     Some(sender) => match sender.try_send(launch) {
                         Err(_) => Outcome::Unconfirmed { message: "The app is busy or closing. This window request was not queued.".into() },
                         Ok(()) => match rx.recv_timeout(COMMIT_TIMEOUT) {

@@ -39,9 +39,25 @@ class RustReleaseTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("unrecognized arguments", result.stderr)
 
+    def test_app_labels_have_no_edition_branding(self):
+        for path in (
+            "crates/notes-ui/src/shell.rs",
+            "crates/notes-ui/src/lib.rs",
+            "crates/notes-ui/src/quick_note.rs",
+            "crates/omarchy-notes/src/main.rs",
+            "crates/notes-export/src/lib.rs",
+        ):
+            source = (ROOT / path).read_text().lower()
+            for label in ("rust edition", "(rust)", "rust quick note", "new rust note"):
+                self.assertNotIn(label, source, path)
+        for path in ("crates/notes-ui/src/lib.rs", "crates/notes-ui/src/quick_note.rs"):
+            self.assertIn('set_window_title("Omarchy Notes")', (ROOT / path).read_text())
+
     def test_metadata_names_and_current_preview_version_align(self):
         version = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["package"]["version"]
         component = ET.parse(ROOT / "packaging/metainfo/org.omarchy.Notes.Rust.metainfo.xml").getroot()
+        self.assertEqual(component.findtext("name"), "Omarchy Notes")
+        self.assertEqual(component.findtext("summary"), "Private local notes")
         self.assertEqual(component.findtext("id"), "org.omarchy.Notes.Rust")
         self.assertEqual(component.findtext("launchable"), "org.omarchy.Notes.Rust.desktop")
         self.assertEqual(component.findtext("provides/binary"), "omarchy-notes-rust")
@@ -49,13 +65,25 @@ class RustReleaseTests(unittest.TestCase):
         self.assertEqual(component.find("releases/release").get("type"), "development" if version.startswith("0.") else "stable")
         if os.environ.get("GITHUB_REF_TYPE") == "tag" and os.environ.get("GITHUB_REF_NAME", "").startswith("rust-v"):
             self.assertEqual(os.environ["GITHUB_REF_NAME"], f"rust-v{version}")
-        self.assertIn(f"omarchy-notes-rust {version}", (ROOT / "packaging/man/omarchy-notes-rust.1").read_text())
+        man = (ROOT / "packaging/man/omarchy-notes-rust.1").read_text()
+        self.assertIn(f"omarchy-notes-rust {version}", man)
+        self.assertIn("desktop launcher has a Quick Note action", man)
+        self.assertNotIn("Rust Quick Note", man)
         desktop = (ROOT / "packaging/desktop/org.omarchy.Notes.Rust.desktop").read_text()
+        self.assertIn("Name=Omarchy Notes\n", desktop)
+        self.assertIn("Name=New Note\n", desktop)
+        self.assertIn("Name=Quick Note\n", desktop)
+        self.assertIn("Comment=Private local notes\n", desktop)
+        self.assertNotIn("Rust edition", desktop)
+        self.assertNotIn("Rust Quick Note", desktop)
         self.assertIn("Exec=/usr/bin/omarchy-notes-rust\n", desktop)
         self.assertIn("StartupWMClass=org.omarchy.Notes.Rust", desktop)
+        self.assertIn("Icon=org.omarchy.Notes.Rust", desktop)
         self.assertIn("Exec=/usr/bin/omarchy-notes-rust --quick-note", desktop)
         recipe = (ROOT / "packaging/arch/PKGBUILD-rust.in").read_text()
         self.assertIn("pkgname=omarchy-notes-rust\n", recipe)
+        self.assertIn("pkgdesc='Omarchy Notes — private local notes", recipe)
+        self.assertNotIn("Rust edition", recipe)
         self.assertNotIn("conflicts=", recipe)
         self.assertNotIn("provides=", recipe)
         self.assertIn("arch=('x86_64')", recipe)

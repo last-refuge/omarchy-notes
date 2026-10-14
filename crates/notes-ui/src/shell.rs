@@ -627,7 +627,7 @@ impl Shell {
                                 if env!("CARGO_PKG_VERSION").starts_with("0.") {
                                     "EARLY ACCESS"
                                 } else {
-                                    "RUST EDITION"
+                                    "LOCAL NOTES"
                                 }
                             } else {
                                 "PREVIEW"
@@ -839,7 +839,7 @@ impl Shell {
             .child(
                 label(
                     if self.live.is_some() {
-                        "LOCAL LIBRARY · RUST EDITION"
+                        "LOCAL LIBRARY"
                     } else {
                         "SAMPLE LIBRARY · LOCAL PREVIEW"
                     },

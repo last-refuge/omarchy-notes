@@ -3,7 +3,7 @@
 pkgname=omarchy-notes-rust
 pkgver=@RUST_VERSION@
 pkgrel=1
-pkgdesc='Omarchy Notes Rust edition (early access; v1 acceptance pending)'
+pkgdesc='Omarchy Notes — private local notes (early access; v1 acceptance pending)'
 arch=('x86_64')
 url='https://lastrefuge.ai/projects/omarchy-notes'
 license=('MIT')

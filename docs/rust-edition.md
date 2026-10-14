@@ -1,4 +1,4 @@
-# Rust app: release identity and compatibility contract
+# Omarchy Notes: release identity and compatibility contract
 
 Omarchy Notes is a Rust-only app. Qt is retired and relevant only to legacy data
 migration. Historical rebuild plans and ADRs record earlier decisions; their Qt
@@ -6,7 +6,7 @@ support and installer-default statements are not current policy.
 
 ## Unchanged identity
 
-| Identity | Rust app |
+| Identity | Omarchy Notes |
 |---|---|
 | Arch package / executable | `omarchy-notes-rust` |
 | Cargo application package | `omarchy-notes-preview` |
@@ -23,7 +23,7 @@ launcher executes `omarchy-notes-rust` with the same arguments and exit status,
 never Qt. An older manual preview earlier on `PATH` can shadow it; inspect and move
 that specific old executable aside rather than deleting profiles.
 
-The current installer installs Rust by default and needs no edition selector.
+The current installer installs Omarchy Notes and needs no edition selector.
 Older edition-aware installers require `--edition rust`. Use Rust tags, not the retired `v1.0.0` tag.
 Checksums, assets, package metadata and the package-owned executable must match
 Rust identity. The package does not provide or conflict with the former
@@ -52,7 +52,7 @@ See the [release notes](rust-release-notes.md) and historical
 
 | Option | Behavior |
 |---|---|
-| `--help`, `--version` | Show Rust app help/version |
+| `--help`, `--version` | Show app help/version |
 | `--data-dir PATH` | Open a selected compatible library |
 | `--new`, `--note UUID` | Launch/forward a new or specific note |
 | `--quick-note` | Launch/forward Quick Note |
@@ -70,7 +70,7 @@ See [data ownership](rust-data-ownership.md) and the [writing guide](gpui-previe
 
 ## Keyboard routes
 
-| Action | Rust shortcut / route |
+| Action | Shortcut / route |
 |---|---|
 | New note / folder | Ctrl+N / Ctrl+Alt+N |
 | Quick Note / handoff to main | Ctrl+Shift+N / Ctrl+Shift+O |

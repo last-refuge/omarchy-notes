@@ -63,7 +63,7 @@ pub struct Saved {
 pub struct LibraryBusy;
 impl std::fmt::Display for LibraryBusy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("This library is locked by another Notes process. A Qt or unrecognised owner cannot receive Rust capture requests; close that edition first.")
+        f.write_str("This library is locked by another Notes process. An older or unrecognised owner cannot receive capture requests; close that app first.")
     }
 }
 impl std::error::Error for LibraryBusy {}

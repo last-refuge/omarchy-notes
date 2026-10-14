@@ -3,7 +3,7 @@
 The Rust v1 [release gates](../llm-docs/rust-v1-release-plan.md) require measured
 release builds, large fixtures, bounded memory, and native input-to-frame
 submission. Qt's [performance report](performance.md) is useful workload
-history; its results do not certify the Rust edition.
+history; its results do not certify the current app.
 
 ## Reproduce CPU and memory diagnostics
 

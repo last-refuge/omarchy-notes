@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
   <id>org.omarchy.Notes.Rust</id>
-  <name>Omarchy Notes (Rust)</name>
-  <summary>Private local notes, Rust edition</summary>
+  <name>Omarchy Notes</name>
+  <summary>Private local notes</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <description>
@@ -13,7 +13,7 @@
       <li>Quick Note and durable command-line capture</li>
       <li>Portable import/export and verified library backups</li>
     </ul>
-    <p>The Rust application retains its preview data directory. Legacy Qt libraries can be migrated from verified backup copies. Tags and Smart Folder interfaces are deferred; existing records remain preserved. Quotation libraries require Rust and returning to Qt uses a pre-upgrade backup.</p>
+    <p>The application retains its preview data directory. Legacy Qt libraries can be migrated from verified backup copies. Tags and Smart Folder interfaces are deferred; existing records remain preserved. Quotation libraries require the current app and returning to Qt uses a pre-upgrade backup.</p>
   </description>
   <launchable type="desktop-id">org.omarchy.Notes.Rust.desktop</launchable>
   <provides><binary>omarchy-notes-rust</binary></provides>
@@ -24,7 +24,7 @@
   <content_rating type="oars-1.1"/>
   <releases>
     <release version="1.0.0" date="2026-10-13" type="stable">
-      <description><p>First Rust release with rich writing, organization, recovery and data ownership workflows.</p></description>
+      <description><p>Version 1.0 release with rich writing, organization, recovery and data ownership workflows.</p></description>
     </release>
   </releases>
 </component>

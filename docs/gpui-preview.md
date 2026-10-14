@@ -1,4 +1,4 @@
-# Rust / GPUI writing and capture guide
+# Omarchy Notes writing and capture guide
 
 Omarchy Notes is Rust-only; Qt is retired and mentioned below only for legacy
 format migration. This guide retains incremental screenshots and verification
@@ -6,11 +6,11 @@ notes from development. Old milestone gates are historical, not current support
 policy. For current release scope and unverified acceptance items, see the
 [release notes](rust-release-notes.md).
 
-The Rust edition creates, edits and saves real notes with inline images,
+Omarchy Notes creates, edits and saves real notes with inline images,
 attachment cards, rich clipboard exchange and carefully typeset PDF export. It pairs a quiet,
 serif writing surface with graphite/champagne and warm-paper appearances,
 selection-aware formatting controls, focus mode and layouts down to 420 logical
-pixels. The current installer defaults to Rust. Retirement of Qt does not close
+pixels. The current installer installs Omarchy Notes. Retirement of Qt does not close
 the native/package or human usability verification gaps.
 
 ![Images and attachment cards in the real GPUI editor](images/gpui-media-dark.png)
@@ -119,7 +119,7 @@ the destination list and action button; Escape returns. Folder moves use the
 same chooser and exclude their own descendants. Saving waits for a durable
 acknowledgement; errors keep your input ready to correct and retry.
 
-![Nested folders in the Rust notebook](images/gpui-folders-dark.png)
+![Nested folders in the notebook](images/gpui-folders-dark.png)
 
 [Warm-paper creation](images/gpui-folders-light.png) ·
 [Compact filing](images/gpui-folders-small.png) ·
@@ -179,7 +179,7 @@ acts on selected text, or on the word when the caret is inside one. At a word
 boundary it changes what you type next. Reapplying the current list style returns
 it to body text. Mixed text marks expose a mixed accessible state.
 
-![Formatting options in the Rust editor](images/gpui-format-dark.png)
+![Formatting options in the editor](images/gpui-format-dark.png)
 
 [Warm paper](images/gpui-format-light.png) · [Compact panel](images/gpui-format-narrow.png) ·
 [Keyboard focus in a short window](images/gpui-format-small.png)
@@ -208,7 +208,7 @@ continues the quote; Return on an empty quote returns to ordinary prose.
 Shift+Return adds a soft break. **Format → Body** changes it back; undo restores
 the earlier structure. Quotations also work inside table cells.
 
-![Editable quotations in the Rust app](images/gpui-quotes-dark.png)
+![Editable quotations in Omarchy Notes](images/gpui-quotes-dark.png)
 
 [Warm paper](images/gpui-quotes-light.png) ·
 [Narrow window](images/gpui-quotes-narrow.png)
@@ -335,7 +335,7 @@ are currently retained; garbage collection/cache cleanup is still pending.
 On Wayland compositors offering **WLR data-control** (verified on Hyprland),
 copy offers Notes JSON, HTML and plain text together. A lone selected image also
 offers its original image MIME/bytes. Rich paste retains supported headings,
-marks, links, lists, tables, images and attachments. Between Rust editions,
+marks, links, lists, tables, images and attachments. Between current app instances,
 media travels with the selection, including across separate libraries;
 attachment IDs are reassigned to the destination note. Clipboard ownership
 lasts while the process is running unless the desktop clipboard manager retains it.

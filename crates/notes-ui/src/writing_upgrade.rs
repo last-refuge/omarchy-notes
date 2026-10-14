@@ -241,7 +241,7 @@ impl Shell {
             .when(!done,|d|d.child(div().mt(px(10.)).text_size(px(13.)).line_height(relative(1.6)).text_color(theme.muted)
                 .child("We’ll make and verify a complete copy of your saved library, then enable the new quote format. Your current draft stays here until it can be saved."))
                 .child(div().mt(px(8.)).text_size(px(12.)).line_height(relative(1.5)).text_color(theme.text)
-                .child("The Qt edition cannot open the upgraded library. Returning to Qt means restoring this earlier backup into a separate folder; later edits must be kept separately.")))
+                .child("Older versions cannot open the upgraded library. To use an older version, restore this earlier backup into a separate folder; keep later edits separately.")))
             .child(div().mt(px(12.)).text_size(px(11.)).text_color(theme.muted).child("PRE-UPGRADE BACKUP"))
             .child(div().id("quote-backup-path").role(Role::Label).aria_label(upgrade.destination.as_ref().map(|p|p.display().to_string()).unwrap_or_default())
                 .mt(px(4.)).p(px(10.)).rounded(px(6.)).bg(theme.editor).text_size(px(12.)).text_color(theme.text).overflow_x_hidden()

@@ -8,13 +8,13 @@ A native app built with **Rust and GPUI**. Rich notes stay on your machine,
 with no account required. Rust is the only maintained implementation.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Rust 1.0](https://img.shields.io/badge/Rust-1.0.0-2d4f8e?logo=rust)](https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.0.0)
+[![Release 1.0](https://img.shields.io/badge/release-1.0.0-2d4f8e)](https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.0.0)
 ![SQLite](https://img.shields.io/badge/SQLite-FTS5-003b57?logo=sqlite&logoColor=white)
 ![Wayland](https://img.shields.io/badge/Wayland-native-ffbc00)
 
-<img src="docs/images/rust-v1-writing-dark.png" alt="Omarchy Notes Rust 1.0 writing view in a dark theme" width="820">
+<img src="docs/images/rust-v1-writing-dark.png" alt="Omarchy Notes 1.0 writing view in a dark theme" width="820">
 
-[Download Rust 1.0](https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.0.0)
+[Download Omarchy Notes 1.0](https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.0.0)
 
 </div>
 
@@ -54,7 +54,7 @@ curl -fsSL https://raw.githubusercontent.com/last-refuge/omarchy-notes/master/in
 This installs the latest stable Omarchy Notes release. There is only one app;
 no edition selector is needed. The installer verifies the release checksum and
 package identity, then uses pacman. You can [inspect the script](install.sh)
-before running it. Open **Omarchy Notes (Rust)** from your launcher, or run
+before running it. Open **Omarchy Notes** from your launcher, or run
 `omarchy-notes-rust`. The `omarchy-notes-preview` compatibility launcher forwards
 to Rust; an older manual preview earlier on `PATH` may need moving aside.
 The binary and Arch package remain `omarchy-notes-rust`, and the desktop ID remains
@@ -67,7 +67,7 @@ See the [build, install and recovery guide](docs/rust-release.md).
 
 ### Quick Note
 
-Choose **Rust Quick Note** from the desktop launcher's actions, run
+Choose **Quick Note** from the desktop launcher's actions, run
 `omarchy-notes-rust --quick-note`, or press **Ctrl+Shift+N** inside the app.
 **Ctrl+Shift+O** moves Quick Note into the main window. Use a distinct, unused
 compositor binding if you want a global shortcut; automatic setup is unavailable.
@@ -93,15 +93,15 @@ See [migration](docs/migrating.md) and [data ownership](docs/rust-data-ownership
 
 ## Screenshots
 
-These are screenshots of the released Rust 1.0 application using a sample library.
+These are screenshots of the released Omarchy Notes 1.0 application using a sample library.
 
 | Light writing | Quick Note |
 |---|---|
-| [![Rust light writing](docs/images/rust-v1-writing-light.png)](docs/images/rust-v1-writing-light.png) | [![Rust Quick Note](docs/images/rust-v1-quick-note.png)](docs/images/rust-v1-quick-note.png) |
+| [![Light writing](docs/images/rust-v1-writing-light.png)](docs/images/rust-v1-writing-light.png) | [![Quick Note](docs/images/rust-v1-quick-note.png)](docs/images/rust-v1-quick-note.png) |
 | **Folders** | **Data and backups** |
-| [![Rust folders](docs/images/rust-v1-folders.png)](docs/images/rust-v1-folders.png) | [![Rust data and backups](docs/images/rust-v1-portability.png)](docs/images/rust-v1-portability.png) |
+| [![Folders](docs/images/rust-v1-folders.png)](docs/images/rust-v1-folders.png) | [![Data and backups](docs/images/rust-v1-portability.png)](docs/images/rust-v1-portability.png) |
 
-[![Rust Recently Deleted](docs/images/rust-v1-recovery.png)](docs/images/rust-v1-recovery.png)
+[![Recently Deleted](docs/images/rust-v1-recovery.png)](docs/images/rust-v1-recovery.png)
 
 ## Development
 

@@ -175,7 +175,7 @@ pub(super) fn ensure_main(
     let mut options = options(cx, false);
     options.focus = focus;
     let h = cx.open_window(options, |w, cx| {
-        w.set_window_title("Omarchy Notes — Rust edition");
+        w.set_window_title("Omarchy Notes");
         shell.update(cx, |s, cx| s.bind_main(w, cx));
         shell.clone()
     })?;

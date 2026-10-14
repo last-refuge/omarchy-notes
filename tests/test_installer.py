@@ -184,6 +184,8 @@ class InstallerTests(unittest.TestCase):
         result = self.run_installer("--yes")
         self.assert_success(result)
         self.assertIn("Application verified", result.stdout)
+        self.assertIn('then type "Omarchy Notes"', result.stdout)
+        self.assertNotIn("Omarchy Notes (Rust)", result.stdout)
         self.assertIn("pacman transaction visible", result.stdout)
         self.assertIn(str(self.root / "data/omarchy-notes-gpui"), result.stdout)
         self.assertEqual(len(self.mutations()), 1)
@@ -222,7 +224,7 @@ class InstallerTests(unittest.TestCase):
         for args, message in (((), "No interactive terminal"),
                               (("--version",), "requires a release tag"),
                               (("--version=", "--yes"), "requires a release tag"),
-                              (("--version", "../bad", "--yes"), "stable Rust release tag"),
+                              (("--version", "../bad", "--yes"), "stable release tag"),
                               (("--quick-note", "--no-quick-note"), "Choose either"),
                               (("--wat",), "Unknown option")):
             self.assert_failure(self.run_installer(*args), message)
@@ -305,6 +307,8 @@ class InstallerTests(unittest.TestCase):
         result = self.run_installer("--yes", "--quick-note")
         self.assert_success(result)
         self.assertIn("No bindings were changed", result.stdout)
+        self.assertIn("Quick Note is available", result.stdout)
+        self.assertNotIn("Rust Quick Note", result.stdout)
         self.assertEqual(self.calls("omarchy-notes-rust"), [["--version"], ["--version"]])
         self.assertEqual((self.root / "config/hypr/bindings.lua").read_text(), "-- sentinel binding\n")
 
@@ -365,7 +369,7 @@ class InstallerTests(unittest.TestCase):
 
     def test_legacy_tags_options_packages_and_architectures_are_refused(self):
         self.rust_release()
-        self.assert_failure(self.run_installer("--yes", "--version=v1.0.0"), "stable Rust release tag")
+        self.assert_failure(self.run_installer("--yes", "--version=v1.0.0"), "stable release tag")
         for edition in ("qt", "rust", "other"):
             self.assert_failure(self.run_installer("--yes", f"--edition={edition}"), "Unknown option")
         self.config["identity"] = "omarchy-notes 0.1.0-1"

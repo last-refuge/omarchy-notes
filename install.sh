@@ -12,8 +12,8 @@ Omarchy Notes installer. A place for your thoughts.
 Installs a verified release package on Omarchy or Arch Linux.
 Run again to update. Your notes and running application are kept.
 
-  --version TAG       select a published Rust release (for example rust-v1.0.0)
-  --source            build the selected Rust release with makepkg as your user
+  --version TAG       select a published release (for example rust-v1.0.0)
+  --source            build the selected release with makepkg as your user
   --yes, -y           accept package installation without confirmation
   --dry-run           inspect the release and show the plan without installing
   --quick-note        show manual Quick Note setup instructions
@@ -217,15 +217,15 @@ finish() {
     note "Use $binary for the package version; move the older copy aside when ready."
   fi
   (( alias_count == 1 )) && [[ -x $preview_alias ]] || die 'The package-owned preview compatibility launcher is missing or ambiguous.'
-  output=$("$preview_alias" --version </dev/null 2>>"$LOG") || die 'The preview compatibility launcher could not execute Rust.'
+  output=$("$preview_alias" --version </dev/null 2>>"$LOG") || die 'The preview compatibility launcher could not execute Omarchy Notes.'
   [[ $output == "$EXECUTABLE $VERSION" ]] || die "The preview compatibility launcher reports an unexpected version: $output."
   shadow=$(command -v omarchy-notes-preview || true)
   if [[ -n $shadow && $(readlink -f -- "$shadow") != "$(readlink -f -- "$preview_alias")" ]]; then
     warn "An older preview at $shadow takes precedence on PATH; move that specific copy aside when ready."
   fi
   if [[ $QUICK == yes ]]; then
-    note 'Rust Quick Note is available in the desktop launcher or with omarchy-notes-rust --quick-note.'
-    note 'Automatic Rust compositor setup is not implemented; use the distinct-key instructions in docs/rust-release.md. No bindings were changed.'
+    note 'Quick Note is available in the desktop launcher or with omarchy-notes-rust --quick-note.'
+    note 'Automatic compositor setup is not implemented; use the distinct-key instructions in docs/rust-release.md. No bindings were changed.'
   fi
   data=${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-notes-gpui
   [[ $data == /* ]] || data=$PWD/$data
@@ -261,8 +261,8 @@ main() {
     esac
     shift
   done
-  PACKAGE_NAME=omarchy-notes-rust; EXECUTABLE=omarchy-notes-rust; TAG_PREFIX=rust-v; DISPLAY_NAME='Omarchy Notes (Rust)'
-  [[ -z $TAG || $TAG =~ ^${TAG_PREFIX}[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "--version must be a stable Rust release tag such as ${TAG_PREFIX}1.0.0."
+  PACKAGE_NAME=omarchy-notes-rust; EXECUTABLE=omarchy-notes-rust; TAG_PREFIX=rust-v; DISPLAY_NAME='Omarchy Notes'
+  [[ -z $TAG || $TAG =~ ^${TAG_PREFIX}[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "--version must be a stable release tag such as ${TAG_PREFIX}1.0.0."
   HAVE_TTY=0
   if ( : </dev/tty ) 2>/dev/null; then HAVE_TTY=1; fi
   if (( ! DRY )); then
@@ -274,7 +274,7 @@ main() {
   if [[ -d /usr/share/omarchy ]] || command -v omarchy >/dev/null 2>&1; then IS_OMARCHY=1; fi
   [[ -f /etc/arch-release ]] || die 'This installer supports Omarchy and Arch Linux. See the README for a Cargo build.'
   ARCH=$(uname -m)
-  [[ $ARCH == x86_64 ]] || die "Unsupported architecture: $ARCH. Rust currently supports x86_64 only."
+  [[ $ARCH == x86_64 ]] || die "Unsupported architecture: $ARCH. Omarchy Notes currently supports x86_64 only."
   local tool
   for tool in curl sha256sum pacman setsid mktemp awk sed tail readlink python3; do
     command -v "$tool" >/dev/null || die "Missing prerequisite: $tool. Install it and try again."
@@ -350,7 +350,7 @@ PY
     fi
     if (( SOURCE )) || [[ $installed != "$PACKAGE_NAME $PACKAGE_VERSION" ]]; then note 'Would run sudo pacman -U <verified-package>.'; fi
     note 'Would verify the package-owned executable with --version.'
-    if [[ $QUICK == yes ]]; then note 'Would show the Rust desktop Quick Note action and manual distinct-key setup instructions.'; fi
+    if [[ $QUICK == yes ]]; then note 'Would show the desktop Quick Note action and manual distinct-key setup instructions.'; fi
     printf '\n'; return 0
   fi
   if (( SOURCE )) || [[ $installed != "$PACKAGE_NAME $PACKAGE_VERSION" ]]; then

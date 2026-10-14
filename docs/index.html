@@ -221,7 +221,7 @@
       <p class="soon">x86_64 Arch/Omarchy · Wayland/Hyprland. Qt is retired; <a href="migrating.md">legacy migration</a> only.</p>
       <div class="shot">
         <img src="images/rust-v1-writing-dark.png"
-             alt="Omarchy Notes Rust 1.0 dark writing view">
+             alt="Omarchy Notes 1.0 dark writing view">
       </div>
     </div>
 
@@ -249,11 +249,11 @@
       </div>
       <div class="themes">
         <figure>
-          <img src="images/rust-v1-writing-light.png" loading="lazy" alt="Rust writing view in a light palette">
+          <img src="images/rust-v1-writing-light.png" loading="lazy" alt="Writing view in a light palette">
           <figcaption>Light writing</figcaption>
         </figure>
         <figure>
-          <img src="images/rust-v1-quick-note.png" loading="lazy" alt="Rust Quick Note window">
+          <img src="images/rust-v1-quick-note.png" loading="lazy" alt="Quick Note window">
           <figcaption>Quick Note</figcaption>
         </figure>
       </div>
@@ -284,16 +284,16 @@
       <div class="install">
         <div class="step">
           <h3>Download and inspect</h3>
-          <p>Use the published <a href="https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.0.0">Rust 1.0 release</a> installer on x86_64 Arch/Omarchy, as your normal user:</p>
+          <p>Use the published <a href="https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.0.0">Omarchy Notes 1.0 release</a> installer on x86_64 Arch/Omarchy, as your normal user:</p>
 <pre class="block">curl -fsSL https://github.com/last-refuge/omarchy-notes/releases/download/rust-v1.0.0/install.sh -o install.sh
 less install.sh
 bash install.sh --version rust-v1.0.0 --dry-run
 bash install.sh --version rust-v1.0.0 --no-quick-note</pre>
-          <p class="note">The current installer installs Rust by default and needs no edition selector. Older edition-aware installers require <code>--edition rust</code>. Checksums and package identity are verified before pacman installation. Run it again to update; data is retained. Binary/package remains <code>omarchy-notes-rust</code>, desktop ID <code>org.omarchy.Notes.Rust</code>.</p>
+          <p class="note">The current installer installs Omarchy Notes and needs no edition selector. Older edition-aware installers require <code>--edition rust</code>. Checksums and package identity are verified before pacman installation. Run it again to update; data is retained. Binary/package remains <code>omarchy-notes-rust</code>, desktop ID <code>org.omarchy.Notes.Rust</code>.</p>
         </div>
         <div class="step">
           <h3>Open and capture</h3>
-          <p>Search your launcher for <b>Omarchy Notes (Rust)</b>. Use its <b>Rust Quick Note</b> action, <code>omarchy-notes-rust --quick-note</code>, or <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>N</kbd> in the app. A global shortcut needs a manual unused compositor binding; automatic setup is not implemented.</p>
+          <p>Search your launcher for <b>Omarchy Notes</b>. Use its <b>Quick Note</b> action, <code>omarchy-notes-rust --quick-note</code>, or <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>N</kbd> in the app. A global shortcut needs a manual unused compositor binding; automatic setup is not implemented.</p>
         </div>
         <div class="step">
           <h3>Build from source</h3>
