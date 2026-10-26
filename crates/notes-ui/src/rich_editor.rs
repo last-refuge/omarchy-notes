@@ -606,7 +606,19 @@ impl RichEditor {
         if let Some(layout) = &self.layout {
             let (p, h) = layout.caret(self.model.global(&self.model.selection.head));
             let x = *self.goal_x.get_or_insert(p.x);
-            let index = layout.index(point(x, p.y + if down { h + px(2.) } else { -px(2.) }));
+            // Step past paragraph spacing until the caret reaches another row.
+            let mut y = if down { p.y + h } else { p.y };
+            let index = loop {
+                y += if down { px(4.) } else { -px(4.) };
+                if y < -h || y > layout.height + h {
+                    break if down { layout.text_len } else { 0 };
+                }
+                let index = layout.index(point(x, y));
+                let row = layout.caret(index).0.y;
+                if if down { row > p.y } else { row < p.y } {
+                    break index;
+                }
+            };
             self.move_to(index, extend, window, cx);
         }
     }
