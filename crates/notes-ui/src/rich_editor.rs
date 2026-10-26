@@ -125,6 +125,8 @@ pub fn bind_keys(cx: &mut App) {
     // Linux reports shifted punctuation as the symbol with Shift consumed.
     keys!("ctrl-&"=>Numbered,"ctrl-*"=>Bullet);
     keys!("ctrl-shift-q"=>Quote);
+    // Omarchy tags org.omarchy.* windows as terminals, so Super+C/V arrive as Ctrl+Insert/Shift+Insert.
+    keys!("ctrl-insert"=>Copy,"shift-insert"=>Paste,"shift-delete"=>Cut);
     keys!("ctrl-home"=>DocumentHome,"ctrl-end"=>DocumentEnd,"ctrl-shift-home"=>SelectDocumentHome,"ctrl-shift-end"=>SelectDocumentEnd);
     keys!("ctrl-shift-k"=>LinkAddress,"ctrl-l"=>LinkNotePicker);
     cx.bind_keys([
