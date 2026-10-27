@@ -13,7 +13,7 @@ support and installer-default statements are not current policy.
 | Source archive | `omarchy-notes-VERSION.tar.gz` |
 | Cargo application package | `omarchy-notes-preview` |
 | Desktop / AppStream ID | `org.omarchy.Notes.Rust` |
-| Release tag | `rust-v1.0.1` (release pattern: `rust-vVERSION`) |
+| Release tag | `rust-v1.0.2` (release pattern: `rust-vVERSION`) |
 | Default library | `$XDG_DATA_HOME/omarchy-notes-gpui` |
 | Preferences | `$XDG_CONFIG_HOME/omarchy-notes-gpui/preferences.json` |
 | Runtime instance directory | `$XDG_RUNTIME_DIR/omarchy-notes-rust` |

@@ -1,6 +1,17 @@
-# Omarchy Notes 1.0.1
+# Omarchy Notes 1.0.2
 
-Version **1.0.1** fixes the packaging/install mismatch and completes the
+Version **1.0.2** fixes two editing problems:
+
+- Omarchy's universal copy, cut and paste shortcuts (Super+C, Super+X,
+  Super+V) now work in notes and search. Omarchy sends Ctrl+Insert and
+  Shift+Insert to Omarchy Notes windows, which are now accepted alongside
+  Ctrl+C/X/V, as is Shift+Delete.
+- Up and Down arrow keys move between paragraphs reliably instead of sticking
+  at paragraph boundaries.
+
+## Omarchy Notes 1.0.1
+
+Version **1.0.1** fixed the packaging/install mismatch and completed the
 Omarchy Notes branding cutover. Release `rust-v1.0.1` uses `omarchy-notes`
 packages and source/recipe archives. The updated installer cannot use the older
 named 1.0.0 packages.
@@ -18,10 +29,10 @@ Install on x86_64 Arch/Omarchy. The current installer installs Omarchy Notes;
 older edition-aware installers require `--edition rust`.
 Older published `rust-v1.0.0` artifacts still use the old `omarchy-notes-rust`
 package name. The new installer requires a newly named `omarchy-notes` release
-package; the older release has not been modified. Install 1.0.1 with:
+package; the older release has not been modified. Install 1.0.2 with:
 
 ```sh
-bash install.sh --version rust-v1.0.1 --no-quick-note
+bash install.sh --version rust-v1.0.2 --no-quick-note
 ```
 
 The Arch package is now `omarchy-notes`; the executable remains
@@ -46,7 +57,7 @@ not altered.
 ## Historical Rust 1.0.0 evidence
 
 The 1.0.0 build was released at the owner's direction on 13 October 2026.
-These historical checks do not certify the 1.0.1 artifacts.
+These historical checks do not certify the 1.0.1 or 1.0.2 artifacts.
 Recorded checks include 171 Rust tests, six dependency tests, full Qt regression
 and interchange checks, 18 GPU workflows, actual CJK composition and silent Orca
 processing, passing CPU budgets, verified dependency notices and a validated

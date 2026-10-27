@@ -5,6 +5,16 @@ All notable changes to Omarchy Notes are documented here. The project uses
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-10-26
+
+### Fixed
+
+- Clipboard: accept Ctrl+Insert, Shift+Insert and Shift+Delete. Omarchy tags
+  `org.omarchy.*` windows as terminals, so its universal Super+C/V shortcuts
+  arrive as these keys and previously did nothing in notes or search.
+- Up/Down arrow keys no longer stick at paragraph boundaries; the caret steps
+  past paragraph spacing and moves to the note start/end from the first/last line.
+
 ## [1.0.1] - 2026-10-13
 
 ### Fixed
@@ -55,6 +65,7 @@ All notable changes to Omarchy Notes are documented here. The project uses
 - Live Omarchy theme following with contrast correction.
 - Arch packaging with desktop entry, AppStream metadata and man page.
 
-[Unreleased]: https://github.com/last-refuge/omarchy-notes/compare/rust-v1.0.1...HEAD
+[Unreleased]: https://github.com/last-refuge/omarchy-notes/compare/rust-v1.0.2...HEAD
+[1.0.2]: https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.0.2
 [1.0.1]: https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.0.1
 [1.0.0]: https://github.com/last-refuge/omarchy-notes/releases/tag/v1.0.0
