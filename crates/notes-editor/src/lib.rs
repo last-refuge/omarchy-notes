@@ -6,6 +6,8 @@ mod links;
 pub use history::{HistoryUsage, MAX_HISTORY_BYTES, MAX_HISTORY_STEPS};
 pub use links::Link;
 #[cfg(test)]
+mod autoformat_tests;
+#[cfg(test)]
 mod format_tests;
 mod tables;
 pub use find::Find;
@@ -43,6 +45,12 @@ pub struct Editor {
     pub selection: Selection,
     pub revision: u64,
     pub marked: Option<Range<usize>>,
+    /// Whether the library can store quotes. Until it can, a typed `>` stays
+    /// text rather than making a note that cannot be saved.
+    pub quotes_enabled: bool,
+    /// Revision right after a typed marker was applied. Backspace takes the
+    /// formatting back while nothing has changed since; moving the caret ends it.
+    marker_undo: Option<u64>,
     typing: Span,
     history: history::History,
     composition: Option<Snapshot>,
@@ -66,6 +74,8 @@ impl Editor {
             },
             revision: 0,
             marked: None,
+            quotes_enabled: false,
+            marker_undo: None,
             typing: Span::text(""),
             history: history::History::default(),
             composition: None,
@@ -181,6 +191,7 @@ impl Editor {
         a.min(b)..a.max(b)
     }
     pub fn select(&mut self, byte: usize, extend: bool) {
+        self.marker_undo = None;
         self.selection.head = self.position(byte);
         if !extend {
             self.selection.anchor = self.selection.head.clone();
@@ -317,7 +328,63 @@ impl Editor {
         self.replace(range, text)?;
         self.last_typing = typing.then_some((time_ms, self.global(&self.selection.head)));
         self.record(before, coalesce);
+        if typing && text == " " {
+            self.apply_typed_marker();
+        }
         Ok(())
+    }
+    /// A typed space after a marker such as `*`, `1.`, `[]` or `##` at the start of
+    /// a paragraph applies the matching block style and removes the marker. The
+    /// conversion is its own history step, so Undo first restores the marker.
+    fn apply_typed_marker(&mut self) {
+        let head = self.selection.head.clone();
+        let Some(block) = self.document.block(&head.block) else {
+            return;
+        };
+        let text = block.text();
+        let Some(&(marker, style)) = TYPED_MARKERS
+            .iter()
+            .find(|(marker, _)| head.offset == marker.len() + 1 && text.starts_with(marker))
+        else {
+            return;
+        };
+        if text.as_bytes()[marker.len()] != b' ' || (style == "quote" && !self.quotes_enabled) {
+            return;
+        }
+        // Brackets also turn a list item into a checklist item; nothing else
+        // converts out of a styled block.
+        let convertible = match block.kind.as_str() {
+            "paragraph" => true,
+            "list" => style == "check" && block.string("list") != "check",
+            _ => false,
+        };
+        if !convertible {
+            return;
+        }
+        let indent = block.number("indent", 0);
+        let before = self.snapshot();
+        let block = self.document.block_mut(&head.block).unwrap();
+        block.spans = slice_spans(&block.spans, marker.len() + 1..text.len());
+        let was_list = block.kind == "list";
+        block.set_kind(style);
+        if was_list && indent > 0 {
+            block.attrs.insert("indent".into(), json!(indent));
+        }
+        if style == "quote" {
+            self.document.schema = 2;
+        }
+        // Set the caret directly, as `replace` does, to keep the typing format.
+        let start = Position {
+            block: head.block,
+            offset: 0,
+        };
+        self.selection = Selection {
+            anchor: start.clone(),
+            head: start,
+        };
+        self.last_typing = None;
+        self.record(before, false);
+        self.marker_undo = Some(self.revision);
     }
     pub fn enter(&mut self, soft: bool) -> Result<()> {
         if self.marked.is_some() {
@@ -330,12 +397,7 @@ impl Editor {
         if !soft && b.kind == "quote" && b.text().is_empty() && collapsed {
             b.set_kind("paragraph");
         } else if !soft && b.kind == "list" && b.text().is_empty() {
-            if b.number("indent", 0) > 0 {
-                b.attrs
-                    .insert("indent".into(), json!(b.number("indent", 0) - 1));
-            } else {
-                b.set_kind("paragraph");
-            }
+            leave_block(b);
         } else if soft {
             let range = self.range();
             let start = self.position(range.start);
@@ -361,7 +423,32 @@ impl Editor {
         if self.marked.is_some() {
             return Ok(());
         }
+        if !forward
+            && self.range().is_empty()
+            && self.marker_undo == Some(self.revision)
+            && self.history.can_undo()
+        {
+            // Backspace right after a typed marker was applied takes it back and
+            // restores the typed text, as in Google Docs and ProseMirror editors.
+            self.marker_undo = None;
+            self.undo();
+            return Ok(());
+        }
         let before = self.snapshot();
+        if !forward && self.range().is_empty() {
+            // Backspace at the start of a list item or quote leaves it instead
+            // of joining the previous block, as in other rich text editors.
+            let head = &self.selection.head;
+            if head.offset == 0
+                && let Some(block) = self.document.block_mut(&head.block)
+                && matches!(block.kind.as_str(), "list" | "quote")
+            {
+                leave_block(block);
+                self.last_typing = None;
+                self.record(before, false);
+                return Ok(());
+            }
+        }
         if self.range().is_empty() {
             self.move_horizontal(forward, true, false);
         }
@@ -816,6 +903,33 @@ pub fn slice_spans(spans: &[Span], range: Range<usize>) -> Vec<Span> {
         offset = end;
     }
     out
+}
+
+/// Markers that start a block style when followed by a typed space. Numbered
+/// lists have no start number, so only `1.` and `1)` qualify. A quote also needs
+/// `Editor::quotes_enabled`.
+const TYPED_MARKERS: [(&str, &str); 10] = [
+    ("*", "bullet"),
+    ("-", "bullet"),
+    ("1.", "ordered"),
+    ("1)", "ordered"),
+    ("[]", "check"),
+    ("[ ]", "check"),
+    ("#", "h1"),
+    ("##", "h2"),
+    ("###", "h3"),
+    (">", "quote"),
+];
+
+/// One step out of a list or quote: outdent a nested list item, otherwise make
+/// the block a paragraph.
+fn leave_block(block: &mut Block) {
+    let indent = block.number("indent", 0);
+    if block.kind == "list" && indent > 0 {
+        block.attrs.insert("indent".into(), json!(indent - 1));
+    } else {
+        block.set_kind("paragraph");
+    }
 }
 
 fn block_style(block: &Block, style: &str) -> bool {

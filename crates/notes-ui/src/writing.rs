@@ -273,6 +273,81 @@ pub fn writing_check(directory: &std::path::Path) -> anyhow::Result<()> {
         caret_block(&mut cx)? == 1,
         "Clicking beside the blank paragraph moved the caret to the next block."
     );
+    // Typed markers start block styles as in other rich text editors. The blank
+    // paragraph under the title becomes the first bullet; Enter continues a
+    // list and Backspace at the start of an item leaves it.
+    let shape = |cx: &mut HeadlessAppContext| {
+        handle.update(cx, |s, _, cx| {
+            let model = &editor_of(s).read(cx).model;
+            model
+                .document
+                .blocks
+                .iter()
+                .map(|b| match b.kind.as_str() {
+                    "list" => format!("{}:{}", b.string("list"), b.text()),
+                    "heading" => format!("h{}:{}", b.number("level", 0), b.text()),
+                    _ => format!("p:{}", b.text()),
+                })
+                .collect::<Vec<_>>()
+        })
+    };
+    type_text(&mut cx, handle, "* one")?;
+    super::visual_keys(&mut cx, handle.into(), "enter")?;
+    type_text(&mut cx, handle, "two")?;
+    let got = shape(&mut cx)?;
+    anyhow::ensure!(
+        got == ["h1:Title", "bullet:one", "bullet:two", "p:Body"],
+        "Typing \"* \" did not start a bullet list that Enter continues: {got:?}"
+    );
+    super::visual_keys(&mut cx, handle.into(), "home backspace")?;
+    let got = shape(&mut cx)?;
+    anyhow::ensure!(
+        got == ["h1:Title", "bullet:one", "p:two", "p:Body"],
+        "Backspace at the start of a bullet did not leave the list: {got:?}"
+    );
+    super::visual_keys(&mut cx, handle.into(), "end enter")?;
+    type_text(&mut cx, handle, "1. a")?;
+    super::visual_keys(&mut cx, handle.into(), "enter")?;
+    type_text(&mut cx, handle, "b")?;
+    super::visual_keys(&mut cx, handle.into(), "enter enter")?;
+    type_text(&mut cx, handle, "[] c")?;
+    super::visual_keys(&mut cx, handle.into(), "enter enter")?;
+    type_text(&mut cx, handle, "## h")?;
+    // Quotes need the upgraded library format, so in this library `> ` is text.
+    super::visual_keys(&mut cx, handle.into(), "enter")?;
+    type_text(&mut cx, handle, "> not a quote")?;
+    let got = shape(&mut cx)?;
+    anyhow::ensure!(
+        got == [
+            "h1:Title",
+            "bullet:one",
+            "p:two",
+            "ordered:a",
+            "ordered:b",
+            "check:c",
+            "h2:h",
+            "p:> not a quote",
+            "p:Body"
+        ],
+        "Typed numbered, checklist and heading markers did not convert: {got:?}"
+    );
+    handle.update(&mut cx, |s, _, cx| {
+        assert_eq!(editor_of(s).read(cx).model.document.schema, 1);
+    })?;
+    // Backspace right after a typed marker takes it back and restores the text.
+    super::visual_keys(&mut cx, handle.into(), "enter")?;
+    type_text(&mut cx, handle, "- ")?;
+    let got = shape(&mut cx)?;
+    anyhow::ensure!(
+        got[got.len() - 2] == "bullet:",
+        "Typing \"- \" did not start a bullet: {got:?}"
+    );
+    super::visual_keys(&mut cx, handle.into(), "backspace")?;
+    let got = shape(&mut cx)?;
+    anyhow::ensure!(
+        got[got.len() - 3..] == ["p:> not a quote", "p:- ", "p:Body"],
+        "Backspace after a typed marker did not restore it: {got:?}"
+    );
     // Back to the new note's initial state for the rest of the check.
     for _ in 0..100 {
         super::visual_keys(&mut cx, handle.into(), "ctrl-z")?;
@@ -730,6 +805,7 @@ impl Shell {
             return Some(editor.clone());
         }
         let library_id = live.root.to_string_lossy().to_string();
+        let quotes = live.schema >= 3;
         let body = session.note.body.clone();
         let state = session.view_state.take();
         let editor = cx.new(|cx| RichEditor::new(body, self.theme, library_id, window, cx));
@@ -738,6 +814,7 @@ impl Shell {
             size: self.preferences.session.value.note_size,
         };
         editor.update(cx, |e, cx| {
+            e.model.quotes_enabled = quotes;
             e.set_typography(typography, cx);
             if let Some(state) = state {
                 e.restore_view_state(state, cx);

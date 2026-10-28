@@ -193,6 +193,11 @@ impl Shell {
         match result {
             Ok(receipt) => {
                 live.schema = 3;
+                for s in live.notes.values() {
+                    if let Some(editor) = s.active_editor() {
+                        editor.update(cx, |e, _| e.model.quotes_enabled = true);
+                    }
+                }
                 live.upgrade.destination = Some(receipt.backup);
                 live.upgrade.message=Some("Quotes are enabled. Your draft will save automatically, and your pre-upgrade backup stays available below.".into());
                 live.message = None;

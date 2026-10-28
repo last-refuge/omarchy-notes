@@ -5,6 +5,21 @@ All notable changes to Omarchy Notes are documented here. The project uses
 
 ## [Unreleased]
 
+### Added
+
+- Live block formatting: typing a marker and a space at the start of a paragraph
+  applies the style immediately. `*` or `-` makes a bullet, `1.` or `1)` a
+  numbered list, `[]` or `[ ]` a checklist item (also from inside a list item)
+  and `#`, `##` or `###` a heading. `>` makes a quote once quotes are enabled
+  for the library; until then it stays text, so typing it can never leave a note
+  that needs the format upgrade before it can be saved. Enter continues a list or
+  quote and Enter on an empty item ends it. Undo first restores the typed marker.
+  Existing headings, quotes and lists are left alone.
+- Backspace at the start of a list item or quote now removes the formatting (one
+  indent level for a nested list item) instead of joining it to the line above.
+  Backspace right after a typed marker takes the formatting back and restores
+  the typed text, so `* ` can stay a literal asterisk.
+
 ### Fixed
 
 - Empty lines (such as the empty title of a new note) are now rows of their own

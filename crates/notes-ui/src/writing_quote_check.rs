@@ -102,6 +102,7 @@ pub fn quote_check(directory: &std::path::Path) -> anyhow::Result<()> {
         wait(&mut cx, h, |l| l.notes[&source.id].needs_upgrade)?;
         h.update(&mut cx, |s, w, cx| {
             assert_eq!(s.live.as_ref().unwrap().schema, 2);
+            assert!(!editor.read(cx).model.quotes_enabled);
             s.command(Command::UpgradePanel, w, cx);
         })?;
         draw(&mut cx, h)?;
@@ -191,6 +192,44 @@ pub fn quote_check(directory: &std::path::Path) -> anyhow::Result<()> {
             assert_eq!(doc.blocks[1].kind, "quote");
             assert!(doc.blocks[1].text().ends_with("One sentence at a time."));
             doc.validate().unwrap();
+        })?;
+        // Enabling quotes reaches the open editor: a typed "> " now starts a quote.
+        h.update(&mut cx, |_, w, cx| {
+            editor.update(cx, |e, cx| {
+                assert!(e.model.quotes_enabled);
+                e.edit(
+                    |e| {
+                        e.select(e.text().len(), false);
+                        e.enter(false)?;
+                        e.insert(">", 2)?;
+                        e.insert(" ", 2)?;
+                        e.insert("said", 2)
+                    },
+                    w,
+                    cx,
+                );
+                let doc = &e.model.document;
+                let last = doc.blocks.last().unwrap();
+                assert_eq!(
+                    (last.kind.as_str(), last.text().as_str()),
+                    ("quote", "said")
+                );
+                doc.validate().unwrap();
+                // Backspace at the start of a quote leaves it, keeping the text.
+                e.edit(
+                    |e| {
+                        e.select(e.text().len() - "said".len(), false);
+                        e.delete(false)
+                    },
+                    w,
+                    cx,
+                );
+                let last = e.model.document.blocks.last().unwrap();
+                assert_eq!(
+                    (last.kind.as_str(), last.text().as_str()),
+                    ("paragraph", "said")
+                );
+            })
         })?;
         // A full rich copy/paste retains the quote; one undo restores the note.
         super::super::visual_keys(&mut cx, h.into(), "ctrl-a ctrl-c end ctrl-v ctrl-z ctrl-s")?;
