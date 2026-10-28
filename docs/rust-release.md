@@ -1,8 +1,9 @@
 # Building and installing Omarchy Notes
 
-Version **1.0.2** is published as `rust-v1.0.2`, fixing Omarchy's universal
-clipboard shortcuts and Up/Down navigation across paragraphs. Version **1.0.1**
-fixed the renamed-package installer mismatch. Its checksummed
+Version **1.1.0** is published as `rust-v1.1.0`, adding live block formatting
+and fixing caret movement on empty lines. Version **1.0.2** fixed Omarchy's
+universal clipboard shortcuts and Up/Down navigation across paragraphs, and
+version **1.0.1** fixed the renamed-package installer mismatch. Its checksummed
 `omarchy-notes` package passed clean Arch build, metadata and install/remove
 checks. Hosted workspace, PDF, storage and installer checks also passed.
 
@@ -85,8 +86,8 @@ package; it cannot install those old artifacts. No published release has been
 modified. The published `rust-v1.0.1` release supplies the new package.
 
 ```sh
-bash install.sh --version rust-v1.0.2 --dry-run
-bash install.sh --version rust-v1.0.2 --no-quick-note
+bash install.sh --version rust-v1.1.0 --dry-run
+bash install.sh --version rust-v1.1.0 --no-quick-note
 ```
 
 The installer selects Rust releases by default. Its latest-release lookup

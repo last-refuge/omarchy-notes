@@ -1,6 +1,24 @@
-# Omarchy Notes 1.0.2
+# Omarchy Notes 1.1.0
 
-Version **1.0.2** fixes two editing problems:
+Version **1.1.0** formats as you type and fixes caret movement on empty lines:
+
+- Typing a marker and a space at the start of a paragraph applies the style
+  immediately: `*` or `-` for a bullet, `1.` or `1)` for a numbered list, `[]`
+  or `[ ]` for a checklist item (also from inside a list item) and `#` to `###`
+  for headings. Enter continues a list and Enter on an empty item ends it. Undo,
+  or Backspace straight away, takes the formatting back and keeps what you typed.
+- `>` starts a quote once quotes are enabled for the library (Ctrl+Shift+Q opens
+  the verified-backup upgrade). Until then it stays text, so typing it never
+  leaves a note that cannot be saved.
+- Backspace at the start of a list item or quote removes the formatting instead
+  of joining it to the line above.
+- Enter on an empty line, such as the empty title of a new note, moves the caret
+  down immediately. Up and Down no longer skip blank lines, and clicking beside
+  one no longer lands in the next paragraph.
+
+## Omarchy Notes 1.0.2
+
+Version **1.0.2** fixed two editing problems:
 
 - Omarchy's universal copy, cut and paste shortcuts (Super+C, Super+X,
   Super+V) now work in notes and search. Omarchy sends Ctrl+Insert and
@@ -29,10 +47,10 @@ Install on x86_64 Arch/Omarchy. The current installer installs Omarchy Notes;
 older edition-aware installers require `--edition rust`.
 Older published `rust-v1.0.0` artifacts still use the old `omarchy-notes-rust`
 package name. The new installer requires a newly named `omarchy-notes` release
-package; the older release has not been modified. Install 1.0.2 with:
+package; the older release has not been modified. Install 1.1.0 with:
 
 ```sh
-bash install.sh --version rust-v1.0.2 --no-quick-note
+bash install.sh --version rust-v1.1.0 --no-quick-note
 ```
 
 The Arch package is now `omarchy-notes`; the executable remains
@@ -57,7 +75,7 @@ not altered.
 ## Historical Rust 1.0.0 evidence
 
 The 1.0.0 build was released at the owner's direction on 13 October 2026.
-These historical checks do not certify the 1.0.1 or 1.0.2 artifacts.
+These historical checks do not certify the 1.0.1, 1.0.2 or 1.1.0 artifacts.
 Recorded checks include 171 Rust tests, six dependency tests, full Qt regression
 and interchange checks, 18 GPU workflows, actual CJK composition and silent Orca
 processing, passing CPU budgets, verified dependency notices and a validated

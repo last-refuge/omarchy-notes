@@ -5,6 +5,8 @@ All notable changes to Omarchy Notes are documented here. The project uses
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-28
+
 ### Added
 
 - Live block formatting: typing a marker and a space at the start of a paragraph
@@ -87,7 +89,8 @@ All notable changes to Omarchy Notes are documented here. The project uses
 - Live Omarchy theme following with contrast correction.
 - Arch packaging with desktop entry, AppStream metadata and man page.
 
-[Unreleased]: https://github.com/last-refuge/omarchy-notes/compare/rust-v1.0.2...HEAD
+[Unreleased]: https://github.com/last-refuge/omarchy-notes/compare/rust-v1.1.0...HEAD
+[1.1.0]: https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.1.0
 [1.0.2]: https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.0.2
 [1.0.1]: https://github.com/last-refuge/omarchy-notes/releases/tag/rust-v1.0.1
 [1.0.0]: https://github.com/last-refuge/omarchy-notes/releases/tag/v1.0.0
