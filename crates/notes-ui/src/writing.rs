@@ -193,6 +193,95 @@ pub fn writing_check(directory: &std::path::Path) -> anyhow::Result<()> {
         .save(directory.join("empty.png"))?;
     super::visual_keys(&mut cx, handle.into(), "ctrl-n")?;
     settle(&mut cx, handle)?;
+    // An empty block is shaped as a placeholder space. Keyboard and mouse
+    // navigation must still treat it as a row of its own.
+    let editor_of = |s: &Shell| {
+        let id = s.library.selected.clone().unwrap();
+        s.live.as_ref().unwrap().notes[&id].editor.clone().unwrap()
+    };
+    let caret = |cx: &mut HeadlessAppContext| {
+        handle.update(cx, |s, _, cx| {
+            editor_of(s).read(cx).caret_test_geometry().unwrap()
+        })
+    };
+    let caret_block = |cx: &mut HeadlessAppContext| {
+        handle.update(cx, |s, _, cx| {
+            let model = &editor_of(s).read(cx).model;
+            model
+                .document
+                .blocks
+                .iter()
+                .position(|b| b.id == model.selection.head.block)
+                .unwrap()
+        })
+    };
+    let title_row = caret(&mut cx)?.0.y;
+    super::visual_keys(&mut cx, handle.into(), "enter")?;
+    anyhow::ensure!(
+        caret(&mut cx)?.0.y > title_row,
+        "Enter on an empty title left the caret on the title row."
+    );
+    super::visual_keys(&mut cx, handle.into(), "ctrl-z")?;
+    anyhow::ensure!(
+        caret(&mut cx)?.0.y == title_row,
+        "Undo did not restore the title caret."
+    );
+    type_text(&mut cx, handle, "Title")?;
+    super::visual_keys(&mut cx, handle.into(), "enter enter")?;
+    type_text(&mut cx, handle, "Body")?;
+    anyhow::ensure!(caret_block(&mut cx)? == 2, "Typing left the body block.");
+    // The blank paragraph is a row of its own for arrow keys from a wide line.
+    super::visual_keys(&mut cx, handle.into(), "ctrl-home end down")?;
+    anyhow::ensure!(
+        caret_block(&mut cx)? == 1,
+        "Down from the title skipped the blank paragraph."
+    );
+    super::visual_keys(&mut cx, handle.into(), "down")?;
+    anyhow::ensure!(
+        caret_block(&mut cx)? == 2,
+        "Down did not leave the blank paragraph."
+    );
+    super::visual_keys(&mut cx, handle.into(), "up")?;
+    anyhow::ensure!(
+        caret_block(&mut cx)? == 1,
+        "Up from the body skipped the blank paragraph."
+    );
+    // Clicking beside the blank paragraph places the caret in it.
+    super::visual_keys(&mut cx, handle.into(), "up")?;
+    super::visual_keys(&mut cx, handle.into(), "down")?;
+    let (blank, height) = caret(&mut cx)?;
+    let click = blank + point(px(300.), height / 2.);
+    for event in [
+        PlatformInput::MouseDown(MouseDownEvent {
+            button: MouseButton::Left,
+            position: click,
+            modifiers: Modifiers::default(),
+            click_count: 1,
+            first_mouse: false,
+        }),
+        PlatformInput::MouseUp(MouseUpEvent {
+            button: MouseButton::Left,
+            position: click,
+            modifiers: Modifiers::default(),
+            click_count: 1,
+        }),
+    ] {
+        cx.update_window(handle.into(), |_, w, cx| w.dispatch_event(event, cx))?;
+    }
+    draw(&mut cx, handle)?;
+    anyhow::ensure!(
+        caret_block(&mut cx)? == 1,
+        "Clicking beside the blank paragraph moved the caret to the next block."
+    );
+    // Back to the new note's initial state for the rest of the check.
+    for _ in 0..100 {
+        super::visual_keys(&mut cx, handle.into(), "ctrl-z")?;
+    }
+    handle.update(&mut cx, |s, _, cx| {
+        let model = &editor_of(s).read(cx).model;
+        assert!(!model.can_undo());
+        assert_eq!(model.document.blocks.len(), 1);
+    })?;
     type_text(&mut cx, handle, "A quieter place to write")?;
     super::visual_keys(&mut cx, handle.into(), "enter")?;
     type_text(&mut cx, handle, "Make room for the next ")?;

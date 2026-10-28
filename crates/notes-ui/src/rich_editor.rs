@@ -309,6 +309,14 @@ impl RichEditor {
         self.profiling.get()
     }
     #[cfg(feature = "visual-tests")]
+    pub(crate) fn caret_test_geometry(&self) -> Option<(Point<Pixels>, Pixels)> {
+        let (point, height) = self
+            .layout
+            .as_ref()?
+            .caret(self.model.global(&self.model.selection.head));
+        Some((self.bounds.origin + point, height))
+    }
+    #[cfg(feature = "visual-tests")]
     pub(crate) fn layout_diagnostics(&self) -> shaped::LayoutDiagnostics {
         let mut stats = self.shape_cache.diagnostics();
         self.geometry_cache.diagnostics(&mut stats);
@@ -363,7 +371,7 @@ impl RichEditor {
                                     line.height,
                                 )
                                 .unwrap_or_else(|index| index)
-                                .min(line.line.len())
+                                .min(line.len)
                     },
                 );
                 let (point, _) = layout.caret(index);
@@ -1018,6 +1026,9 @@ struct Line {
     origin: Point<Pixels>,
     height: Pixels,
     start: usize,
+    /// Document bytes on this row. An empty block is shaped as one placeholder
+    /// space, so `line.len()` would overlap the next block's first index.
+    len: usize,
 }
 #[derive(Clone)]
 struct Object {
@@ -1062,7 +1073,7 @@ impl Layout {
                 + l.line
                     .closest_index_for_position(p - l.origin, l.height)
                     .unwrap_or_else(|i| i)
-                    .min(l.line.len())
+                    .min(l.len)
         })
     }
     fn caret(&self, index: usize) -> (Point<Pixels>, Pixels) {
@@ -1086,16 +1097,13 @@ impl Layout {
         let line = self
             .lines
             .iter()
-            .find(|l| index >= l.start && index <= l.start + l.line.len())
+            .find(|l| index >= l.start && index <= l.start + l.len)
             .or_else(|| self.lines.last());
         line.map_or((point(px(0.), px(0.)), px(30.)), |l| {
             (
                 l.origin
                     + l.line
-                        .position_for_index(
-                            index.saturating_sub(l.start).min(l.line.len()),
-                            l.height,
-                        )
+                        .position_for_index(index.saturating_sub(l.start).min(l.len), l.height)
                         .unwrap_or_default(),
                 l.height,
             )

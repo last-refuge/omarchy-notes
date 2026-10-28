@@ -365,6 +365,7 @@ pub(super) fn make_layout_cached(
             origin: line.origin + point(px(0.), y),
             height: line.height,
             start: line.start + global,
+            len: line.len,
         }));
         out.objects.extend(root.objects.iter().map(|object| {
             let mut object = object.clone();
@@ -721,6 +722,7 @@ fn shape_root(
                         origin: point(x + indent, y),
                         height,
                         start: *global + local,
+                        len: if text.is_empty() { 0 } else { len },
                     });
                     y += h;
                     local += len + 1;

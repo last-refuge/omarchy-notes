@@ -5,6 +5,13 @@ All notable changes to Omarchy Notes are documented here. The project uses
 
 ## [Unreleased]
 
+### Fixed
+
+- Empty lines (such as the empty title of a new note) are now rows of their own
+  for the caret: Enter moves to the new line immediately instead of after a
+  second Enter, the Up/Down arrows no longer skip a blank line, and clicking
+  beside a blank line no longer places the caret in the next paragraph.
+
 ## [1.0.2] - 2026-10-26
 
 ### Fixed
